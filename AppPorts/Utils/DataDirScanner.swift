@@ -278,13 +278,13 @@ actor DataDirScanner {
             let linkedDest = detectLinkedDestination(at: fullPath)
 
             var item = DataDirItem(
-                name: known.name,
+                name: known.name.localized,
                 path: fullPath,
                 type: .dotFolder,
                 priority: known.priority,
-                description: known.description,
+                description: known.description.localized,
                 isMigratable: known.isMigratable,
-                nonMigratableReason: known.nonMigratableReason
+                nonMigratableReason: known.nonMigratableReason?.localized
             )
             item.status = status
             item.linkedDestination = linkedDest
@@ -328,11 +328,11 @@ actor DataDirScanner {
                 let linkedDest = detectLinkedDestination(at: candidateURL)
 
                 var item = DataDirItem(
-                    name: "\(config.type.rawValue)：\(candidateURL.lastPathComponent)",
+                    name: "\(config.type.rawValue.localized): \(candidateURL.lastPathComponent)",
                     path: candidateURL,
                     type: config.type,
                     priority: config.priority,
-                    description: config.desc,
+                    description: config.desc.localized,
                     isMigratable: true
                 )
                 item.associatedAppName = appName

@@ -111,6 +111,10 @@ xattr -rd com.apple.quarantine /Applications/AppPorts.app
 
 欢迎提交 Issue 或 Pull Request！
 如果您发现翻译错误或有新的功能建议，请随时告诉我们。
+## AppPorts 的英雄💗  
+<a href="https://github.com/wzh4869/AppPorts/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=wzh4869/AppPorts" />
+</a>     
 
 ## 🔗 进阶存储管理
 

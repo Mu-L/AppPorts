@@ -1,6 +1,11 @@
 # 贡献指南 | Contributing Guide
 
-[简体中文](#简体中文) | [English](#english)
+[简体中文](#简体中文) | [English](#english)   
+# THANKS💗  
+<a href="https://github.com/wzh4869/AppPorts/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=wzh4869/AppPorts" />
+</a>
+
 
 ---
 

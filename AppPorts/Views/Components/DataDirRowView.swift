@@ -63,7 +63,7 @@ struct DataDirRowView: View {
                         .foregroundColor(.primary)
                         .monospacedDigit()
                 } else if item.status != "已链接" {
-                    Text("计算中...")
+                    Text("计算中...".localized)
                         .font(.system(size: 11))
                         .foregroundColor(.secondary.opacity(0.5))
                 }
@@ -109,7 +109,7 @@ struct DataDirRowView: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary.opacity(0.5))
-                .help(item.nonMigratableReason ?? "此目录不支持迁移")
+                .help((item.nonMigratableReason ?? "此目录不支持迁移").localized)
         } else if item.status == "已链接" {
             // 已链接：显示「还原」按钮
             Button(action: { onRestore(item) }) {
@@ -126,7 +126,7 @@ struct DataDirRowView: View {
                 )
             }
             .buttonStyle(.plain)
-            .help("将数据目录还原到本地")
+            .help("将数据目录还原到本地".localized)
         } else if item.status == "本地" {
             // 本地：显示「迁移」按钮
             Button(action: { onMigrate(item) }) {
@@ -143,7 +143,7 @@ struct DataDirRowView: View {
                 )
             }
             .buttonStyle(.plain)
-            .help("将数据目录迁移到外部存储")
+            .help("将数据目录迁移到外部存储".localized)
         }
     }
 
@@ -166,7 +166,7 @@ struct PriorityBadge: View {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
-            Text(priority.rawValue)
+            Text(priority.rawValue.localized)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(color)
         }

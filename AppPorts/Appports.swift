@@ -159,7 +159,7 @@ struct AppMoverApp: App {
                 
                 Divider()
                 
-                Text("当前大小: \(AppLogger.shared.getLogSizeString())")
+                Text(String(format: "当前大小: %@".localized, AppLogger.shared.getLogSizeString()))
                     .font(.caption)
                 
                 Button("清空日志".localized) {

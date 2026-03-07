@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+// MARK: - 贡献者数据
+
+/// 项目贡献者信息
+struct Contributor: Identifiable {
+    let id = UUID()
+    let name: String
+    let github: String
+    var url: String { "https://github.com/\(github)" }
+}
+
+private let contributors: [Contributor] = [
+    Contributor(name: "wzh4869", github: "wzh4869"),
+    Contributor(name: "sulimu2", github: "sulimu2"),
+]
+
 // MARK: - 关于界面
 
 /// 应用的"关于"弹窗界面
@@ -15,7 +30,8 @@ import SwiftUI
 /// - 🖼 应用图标和名称
 /// - 📌 当前版本号
 /// - 💬 感谢文案
-/// - 🔗 个人网站和 GitHub 项目链接
+/// - 👥 项目贡献者列表
+/// - 🔗 GitHub 项目链接
 ///
 /// ## 界面尺寸
 /// 固定尺寸：380 x 480 点
@@ -50,7 +66,7 @@ struct AboutView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
             
             // 3. 描述文案
             Text("感谢你使用本工具，外置硬盘拯救世界！".localized)
@@ -58,28 +74,32 @@ struct AboutView: View {
                 .multilineTextAlignment(.center)
                 .foregroundColor(.primary.opacity(0.9))
                 .padding(.horizontal)
-                .padding(.bottom, 20)
             
-            // 4. 链接区域 (垂直排列)
-            VStack(spacing: 12) {
-                LinkButton(
-                    title: "个人网站".localized,
-                    icon: "globe",
-                    url: "https://www.shimoko.com"
-                )
+            // 4. 贡献者区域
+            VStack(alignment: .leading, spacing: 8) {
+                Text("项目贡献者".localized)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
-
-                LinkButton(
-                    title: "项目地址".localized,
-                    icon: "terminal.fill",
-                    url: "https://github.com/wzh4869/AppPorts"
-                )
+                ForEach(contributors) { contributor in
+                    ContributorButton(contributor: contributor)
+                }
             }
+            .padding(.horizontal, 40)
+            .padding(.top, 4)
+            
+            // 5. 项目地址
+            LinkButton(
+                title: "项目地址".localized,
+                icon: "terminal.fill",
+                url: "https://github.com/wzh4869/AppPorts"
+            )
             .padding(.horizontal, 40)
             
             Spacer()
             
-            // 5. 关闭按钮
+            // 6. 关闭按钮
             Button("关闭".localized) {
                 dismiss()
             }
@@ -90,7 +110,51 @@ struct AboutView: View {
             
         }
         .padding(30)
-        .frame(width: 380, height: 480)
+        .frame(width: 380, height: 500)
+    }
+}
+
+// MARK: - 贡献者按钮组件
+
+/// 贡献者链接按钮
+struct ContributorButton: View {
+    let contributor: Contributor
+    @State private var isHovering = false
+    
+    var body: some View {
+        Link(destination: URL(string: contributor.url)!) {
+            HStack {
+                Image(systemName: "person.circle.fill")
+                    .frame(width: 20)
+                    .foregroundColor(.accentColor)
+                
+                Text(contributor.name)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Text("@\(contributor.github)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10))
+                    .opacity(0.5)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .foregroundColor(.primary)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.05))
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hover in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovering = hover
+            }
+        }
     }
 }
 

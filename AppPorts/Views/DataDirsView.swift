@@ -83,7 +83,7 @@ struct DataDirsView: View {
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
                 .disabled(isScanning)
-                .help("刷新列表")
+                .help("刷新列表".localized)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
@@ -154,7 +154,7 @@ struct DataDirsView: View {
                 if isScanning && dotFolderItems.isEmpty {
                     loadingView
                 } else if dotFolderItems.isEmpty {
-                    ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未发现已知工具目录")
+                    ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未发现已知工具目录".localized)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 4) {
@@ -206,7 +206,7 @@ struct DataDirsView: View {
                 Divider()
 
                 if localApps.isEmpty {
-                    ContentView.EmptyStateView(icon: "app.dashed", text: "无本地应用")
+                    ContentView.EmptyStateView(icon: "app.dashed", text: "无本地应用".localized)
                 } else {
                     let filteredApps = localApps.filter { !$0.isFolder }
                     ScrollView {
@@ -231,7 +231,7 @@ struct DataDirsView: View {
             VStack(spacing: 0) {
                 HStack {
                     if let app = selectedApp {
-                        Text("\(app.name.replacingOccurrences(of: ".app", with: "")) 的数据目录".localized)
+                        Text(String(format: "%@ 的数据目录".localized, app.name.replacingOccurrences(of: ".app", with: "")))
                     } else {
                         Text("请从左侧选择应用".localized)
                     }
@@ -309,15 +309,15 @@ struct DataDirsView: View {
         formatter.allowedUnits = [.useMB, .useGB]
 
         return HStack(spacing: 20) {
-            Label("\(items.count) 个目录", systemImage: "folder.fill")
+            Label(String(format: "%lld 个目录".localized, Int64(items.count)), systemImage: "folder.fill")
                 .foregroundColor(.secondary)
             if total > 0 {
-                Label(formatter.string(fromByteCount: total) + " 可释放", systemImage: "sparkles")
+                Label(formatter.string(fromByteCount: total) + " 可释放".localized, systemImage: "sparkles")
                     .foregroundColor(.accentColor)
                     .fontWeight(.medium)
             }
             if linked > 0 {
-                Label("\(linked) 个已链接", systemImage: "link.circle.fill")
+                Label(String(format: "%lld 个已链接".localized, Int64(linked)), systemImage: "link.circle.fill")
                     .foregroundColor(.green)
             }
             Spacer()
@@ -409,15 +409,15 @@ struct DataDirsView: View {
 
     private func askMigrate(_ item: DataDirItem) {
         guard let dest = externalDriveURL else {
-            errorMessage = "请先选择外部存储路径"
+            errorMessage = "请先选择外部存储路径".localized
             showError = true
             return
         }
 
         let destPath = dest.appendingPathComponent(item.type.rawValue).appendingPathComponent(item.path.lastPathComponent)
-        let sizeInfo = item.size.map { "，大小约 \($0)" } ?? ""
+        let sizeInfo = item.size.map { "，大小约 \($0)".localized } ?? ""
 
-        confirmTitle = "迁移数据目录"
+        confirmTitle = "迁移数据目录".localized
         confirmMessage = """
         将「\(item.name)」迁移到外部存储\(sizeInfo)。
 
@@ -433,7 +433,7 @@ struct DataDirsView: View {
     private func askRestore(_ item: DataDirItem) {
         let linkedDest = item.linkedDestination?.path ?? "（未知）"
 
-        confirmTitle = "还原数据目录"
+        confirmTitle = "还原数据目录".localized
         confirmMessage = """
         将「\(item.name)」从外部存储还原到本地。
 
@@ -449,7 +449,7 @@ struct DataDirsView: View {
     // MARK: - 执行操作
 
     private func performMigrate(_ item: DataDirItem, to dest: URL) {
-        progressTitle = "正在迁移「\(item.name)」"
+        progressTitle = String(format: "正在迁移「%@」".localized, item.name)
         showProgress = true
 
         Task {
@@ -477,7 +477,7 @@ struct DataDirsView: View {
     }
 
     private func performRestore(_ item: DataDirItem) {
-        progressTitle = "正在还原「\(item.name)」"
+        progressTitle = String(format: "正在还原「%@」".localized, item.name)
         showProgress = true
 
         Task {

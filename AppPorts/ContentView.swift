@@ -150,7 +150,7 @@ struct ContentView: View {
                 // --- 左侧：本地应用 ---
                 VStack(spacing: 0) {
                     // Header Area (Restored to original simple style)
-                    HeaderView(title: "Mac 本地应用", subtitle: "/Applications", icon: "macmini") {
+                    HeaderView(title: "Mac 本地应用".localized, subtitle: "/Applications", icon: "macmini") {
                         scanLocalApps()
                     }
                     
@@ -159,9 +159,9 @@ struct ContentView: View {
                         
                         if filteredLocalApps.isEmpty {
                             if searchText.isEmpty {
-                                EmptyStateView(icon: "magnifyingglass", text: "正在扫描...")
+                                EmptyStateView(icon: "magnifyingglass", text: "正在扫描...".localized)
                             } else {
-                                EmptyStateView(icon: "doc.text.magnifyingglass", text: "未找到匹配应用")
+                                EmptyStateView(icon: "doc.text.magnifyingglass", text: "未找到匹配应用".localized)
                             }
                         } else {
                             List(filteredLocalApps, selection: $selectedLocalApps) { app in
@@ -195,10 +195,10 @@ struct ContentView: View {
                 // --- 右侧：外部应用 ---
                 VStack(spacing: 0) {
                     HeaderView(
-                        title: "外部应用库",
+                        title: "外部应用库".localized,
                         subtitle: externalDriveURL?.path ?? "未选择".localized,
                         icon: "externaldrive.fill",
-                        actionButtonText: "选择文件夹",
+                        actionButtonText: "选择文件夹".localized,
                         onAction: openPanelForExternalDrive,
                         onRefresh: { scanExternalApps() }
                     )
@@ -224,7 +224,7 @@ struct ContentView: View {
                                 .controlSize(.large)
                         }
                     } else if filteredExternalApps.isEmpty {
-                        EmptyStateView(icon: "folder", text: "空文件夹")
+                        EmptyStateView(icon: "folder", text: "空文件夹".localized)
                     } else {
                         List(filteredExternalApps, selection: $selectedExternalApps) { app in
                             AppRowView(
@@ -302,8 +302,8 @@ struct ContentView: View {
                     if let release = try await UpdateChecker.shared.checkForUpdates() {
                         print("New version found: \(release.tagName)")
                         await MainActor.run {
-                            self.alertTitle = "发现新版本"
-                            self.alertMessage = "发现新版本 \(release.tagName)。\n\(release.body)" // Simplified body?
+                            self.alertTitle = "发现新版本".localized
+                            self.alertMessage = String(format: "发现新版本 %@。\n%@".localized, release.tagName, release.body)
                             self.updateURL = URL(string: release.htmlUrl)
                             self.showUpdateAlert = true
                         }
@@ -350,12 +350,12 @@ struct ContentView: View {
                 pendingAppStoreApps = []
             }
         } message: {
-            let count = pendingAppStoreApps.filter { isAppStoreApp(at: $0.path) }.count
-            let totalCount = pendingAppStoreApps.count
+            let count = Int64(pendingAppStoreApps.filter { isAppStoreApp(at: $0.path) }.count)
+            let totalCount = Int64(pendingAppStoreApps.count)
             if count == totalCount {
-                Text("选中的 \(totalCount) 个应用均来自 App Store，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。")
+                Text(String(format: "选中的 %lld 个应用均来自 App Store，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。".localized, totalCount))
             } else {
-                Text("选中的 \(totalCount) 个应用包含 \(count) 个 App Store 应用，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。")
+                Text(String(format: "选中的 %lld 个应用包含 %lld 个 App Store 应用，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。".localized, totalCount, count))
             }
         }
         // App Store 设置页面
@@ -458,7 +458,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.borderless)
                     .padding(.leading, 8)
-                    .help("刷新列表")
+                    .help("刷新列表".localized)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -568,7 +568,7 @@ struct ContentView: View {
             return ("迁移到外部", false)
         }
         
-        return ("迁移 \(validApps.count) 个应用", false)
+        return (String(format: "迁移 %lld 个应用".localized, Int64(validApps.count)), false)
     }
     
     var canMoveOut: Bool {
@@ -604,7 +604,7 @@ struct ContentView: View {
             return "链接回本地".localized
         }
         
-        return "链接 \(validApps.count) 个应用"
+        return String(format: "链接 %lld 个应用".localized, Int64(validApps.count))
     }
     
     func getRunningAppURLs() -> Set<URL> {
@@ -1339,7 +1339,7 @@ struct ContentView: View {
             return "迁移回本地".localized
         }
         
-        return "迁移 \(selectedExternalApps.count) 个应用"
+        return String(format: "迁移 %lld 个应用".localized, Int64(selectedExternalApps.count))
     }
     
     // MARK: - Monitoring Helpers

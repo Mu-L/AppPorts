@@ -93,7 +93,7 @@ struct AppItem: Identifiable, Equatable, Sendable {
     /// - 文件夹：返回 "文件夹名 (X 个应用)"
     var displayName: String {
         if isFolder {
-            return "\(name) (\(appCount) 个应用)"
+            return String(format: "%@ (%lld 个应用)".localized, name, Int64(appCount))
         }
         return name
     }
@@ -158,13 +158,13 @@ enum AppMoverError: LocalizedError {
             return """
             权限不足。请前往"系统设置 > 隐私与安全性 > 完全磁盘访问权限"，\
             允许 AppPorts 访问磁盘，然后重启应用。
-            """
+            """.localized
             
         case .generalError(let innerError):
             return innerError.localizedDescription
             
         case .appIsRunning:
-            return "该应用正在运行。请先退出应用，然后再试。"
+            return "该应用正在运行。请先退出应用，然后再试。".localized
             
         case .appStoreAppError:
             return """
@@ -173,7 +173,7 @@ enum AppMoverError: LocalizedError {
             请尝试：
             1. 手动将应用移动到外部存储
             2. 然后回到 AppPorts 创建链接
-            """
+            """.localized
         }
     }
 }
