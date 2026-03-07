@@ -128,7 +128,8 @@ xattr -rd com.apple.quarantine /Applications/AppPorts.app
 ## AppPorts 的英雄💗  
 <a href="https://github.com/wzh4869/AppPorts/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=wzh4869/AppPorts" />
-</a>     
+</a>
+     
 
 ## 🔗 进阶存储管理
 

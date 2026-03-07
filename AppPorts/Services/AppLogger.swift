@@ -78,9 +78,9 @@ class AppLogger {
         set {
             UserDefaults.standard.set(newValue, forKey: logEnabledKey)
             if newValue {
-                log("日志记录已启用")
+                log("日志记录已启用".localized)
             } else {
-                log("日志记录已禁用")
+                log("日志记录已禁用".localized)
             }
         }
     }
@@ -136,7 +136,7 @@ class AppLogger {
     /// 设置日志文件路径
     func setLogPath(_ url: URL) {
         UserDefaults.standard.set(url.path, forKey: logPathKey)
-        log("日志路径已更改为: \(url.path)")
+        log("日志路径已更改为: \(url.path)".localized)
     }
     
     /// 在 Finder 中打开日志文件
@@ -153,7 +153,7 @@ class AppLogger {
     /// 清空日志
     func clearLog() {
         try? fileManager.removeItem(at: logFileURL)
-        log("日志已清空")
+        log("日志已清空".localized)
     }
     
     func log(_ message: String, level: String = "INFO") {
@@ -211,7 +211,7 @@ class AppLogger {
             if let nsError = error as NSError? {
                 fullMessage += " | Domain: \(nsError.domain) | Code: \(nsError.code)"
                 if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-                    fullMessage += " | 底层错误: \(underlying)"
+                    fullMessage += " | 底层错误: \(underlying)".localized
                 }
             }
         }
@@ -236,18 +236,18 @@ class AppLogger {
     
     /// 记录应用启动时的系统信息
     func logSystemInfo() {
-        log("========== 系统诊断信息 ==========", level: "DIAG")
-        log("App 版本: \(getAppVersion())", level: "DIAG")
-        log("macOS 版本: \(getMacOSVersion())", level: "DIAG")
-        log("设备型号: \(getDeviceModel())", level: "DIAG")
-        log("处理器: \(getProcessorInfo())", level: "DIAG")
-        log("内存: \(getMemoryInfo())", level: "DIAG")
-        log("======================================", level: "DIAG")
+        log("========== 系统诊断信息 ==========".localized, level: "DIAG")
+        log("App 版本: \(getAppVersion())".localized, level: "DIAG")
+        log("macOS 版本: \(getMacOSVersion())".localized, level: "DIAG")
+        log("设备型号: \(getDeviceModel())".localized, level: "DIAG")
+        log("处理器: \(getProcessorInfo())".localized, level: "DIAG")
+        log("内存: \(getMemoryInfo())".localized, level: "DIAG")
+        log("======================================".localized, level: "DIAG")
     }
     
     /// 记录外接硬盘信息
     func logExternalDriveInfo(at url: URL) {
-        log("========== 外接硬盘信息 ==========", level: "DISK")
+        log("========== 外接硬盘信息 ==========".localized, level: "DISK")
         
         // 获取卷信息
         let volumeInfo = getVolumeInfo(at: url)
@@ -261,27 +261,27 @@ class AppLogger {
             log("\(key): \(value)", level: "DISK")
         }
         
-        log("====================================", level: "DISK")
+        log("====================================".localized, level: "DISK")
     }
     
     /// 记录迁移性能信息
     func logMigrationPerformance(appName: String, size: Int64, duration: TimeInterval, sourcePath: String, destPath: String) {
         let speed = duration > 0 ? Double(size) / duration / 1024 / 1024 : 0
-        log("========== 迁移性能报告 ==========", level: "PERF")
-        log("应用: \(appName)", level: "PERF")
-        log("大小: \(formatBytes(size))", level: "PERF")
-        log("耗时: \(String(format: "%.2f", duration)) 秒", level: "PERF")
-        log("速度: \(String(format: "%.2f", speed)) MB/s", level: "PERF")
-        log("源路径: \(sourcePath)", level: "PERF")
-        log("目标: \(destPath)", level: "PERF")
-        log("====================================", level: "PERF")
+        log("========== 迁移性能报告 ==========".localized, level: "PERF")
+        log(String(format: "应用: %@".localized, appName), level: "PERF")
+        log(String(format: "大小: %@".localized, formatBytes(size)), level: "PERF")
+        log(String(format: "耗时: %@ 秒".localized, String(format: "%.2f", duration)), level: "PERF")
+        log(String(format: "速度: %@ MB/s".localized, String(format: "%.2f", speed)), level: "PERF")
+        log("源路径: \(sourcePath)".localized, level: "PERF")
+        log("目标: \(destPath)".localized, level: "PERF")
+        log("====================================".localized, level: "PERF")
     }
     
     // MARK: - 获取系统信息的辅助方法
     
     private func getAppVersion() -> String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知".localized
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知".localized
         return "\(version) (\(build))"
     }
     
@@ -350,7 +350,7 @@ class AppLogger {
             "iMac21,1": "iMac (24-inch, M1, 2021)",
             "iMac21,2": "iMac (24-inch, M1, 2021)"
         ]
-        return models[identifier] ?? "Mac"
+        return models[identifier] ?? "Mac".localized
     }
     
     private func getProcessorInfo() -> String {
@@ -366,9 +366,9 @@ class AppLogger {
         
         if brandString.isEmpty {
             // Apple Silicon
-            return "Apple Silicon (\(processorCount) 核心, \(activeCount) 活跃)"
+            return "Apple Silicon (\(processorCount) 核心, \(activeCount) 活跃)".localized
         }
-        return "\(brandString) (\(activeCount)/\(processorCount) 核心)"
+        return "\(brandString) (\(activeCount)/\(processorCount) 核心)".localized
     }
     
     private func getMemoryInfo() -> String {
@@ -392,25 +392,25 @@ class AppLogger {
             ])
             
             if let name = values.volumeName {
-                info.append(("卷名称", name))
+                info.append(("卷名称".localized, name))
             }
             if let total = values.volumeTotalCapacity {
-                info.append(("总容量", formatBytes(Int64(total))))
+                info.append(("总容量".localized, formatBytes(Int64(total))))
             }
             if let available = values.volumeAvailableCapacity {
-                info.append(("可用空间", formatBytes(Int64(available))))
+                info.append(("可用空间".localized, formatBytes(Int64(available))))
             }
             if let format = values.volumeLocalizedFormatDescription {
-                info.append(("文件系统", format))
+                info.append(("文件系统".localized, format))
             }
             if let removable = values.volumeIsRemovable {
-                info.append(("可移除", removable ? "是" : "否"))
+                info.append(("可移除".localized, removable ? "是".localized : "否".localized))
             }
             if let ejectable = values.volumeIsEjectable {
-                info.append(("可弹出", ejectable ? "是" : "否"))
+                info.append(("可弹出".localized, ejectable ? "是".localized : "否".localized))
             }
         } catch {
-            info.append(("错误", error.localizedDescription))
+            info.append(("错误".localized, error.localizedDescription))
         }
         
         return info
@@ -440,17 +440,17 @@ class AppLogger {
                 
                 // 提取基本信息
                 if let location = plist["DeviceLocation"] as? String {
-                    info.append(("设备位置", location))
+                    info.append(("设备位置".localized, location))
                 } else if let mediaName = plist["MediaName"] as? String {
-                    info.append(("设备名称", mediaName))
+                    info.append(("设备名称".localized, mediaName))
                 }
                 
                 if let blockSize = plist["DeviceBlockSize"] as? Int {
-                    info.append(("块大小", "\(blockSize) Bytes"))
+                    info.append(("块大小".localized, String(format: "%d Bytes", blockSize)))
                 }
                 
                 if let protocolName = plist["BusProtocol"] as? String {
-                    info.append(("接口协议", protocolName))
+                    info.append(("接口协议".localized, protocolName))
                 }
                 
                 if let uuid = plist["VolumeUUID"] as? String {
@@ -471,7 +471,7 @@ class AppLogger {
                 }
             }
         } catch {
-            info.append(("diskutil错误", error.localizedDescription))
+            info.append(("diskutil错误".localized, error.localizedDescription))
         }
         
         // 2. 使用 system_profiler 获取更详细的速率信息
@@ -520,7 +520,7 @@ class AppLogger {
         }
         
         if !foundSpeed {
-            info.append(("接口速率", "未检测到或内置存储"))
+            info.append(("接口速率".localized, "未检测到或内置存储".localized))
         }
         
         return info
@@ -585,17 +585,17 @@ class AppLogger {
                 var info: [(String, String)] = []
                 
                 if type == "USB" {
-                    if let speed = device["device_speed"] as? String { info.append(("设备速率", speed)) }
-                    if let busSpeed = device["host_controller_speed"] as? String { info.append(("总线速率", busSpeed)) }
+                    if let speed = device["device_speed"] as? String { info.append(("设备速率".localized, speed)) }
+                    if let busSpeed = device["host_controller_speed"] as? String { info.append(("总线速率".localized, busSpeed)) }
                 } else if type == "Thunderbolt" {
-                    if let speed = device["link_speed"] as? String { info.append(("链接速率", speed)) }
-                    if let width = device["link_width"] as? String { info.append(("链接带宽", width)) }
+                    if let speed = device["link_speed"] as? String { info.append(("链接速率".localized, speed)) }
+                    if let width = device["link_width"] as? String { info.append(("链接带宽".localized, width)) }
                 } else if type == "NVMe" {
-                    if let width = device["link_width"] as? String { info.append(("链接宽度", width)) }
-                    if let speed = device["link_speed"] as? String { info.append(("链接速率", speed)) }
+                    if let width = device["link_width"] as? String { info.append(("链接宽度".localized, width)) }
+                    if let speed = device["link_speed"] as? String { info.append(("链接速率".localized, speed)) }
                 }
                 
-                info.append(("连接类型", type))
+                info.append(("连接类型".localized, type))
                 return info
             }
             

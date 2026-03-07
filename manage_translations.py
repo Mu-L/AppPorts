@@ -1,27 +1,24 @@
+import os
 import json
+import re
 
-# Define languages
-langs = ['en', 'zh-Hans', 'zh-Hant', 'hi', 'es', 'ar', 'ru', 'pt', 'fr', 'it', 'ja', 
-         'eo', 'de', 'ko', 'tr', 'vi', 'th', 'nl', 'pl', 'id', 'br']
+# ==========================================
+# 1. Config
+# ==========================================
 
-def to_braille(text):
-    # Basic English to Braille mapping (Grade 1 simplified)
-    mapping = {
-        'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑', 'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
-        'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕', 'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
-        'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽', 'z': '⠵',
-        'A': '⠠⠁', 'B': '⠠⠃', 'C': '⠠⠉', 'D': '⠠⠙', 'E': '⠠⠑', 'F': '⠠⠋', 'G': '⠠⠛', 'H': '⠠⠓', 'I': '⠠⠊', 'J': '⠠⠚',
-        'K': '⠠⠅', 'L': '⠠⠇', 'M': '⠠⠍', 'N': '⠠⠝', 'O': '⠠⠕', 'P': '⠠⠏', 'Q': '⠠⠟', 'R': '⠠⠗', 'S': '⠠⠎', 'T': '⠠⠞',
-        'U': '⠠⠥', 'V': '⠠⠧', 'W': '⠠⠺', 'X': '⠠⠭', 'Y': '⠠⠽', 'Z': '⠠⠵',
-        '1': '⠼⠁', '2': '⠼⠃', '3': '⠼⠉', '4': '⠼⠙', '5': '⠼⠑', '6': '⠼⠋', '7': '⠼⠛', '8': '⠼⠓', '9': '⠼⠊', '0': '⠼⠚',
-        ' ': ' ', '.': '⠲', ',': '⠂', '!': '⠖', '?': '⠦', '\'': '⠄', '-': '⠤',
-        '/': '⠌', '(': '⠐⠣', ')': '⠐⠜', ':': '⠒', ';': '⠆'
-    }
-    # Fallback to original char if not found
-    return "".join(mapping.get(char, char) for char in text)
+XCSTRINGS_PATH = "AppPorts/Localizable.xcstrings"
+SWIFT_SCAN_DIR = "AppPorts"
 
-# Dictionary of translations
-data = {
+LANGS = [
+    "en", "zh-Hans", "zh-Hant", "hi", "es", "ar", "ru", "pt", "fr", "it", "ja", 
+    "eo", "de", "ko", "tr", "vi", "th", "nl", "pl", "id", "br"
+]
+
+# ==========================================
+# 2. Dictionary
+# ==========================================
+
+DICT = {
     "AppPorts": {
         "en": "AppPorts", "zh-Hans": "AppPorts", "zh-Hant": "AppPorts",
         "hi": "AppPorts", "es": "AppPorts", "ar": "AppPorts", "ru": "AppPorts",
@@ -1071,56 +1068,486 @@ data = {
     "选中的 %lld 个应用包含 %lld 个 App Store 应用，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。": {
         "en": "Selected %lld apps include %lld App Store apps. They will be deleted via Finder (trash sound).\n\nThis is normal, apps are safely moved.",
         "zh-Hans": "选中的 %lld 个应用包含 %lld 个 App Store 应用，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。",
-        "zh-Hant": "選中的 %lld 個應用程式包含 %lld 個 App Store 應用程式，遷移時會使用 Finder 刪除，您會聽到垃圾桶的聲音。\n\n這是正常的，應用程式會被安全地移動到外部儲存。",
-        "hi": "चयनित %lld ऐप्स में %lld ऐप स्टोर ऐप्स शामिल हैं। उन्हें फाइंडर (कचरा ध्वनि) के माध्यम से हटा दिया जाएगा।\n\nयह सामान्य है, ऐप्स सुरक्षित रूप से स्थानांतरित हो जाते हैं।",
-        "es": "Las %lld apps seleccionadas incluyen %lld de App Store. Se eliminarán vía Finder (sonido papelera).\n\nEs normal, se mueven con seguridad.",
-        "ar": "تتضمن التطبيقات المحددة %lld تطبيقًا %lld من App Store. سيتم حذفها عبر Finder (صوت سلة المهملات).\n\nهذا طبيعي.",
-        "ru": "Выбрано %lld приложений, включая %lld из App Store. Они будут удалены через Finder.\n\nЭто нормальный процесс.",
-        "pt": "Os %lld apps selecionados incluem %lld da App Store. Serão excluídos via Finder.\n\nIsso é normal.",
-        "fr": "Les %lld apps sélectionnées incluent %lld apps App Store. Elles seront supprimées via Finder.\n\nC'est normal.",
-        "it": "Le %lld app selezionate includono %lld app App Store. Verranno eliminate tramite Finder.\n\nÈ normale.",
-        "ja": "選択された %lld 個のアプリには %lld 個のApp Storeアプリが含まれています。Finder経由で削除されます（ゴミ箱の音）。\n\nこれは正常です。",
-        "eo": "Elektitaj %lld aplikaĵoj inkluzivas %lld App Store-aplikaĵojn. Ili estos forigitaj per Finder.\n\nĈi tio estas normala.",
-        "de": "Ausgewählte %lld Apps enthalten %lld App Store-Apps. Sie werden über den Finder gelöscht.\n\nDas ist normal.",
-        "ko": "선택된 %lld개 앱에 %lld개의 App Store 앱이 포함되어 있습니다. Finder를 통해 삭제됩니다.\n\n이는 정상입니다.",
-        "tr": "Seçilen %lld uygulama, %lld App Store uygulaması içeriyor. Finder aracılığıyla silinecekler.\n\nBu normaldir.",
-        "vi": "Đã chọn %lld ứng dụng bao gồm %lld ứng dụng App Store. Chúng sẽ bị xóa qua Finder.\n\nĐiều này là bình thường.",
-        "th": "แอปที่เลือก %lld รายการมีแอป App Store %lld รายการ จะถูกลบผ่าน Finder\n\nนี่เป็นเรื่องปกติ",
-        "nl": "Geselecteerde %lld apps bevatten %lld App Store-apps. Ze worden verwijderd via Finder.\n\nDit is normaal.",
-        "pl": "Wybrane aplikacje (%lld) zawierają aplikacje z App Store (%lld). Zostaną usunięte przez Finder.\n\nTo normalne.",
         "id": "Dipilih %lld aplikasi termasuk %lld aplikasi App Store. Mereka akan dihapus melalui Finder.\n\nIni normal."
-    }
+    },
+    
+    # --- Data Directory Terms ---
+    "npm 缓存": {"en": "npm Cache", "zh-Hans": "npm 缓存", "zh-Hant": "npm 快取"},
+    "Node.js 包管理器本地缓存": {"en": "Node.js package manager local cache", "zh-Hans": "Node.js 包管理器本地缓存", "zh-Hant": "Node.js 套件管理員本地快取"},
+    "Maven 仓库": {"en": "Maven Repository", "zh-Hans": "Maven 仓库", "zh-Hant": "Maven 倉庫"},
+    "Java Maven 依赖仓库": {"en": "Java Maven dependency repository", "zh-Hans": "Java Maven 依赖仓库", "zh-Hant": "Java Maven 依賴倉庫"},
+    "Bun 运行时": {"en": "Bun Runtime", "zh-Hans": "Bun 运行时", "zh-Hant": "Bun 執行階段"},
+    "Bun JavaScript 运行时及缓存": {"en": "Bun JavaScript runtime and cache", "zh-Hans": "Bun JavaScript 运行时及缓存", "zh-Hant": "Bun JavaScript 執行階段及快取"},
+    "Conda 环境": {"en": "Conda Environments", "zh-Hans": "Conda 环境", "zh-Hant": "Conda 環境"},
+    "Anaconda/Miniconda 环境数据": {"en": "Anaconda/Miniconda environment data", "zh-Hans": "Anaconda/Miniconda 环境数据", "zh-Hant": "Anaconda/Miniconda 環境資料"},
+    "Nexus 数据": {"en": "Nexus Data", "zh-Hans": "Nexus 数据", "zh-Hant": "Nexus 資料"},
+    "Nexus 代理缓存": {"en": "Nexus proxy cache", "zh-Hans": "Nexus 代理缓存", "zh-Hant": "Nexus 代理快取"},
+    "Composer 包": {"en": "Composer Packages", "zh-Hans": "Composer 包", "zh-Hant": "Composer 套件"},
+    "PHP Composer 全局包": {"en": "PHP Composer global packages", "zh-Hans": "PHP Composer 全局包", "zh-Hant": "PHP Composer 全域套件"},
+    "Ollama 模型": {"en": "Ollama Models", "zh-Hans": "Ollama 模型", "zh-Hant": "Ollama 模型"},
+    "Ollama 本地大语言模型存储": {"en": "Ollama local LLM storage", "zh-Hans": "Ollama 本地大语言模型存储", "zh-Hant": "Ollama 本地大語言模型儲存"},
+    "PyTorch 模型缓存": {"en": "PyTorch Model Cache", "zh-Hans": "PyTorch 模型缓存", "zh-Hant": "PyTorch 模型快取"},
+    "PyTorch 预训练模型权重缓存": {"en": "PyTorch pre-trained model weight cache", "zh-Hans": "PyTorch 预训练模型权重缓存", "zh-Hant": "PyTorch 預訓練模型權重快取"},
+    "Whisper 语音模型": {"en": "Whisper Voice Models", "zh-Hans": "Whisper 语音模型", "zh-Hant": "Whisper 語音模型"},
+    "OpenAI Whisper 语音识别模型": {"en": "OpenAI Whisper speech recognition model", "zh-Hans": "OpenAI Whisper 语音识别模型", "zh-Hant": "OpenAI Whisper 語音辨識模型"},
+    "Keras 数据": {"en": "Keras Data", "zh-Hans": "Keras 数据", "zh-Hant": "Keras 資料"},
+    "Keras 模型和数据集": {"en": "Keras models and datasets", "zh-Hans": "Keras 模型和数据集", "zh-Hant": "Keras 模型和資料集"},
+    "灵码 (Lingma) 数据": {"en": "Lingma Data", "zh-Hans": "灵码 (Lingma) 数据", "zh-Hant": "靈碼 (Lingma) 資料"},
+    "阿里云灵码 AI 编程助手数据": {"en": "Alibaba Cloud Lingma AI coding assistant data", "zh-Hans": "阿里云灵码 AI 编程助手数据", "zh-Hant": "阿里雲靈碼 AI 編程助手資料"},
+    "Trae IDE 数据": {"en": "Trae IDE Data", "zh-Hans": "Trae IDE 数据", "zh-Hant": "Trae IDE 資料"},
+    "字节跳动 Trae IDE 运行数据": {"en": "ByteDance Trae IDE runtime data", "zh-Hans": "字节跳动 Trae IDE 运行数据", "zh-Hant": "字節跳動 Trae IDE 執行資料"},
+    "Trae CN 数据": {"en": "Trae CN Data", "zh-Hans": "Trae CN 数据", "zh-Hant": "Trae CN 資料"},
+    "字节跳动 Trae IDE 国内版数据": {"en": "ByteDance Trae IDE China version data", "zh-Hans": "字节跳动 Trae IDE 国内版数据", "zh-Hant": "字節跳動 Trae IDE 國內版資料"},
+    "Trae AICC 数据": {"en": "Trae AICC Data", "zh-Hans": "Trae AICC 数据", "zh-Hant": "Trae AICC 資料"},
+    "字节跳动 Trae AICC 数据": {"en": "ByteDance Trae AICC data", "zh-Hans": "字节跳动 Trae AICC 数据", "zh-Hant": "字節跳動 Trae AICC 資料"},
+    "MarsCode 数据": {"en": "MarsCode Data", "zh-Hans": "MarsCode 数据", "zh-Hant": "MarsCode 資料"},
+    "字节跳动 MarsCode IDE 数据": {"en": "ByteDance MarsCode IDE data", "zh-Hans": "字节跳动 MarsCode IDE 数据", "zh-Hant": "字節跳動 MarsCode IDE 資料"},
+    "CodeBuddy 数据": {"en": "CodeBuddy Data", "zh-Hans": "CodeBuddy 数据", "zh-Hant": "CodeBuddy 資料"},
+    "腾讯 CodeBuddy AI 助手数据": {"en": "Tencent CodeBuddy AI assistant data", "zh-Hans": "腾讯 CodeBuddy AI 助手数据", "zh-Hant": "騰訊 CodeBuddy AI 助手資料"},
+    "CodeBuddy CN 数据": {"en": "CodeBuddy CN Data", "zh-Hans": "CodeBuddy CN 数据", "zh-Hant": "CodeBuddy CN 資料"},
+    "腾讯 CodeBuddy 国内版 data": {"en": "Tencent CodeBuddy China version data", "zh-Hans": "腾讯 CodeBuddy 国内版数据", "zh-Hant": "騰訊 CodeBuddy 國內版資料"},
+    "Qwen 数据": {"en": "Qwen Data", "zh-Hans": "Qwen 数据", "zh-Hant": "Qwen 資料"},
+    "阿里通义千问相关数据": {"en": "Alibaba Qwen related data", "zh-Hans": "阿里通义千问相关数据", "zh-Hant": "阿里通義千問相關資料"},
+    "ClawBOT 数据": {"en": "ClawBOT Data", "zh-Hans": "ClawBOT 数据", "zh-Hant": "ClawBOT 資料"},
+    "ClawdBOT AI 工具数据": {"en": "ClawdBOT AI tool data", "zh-Hans": "ClawdBOT AI 工具数据", "zh-Hant": "ClawdBOT AI 工具資料"},
+    "Selenium 浏览器": {"en": "Selenium Browsers", "zh-Hans": "Selenium 浏览器", "zh-Hant": "Selenium 瀏覽器"},
+    "Selenium 自动下载的浏览器驱动": {"en": "Selenium auto-downloaded browser drivers", "zh-Hans": "Selenium 自动下载的浏览器驱动", "zh-Hant": "Selenium 自動下載的瀏覽器驅動"},
+    "Chromium 快照": {"en": "Chromium Snapshots", "zh-Hans": "Chromium 快照", "zh-Hant": "Chromium 快照"},
+    "Playwright/Selenium 使用的 Chromium 浏览器快照": {"en": "Chromium browser snapshots used by Playwright/Selenium", "zh-Hans": "Playwright/Selenium 使用的 Chromium 浏览器快照", "zh-Hant": "Playwright/Selenium 使用的 Chromium 瀏覽器快照"},
+    "WDM 浏览器驱动": {"en": "WDM Browser Drivers", "zh-Hans": "WDM 浏览器驱动", "zh-Hant": "WDM 瀏覽器驅動"},
+    "WebDriver Manager 下载的驱动程序": {"en": "Drivers downloaded by WebDriver Manager", "zh-Hans": "WebDriver Manager 下载的驱动程序", "zh-Hant": "WebDriver Manager 下載的驅動程式"},
+    "VSCode 数据": {"en": "VSCode Data", "zh-Hans": "VSCode 数据", "zh-Hant": "VSCode 資料"},
+    "Visual Studio Code 扩展及配置": {"en": "Visual Studio Code extensions and configurations", "zh-Hans": "Visual Studio Code 扩展及配置", "zh-Hant": "Visual Studio Code 擴充功能及設定"},
+    "Cursor 数据": {"en": "Cursor Data", "zh-Hans": "Cursor 数据", "zh-Hant": "Cursor 資料"},
+    "Cursor AI 编辑器数据": {"en": "Cursor AI editor data", "zh-Hans": "Cursor AI 编辑器数据", "zh-Hant": "Cursor AI 編輯器資料"},
+    "STS4 数据": {"en": "STS4 Data", "zh-Hans": "STS4 数据", "zh-Hant": "STS4 資料"},
+    "Spring Tool Suite 4 数据": {"en": "Spring Tool Suite 4 data", "zh-Hans": "Spring Tool Suite 4 数据", "zh-Hant": "Spring Tool Suite 4 資料"},
+    "Docker CLI 配置": {"en": "Docker CLI Config", "zh-Hans": "Docker CLI 配置", "zh-Hant": "Docker CLI 設定"},
+    "Docker Desktop CLI 配置和上下文": {"en": "Docker Desktop CLI config and contexts", "zh-Hans": "Docker Desktop CLI 配置和上下文", "zh-Hant": "Docker Desktop CLI 設定和上下文"},
+    "OpenClaw 数据": {"en": "OpenClaw Data", "zh-Hans": "OpenClaw 数据", "zh-Hant": "OpenClaw 資料"},
+    "OpenClaw 工具数据": {"en": "OpenClaw tool data", "zh-Hans": "OpenClaw 工具数据", "zh-Hant": "OpenClaw 工具資料"},
+    "Python NLTK 数据": {"en": "Python NLTK Data", "zh-Hans": "Python NLTK 数据", "zh-Hant": "Python NLTK 資料"},
+    "自然语言处理 NLTK 语料库": {"en": "NLP NLTK corpora", "zh-Hans": "自然语言处理 NLTK 语料库", "zh-Hant": "自然語言處理 NLTK 語料庫"},
+    ".local (系统工具)": {"en": ".local (System Tools)", "zh-Hans": ".local (系统工具)", "zh-Hant": ".local (系統工具)"},
+    "Python pip 等工具的用户级安装目录，内部结构复杂": {"en": "User-level installation directory for tools like Python pip, complex internal structure", "zh-Hans": "Python pip 等工具的用户级安装目录，内部结构复杂", "zh-Hant": "Python pip 等工具的用戶級安裝目錄，內部結構複雜"},
+    ".config (工具配置)": {"en": ".config (Tool Config)", "zh-Hans": ".config (工具配置)", "zh-Hant": ".config (工具設定)"},
+    "多个命令行工具的配置目录，包含硬编码路径": {"en": "Configuration directory for multiple CLI tools, contains hardcoded paths", "zh-Hans": "多个命令行工具的配置目录，包含硬编码路径", "zh-Hant": "多個命令列工具的設定目錄，包含硬編碼路徑"},
+    "应用核心数据 (设置、数据库等)": {"en": "App core data (Settings, Databases, etc.)", "zh-Hans": "应用核心数据 (设置、数据库等)", "zh-Hant": "應用程式核心資料 (設定、資料庫等)"},
+    "沙盒容器数据 (App Store 应用)": {"en": "Sandbox container data (App Store apps)", "zh-Hans": "沙盒容器数据 (App Store 应用)", "zh-Hant": "沙盒容器資料 (App Store 應用程式)"},
+    "应用组共享数据": {"en": "App group shared data", "zh-Hans": "应用组共享数据", "zh-Hant": "應用程式組共享資料"},
+    "应用缓存 (可重建)": {"en": "App cache (rebuildable)", "zh-Hans": "应用缓存 (可重建)", "zh-Hant": "應用程式快取 (可重建)"},
+    "窗口状态恢复数据": {"en": "Saved application state data", "zh-Hans": "窗口状态恢复数据", "zh-Hant": "視窗狀態恢復資料"},
+    "本地": {"en": "Local", "zh-Hans": "本地", "zh-Hant": "本地"},
+    "已链接": {"en": "Linked", "zh-Hans": "已链接", "zh-Hant": "已連結"},
+    "未找到": {"en": "Not Found", "zh-Hans": "未找到", "zh-Hant": "未找到"},
+    "工具目录": {"en": "Tool Directories", "zh-Hans": "工具目录", "zh-Hant": "工具目錄"},
+    "应用数据": {"en": "App Data", "zh-Hans": "应用数据", "zh-Hant": "應用程式資料"},
+    "未发现已知工具目录": {"en": "No known tool directories found", "zh-Hans": "未发现已知工具目录", "zh-Hant": "未發現已知工具目錄"},
+    "选择应用": {"en": "Select App", "zh-Hans": "选择应用", "zh-Hant": "選擇應用程式"},
+    "无本地应用": {"en": "No local apps", "zh-Hans": "无本地应用", "zh-Hant": "無本地應用程式"},
+    "%@ 的数据目录": {"en": "%@'s Data Directory", "zh-Hans": "%@ 的数据目录", "zh-Hant": "%@ 的資料目錄"},
+    "请从左侧选择应用": {"en": "Please select an app from the left", "zh-Hans": "请从左侧选择应用", "zh-Hant": "請從左側選擇應用程式"},
+    "从左侧选择一个应用": {"en": "Select an app from the left", "zh-Hans": "从左侧选择一个应用", "zh-Hant": "從左側選擇一個應用程式"},
+    "未找到关联数据目录": {"en": "No associated data directory found", "zh-Hans": "未找到关联数据目录", "zh-Hant": "未找到關聯資料目錄"},
+    "请先在「应用」页面选择外部存储路径": {"en": "Please select external drive path on Applications page first", "zh-Hans": "请先在「应用」页面选择外部存储路径", "zh-Hant": "請先在「應用程式」頁面選擇外部儲存路徑"},
+    "去选择": {"en": "Go select", "zh-Hans": "去选择", "zh-Hant": "前往選擇"},
+    "%lld 个目录": {"en": "%lld Directories", "zh-Hans": "%lld 个目录", "zh-Hant": "%lld 個目錄"},
+    " 可释放": {"en": " freeable", "zh-Hans": " 可释放", "zh-Hant": " 可釋放"},
+    "%lld 个已链接": {"en": "%lld Linked", "zh-Hans": "%lld 个已链接", "zh-Hant": "%lld 個已連結"},
+    "扫描中...": {"en": "Scanning...", "zh-Hans": "扫描中...", "zh-Hant": "掃描中..."},
+    "迁移数据目录": {"en": "Migrate Data Directory", "zh-Hans": "迁移数据目录", "zh-Hant": "遷移資料目錄"},
+    "还原数据目录": {"en": "Restore Data Directory", "zh-Hans": "还原数据目录", "zh-Hant": "還原資料目錄"},
+    "此目录不支持迁移": {"en": "This directory does not support migration", "zh-Hans": "此目录不支持迁移", "zh-Hant": "此目錄不支援遷移"},
+    "迁移": {"en": "Migrate", "zh-Hans": "迁移", "zh-Hant": "遷移"},
+    "还原": {"en": "Restore", "zh-Hans": "还原", "zh-Hant": "還原"},
+    "将数据目录还原到本地": {"en": "Restore data directory to local", "zh-Hans": "将数据目录还原到本地", "zh-Hant": "將資料目錄還原到本地"},
+    "将数据目录迁移到外部存储": {"en": "Migrate data directory to external storage", "zh-Hans": "将数据目录迁移到外部存储", "zh-Hant": "將資料目錄遷移到外部存儲"},
+    "重要": {"en": "Critical", "zh-Hans": "重要", "zh-Hant": "重要"},
+    "推荐": {"en": "Recommended", "zh-Hans": "推荐", "zh-Hant": "推薦"},
+    "可选": {"en": "Optional", "zh-Hans": "可选", "zh-Hant": "可選"},
+    "自定义": {"en": "Custom", "zh-Hans": "自定义", "zh-Hant": "自定義"},
+    "Application Support": {"en": "Application Support", "zh-Hans": "Application Support", "zh-Hant": "Application Support"},
+    "Containers": {"en": "Containers", "zh-Hans": "Containers", "zh-Hant": "Containers"},
+    "Group Containers": {"en": "Group Containers", "zh-Hans": "Group Containers", "zh-Hant": "Group Containers"},
+    "Caches": {"en": "Caches", "zh-Hans": "Caches", "zh-Hant": "Caches"},
+    "Saved State": {"en": "Saved State", "zh-Hans": "Saved State", "zh-Hant": "Saved State"},
+    "将「%@」迁移到外部存储": {"en": "Migrate \"%@\" to external storage", "zh-Hans": "将「%@」迁移到外部存储", "zh-Hant": "將「%@」遷移到外部存儲"},
+    "将「%@」从外部存储还原到本地": {"en": "Restore \"%@\" from external storage to local", "zh-Hans": "将「%@」从外部存储还原到本地", "zh-Hant": "將「%@」從外部存儲還原到本地"},
+    "正在迁移「%@」": {"en": "Migrating \"%@\"", "zh-Hans": "正在迁移「%@」", "zh-Hant": "正在遷移「%@」"},
+    "正在还原「%@」": {"en": "Restoring \"%@\"", "zh-Hans": "正在还原「%@」", "zh-Hant": "正在還原「%@」"},
+    "操作失败": {"en": "Operation Failed", "zh-Hans": "操作失败", "zh-Hant": "操作失敗"},
+    "扫描关联目录中...": {"en": "Scanning associated directories...", "zh-Hans": "扫描关联目录中...", "zh-Hant": "掃描觀聯目錄中..."},
+    "未发现关联数据目录": {"en": "No associated data directory found", "zh-Hans": "未发现关联数据目录", "zh-Hant": "未發現關聯資料目錄"},
+    "迁移完成后，原路径将自动变成符号链接，相关工具无需任何修改即可继续使用。": {
+        "en": "After migration, the original path will automatically become a symbolic link, and related tools can continue to be used without any modification.",
+        "zh-Hans": "迁移完成后，原路径将自动变成符号链接，相关工具无需任何修改即可继续使用。",
+        "zh-Hant": "遷移完成後，原路徑將自動變成符號連結，相關工具無需任何修改即可繼續使用。"
+    },
+    "还原完成后，外部存储中的副本将被删除。": {
+        "en": "After restoration, the copy in external storage will be deleted.",
+        "zh-Hans": "还原完成后，外部存储中的副本将被删除。",
+        "zh-Hant": "還原完成後，外部存儲中的副本將被刪除。"
+    },
+    
+    # --- Hardware Terms ---
+    "设备速率": {"en": "Device Speed", "zh-Hans": "设备速率", "zh-Hant": "設備速率"},
+    "总线速率": {"en": "Bus Speed", "zh-Hans": "总线速率", "zh-Hant": "總線速率"},
+    "链接速率": {"en": "Link Speed", "zh-Hans": "链接速率", "zh-Hant": "連結速率"},
+    "链接带宽": {"en": "Link Bandwidth", "zh-Hans": "链接带宽", "zh-Hant": "連結頻寬"},
+    "链接宽度": {"en": "Link Width", "zh-Hans": "链接宽度", "zh-Hant": "連結寬度"},
+    "连接类型": {"en": "Connection Type", "zh-Hans": "连接类型", "zh-Hant": "連接類型"},
+    "卷名称": {"en": "Volume Name", "zh-Hans": "卷名称", "zh-Hant": "卷名稱"},
+    "总容量": {"en": "Total Capacity", "zh-Hans": "总容量", "zh-Hant": "總容量"},
+    "可用空间": {"en": "Available Space", "zh-Hans": "可用空间", "zh-Hant": "可用空間"},
+    "文件系统": {"en": "File System", "zh-Hans": "文件系统", "zh-Hant": "文件系統"},
+    "可移除": {"en": "Removable", "zh-Hans": "可移除", "zh-Hant": "可移除"},
+    "可弹出": {"en": "Ejectable", "zh-Hans": "可弹出", "zh-Hant": "可彈出"},
+    "是": {"en": "Yes", "zh-Hans": "是", "zh-Hant": "是"},
+    "否": {"en": "No", "zh-Hans": "否", "zh-Hant": "否"},
+    "设备位置": {"en": "Device Location", "zh-Hans": "设备位置", "zh-Hant": "設備位置"},
+    "设备名称": {"en": "Device Name", "zh-Hans": "设备名称", "zh-Hant": "設備名稱"},
+    "块大小": {"en": "Block Size", "zh-Hans": "块大小", "zh-Hant": "塊大小"},
+    "接口协议": {"en": "Interface Protocol", "zh-Hans": "接口协议", "zh-Hant": "接口協議"},
+    "卷 UUID": {"en": "Volume UUID", "zh-Hans": "卷 UUID", "zh-Hant": "卷 UUID"},
+    "未知": {"en": "Unknown", "zh-Hans": "未知", "zh-Hant": "未知"},
+    "耗时: %@ 秒": {"en": "Duration: %@ seconds", "zh-Hans": "耗时: %@ 秒", "zh-Hant": "耗時: %@ 秒"},
+    "速度: %@ MB/s": {"en": "Speed: %@ MB/s", "zh-Hans": "速度: %@ MB/s", "zh-Hant": "速度: %@ MB/s"},
+    "大小: %@": {"en": "Size: %@", "zh-Hans": "大小: %@", "zh-Hant": "大小: %@"},
+    "应用: %@": {"en": "App: %@", "zh-Hans": "应用: %@", "zh-Hant": "應用程式: %@"},
+    "接口速率": {"en": "Interface Rate", "zh-Hans": "接口速率", "zh-Hant": "介面速率"},
+    "未检测到或内置存储": {"en": "Not detected or internal storage", "zh-Hans": "未检测到或内置存储", "zh-Hant": "未檢測到或內建儲存"},
+    "========== 迁移性能报告 ==========": {"en": "========== Migration Performance Report ==========", "zh-Hans": "========== 迁移性能报告 ==========", "zh-Hant": "========== 遷移性能報告 =========="},
+    
+    # --- Critical UI Terms ---
+    "应用": {
+        "en": "Apps", "zh-Hans": "应用", "zh-Hant": "應用程式",
+        "ja": "アプリ", "ko": "앱", "de": "Apps", "fr": "Apps",
+        "es": "Apps", "it": "App", "pt": "Apps", "ru": "Приложения",
+        "ar": "التطبيقات", "hi": "ऐप्स", "tr": "Uygulamalar", "vi": "Ứng dụng",
+        "th": "แอป", "nl": "Apps", "pl": "Aplikacje", "id": "Aplikasi",
+        "eo": "Aplikaĵoj"
+    },
+    "数据目录": {
+        "en": "Data Directories", "zh-Hans": "数据目录", "zh-Hant": "資料目錄",
+        "ja": "データディレクトリ", "ko": "데이터 디렉토리", "de": "Datenverzeichnisse", "fr": "Répertoires de données",
+        "es": "Directorios de datos", "it": "Directory dati", "pt": "Diretórios de dados", "ru": "Каталоги данных",
+        "ar": "دلائل البيانات", "hi": "डेटा डायरेक्ट्री", "tr": "Veri Dizinleri", "vi": "Thư mục dữ liệu",
+        "th": "ไดเรกทอรีข้อมูล", "nl": "Gegevensmappen", "pl": "Katalogi danych", "id": "Direktori Data",
+        "eo": "Datumaj Dosierujoj"
+    },
+    "工具目录": {
+        "en": "Tool Directories", "zh-Hans": "工具目录", "zh-Hant": "工具目錄",
+        "ja": "ツールディレクトリ", "ko": "도구 디렉토리", "de": "Tool-Verzeichnisse", "fr": "Répertoires d'outils",
+        "es": "Directorios de herramientas", "it": "Directory strumenti", "pt": "Diretórios de ferramentas", "ru": "Каталоги инструментов",
+        "ar": "دلائل الأدوات", "hi": "टूल डायरेक्ट्री", "tr": "Araç Dizinleri", "vi": "Thư mục công cụ",
+        "th": "ไดเรกทอรีเครื่องมือ", "nl": "Hulpmiddelmappen", "pl": "Katalogi narzędzi", "id": "Direktori Alat",
+        "eo": "Ilaj Dosierujoj"
+    },
+    "继续": {
+        "en": "Continue", "zh-Hans": "继续", "zh-Hant": "繼續",
+        "ja": "続行", "ko": "계속", "de": "Weiter", "fr": "Continuer",
+        "es": "Continuar", "it": "Continua", "pt": "Continuar", "ru": "Продолжить",
+        "ar": "متابعة", "hi": "जारी रखें", "tr": "Devam", "vi": "Tiếp tục",
+        "th": "ดำเนินการต่อ", "nl": "Doorgaan", "pl": "Kontynuuj", "id": "Lanjutkan",
+        "eo": "Daŭrigi"
+    },
+    "App Store 应用迁移设置": {
+        "en": "App Store Migration Settings", "zh-Hans": "App Store 应用迁移设置", "zh-Hant": "App Store 應用程式遷移設定",
+        "ja": "App Store アプリ移行設定", "ko": "App Store 앱 마이그레이션 설정", "de": "App Store Migrationseinstellungen",
+        "fr": "Paramètres de migration App Store", "es": "Ajustes de migración App Store",
+        "it": "Impostazioni migrazione App Store", "pt": "Configurações de migração da App Store",
+        "ru": "Настройки миграции App Store", "ar": "إعدادات نقل App Store",
+        "hi": "App Store माइग्रेशन सेटिंग्स", "tr": "App Store Taşıma Ayarları",
+        "vi": "Cài đặt di chuyển App Store", "th": "ตั้งค่าการย้าย App Store",
+        "nl": "App Store-migratie-instellingen", "pl": "Ustawienia migracji App Store",
+        "id": "Pengaturan Migrasi App Store", "eo": "App Store Migraj Agordoj"
+    },
+    "外部": {
+        "en": "External", "zh-Hans": "外部", "zh-Hant": "外部",
+        "ja": "外部", "ko": "외부", "de": "Extern", "fr": "Externe",
+        "es": "Externo", "it": "Esterno", "pt": "Externo", "ru": "Внешний",
+        "ar": "خارجي", "hi": "बाहरी", "tr": "Harici", "vi": "Bên ngoài",
+        "th": "ภายนอก", "nl": "Extern", "pl": "Zewnętrzny", "id": "Eksternal", "eo": "Ekstera"
+    },
+    "项目贡献者": {
+        "en": "Project Contributors", "zh-Hans": "项目贡献者", "zh-Hant": "專案貢獻者",
+        "ja": "プロジェクト貢献者", "ko": "프로젝트 기여자", "de": "Projektmitwirkende",
+        "fr": "Contributeurs du projet", "es": "Colaboradores del proyecto",
+        "it": "Collaboratori del progetto", "pt": "Contribuidores do projeto",
+        "ru": "Участники проекта", "ar": "المساهمين في المشروع",
+        "hi": "प्रोजेक्ट योगदानकर्ता", "tr": "Proje Katkıda Bulunanlar",
+        "vi": "Người đóng góp dự án", "th": "ผู้มีส่วนร่วมในโครงการ",
+        "nl": "Projectmedewerkers", "pl": "Współtwórcy projektu",
+        "id": "Kontributor Proyek", "eo": "Projekto-Kontribuantoj"
+    },
+    "请先选择外部存储路径": {
+        "en": "Please select an external storage path first",
+        "zh-Hans": "请先选择外部存储路径", "zh-Hant": "請先選擇外部儲存路徑",
+        "ja": "まず外部ストレージパスを選択してください",
+        "ko": "먼저 외부 저장소 경로를 선택하세요",
+        "de": "Bitte zuerst einen externen Speicherpfad auswählen",
+        "fr": "Veuillez d'abord sélectionner un chemin de stockage externe",
+        "es": "Seleccione primero una ruta de almacenamiento externo",
+        "it": "Seleziona prima un percorso di archiviazione esterna",
+        "pt": "Selecione primeiro um caminho de armazenamento externo",
+        "ru": "Сначала выберите путь к внешнему хранилищу",
+        "ar": "يرجى تحديد مسار التخزين الخارجي أولاً",
+        "hi": "कृपया पहले बाहरी संग्रहण पथ चुनें",
+        "tr": "Lütfen önce harici depolama yolunu seçin",
+        "vi": "Vui lòng chọn đường dẫn lưu trữ ngoài trước",
+        "th": "กรุณาเลือกพาธที่เก็บข้อมูลภายนอกก่อน",
+        "nl": "Selecteer eerst een extern opslagpad",
+        "pl": "Najpierw wybierz zewnętrzną ścieżkę przechowywania",
+        "id": "Harap pilih jalur penyimpanan eksternal terlebih dahulu",
+        "eo": "Bonvolu unue elekti eksteran stokadan vojon"
+    },
+    "，大小约 %@": {
+        "en": ", size about %@",
+        "zh-Hans": "，大小约 %@", "zh-Hant": "，大小約 %@",
+        "ja": "、サイズ約 %@",
+        "ko": "，크기 약 %@",
+        "de": ", Größe ca. %@",
+        "fr": ", taille env. %@",
+        "es": ", tamaño aprox. %@",
+        "it": ", dimensione circa %@",
+        "pt": ", tamanho aprox. %@",
+        "ru": ", размер ок. %@",
+        "ar": "، الحجم تقريباً %@",
+        "hi": ", आकार लगभग %@",
+        "tr": ", boyut yaklaşık %@",
+        "vi": ", kích thước khoảng %@",
+        "th": " ขนาดประมาณ %@",
+        "nl": ", grootte ca. %@",
+        "pl": ", rozmiar ok. %@",
+        "id": ", ukuran sekitar %@",
+        "eo": ", grandeco ĉirkaŭ %@"
+    },
+    "%@ (%lld 个应用)": {
+        "en": "%@ (%lld Apps)",
+        "zh-Hans": "%@ (%lld 个应用)", "zh-Hant": "%@ (%lld 個應用程式)",
+        "ja": "%@ (%lld 個のアプリ)",
+        "ko": "%@ (%lld 개 앱)",
+        "de": "%@ (%lld Apps)",
+        "fr": "%@ (%lld apps)",
+        "es": "%@ (%lld apps)",
+        "it": "%@ (%lld app)",
+        "pt": "%@ (%lld apps)",
+        "ru": "%@ (%lld приложений)",
+        "ar": "%@ (%lld تطبيقات)",
+        "hi": "%@ (%lld ऐप्स)",
+        "tr": "%@ (%lld uygulama)",
+        "vi": "%@ (%lld ứng dụng)",
+        "th": "%@ (%lld แอป)",
+        "nl": "%@ (%lld apps)",
+        "pl": "%@ (%lld aplikacji)",
+        "id": "%@ (%lld aplikasi)",
+        "eo": "%@ (%lld aplikaĵoj)"
+    },
+    "双击打开系统设置": {
+        "en": "Double-click to open System Settings", "zh-Hans": "双击打开系统设置", "zh-Hant": "雙擊打開系統設定",
+        "ja": "ダブルクリックしてシステム設定を開く", "ko": "더블 클릭하여 시스템 설정 열기"
+    },
+    "日志已清空": {
+        "en": "Log cleared", "zh-Hans": "日志已清空", "zh-Hant": "日誌已清空",
+        "ja": "ログをクリアしました", "ko": "로그 삭제됨"
+    },
+    "日志记录已启用": {
+        "en": "Logging enabled", "zh-Hans": "日志记录已启用", "zh-Hant": "日誌記錄已啟用",
+        "ja": "ログ記録が有効になりました", "ko": "로깅이 활성화됨"
+    },
+    "日志记录已禁用": {
+        "en": "Logging disabled", "zh-Hans": "日志记录已禁用", "zh-Hant": "日誌記錄已停用",
+        "ja": "ログ記録が無効になりました", "ko": "로깅이 비활성화됨"
+    },
+    "启用/禁用日志记录": {
+        "en": "Enable/Disable logging", "zh-Hans": "启用/禁用日志记录", "zh-Hant": "啟用/停用日誌記錄",
+        "ja": "ログ記録の有効/無効", "ko": "로깅 활성화/비활성화"
+    },
+    "GitHub API 响应无效": {
+        "en": "Invalid GitHub API response", "zh-Hans": "GitHub API 响应无效", "zh-Hant": "GitHub API 回應無效",
+        "ja": "GitHub API レスポンスが無効です", "ko": "GitHub API 응답이 잘못됨"
+    },
+    "Finder 删除失败": {
+        "en": "Finder deletion failed", "zh-Hans": "Finder 删除失败", "zh-Hant": "Finder 刪除失敗",
+        "ja": "Finderの削除に失敗しました", "ko": "Finder 삭제 실패"
+    },
+    "无法迁移": {
+        "en": "Cannot migrate", "zh-Hans": "无法迁移", "zh-Hant": "無法遷移",
+        "ja": "移行できません", "ko": "마이그레이션 불가"
+    },
+    "系统设置 > 隐私与安全性 > 完全磁盘访问权限": {
+        "en": "System Settings > Privacy & Security > Full Disk Access", "zh-Hans": "系统设置 > 隐私与安全性 > 完全磁盘访问权限",
+        "zh-Hant": "系統設定 > 隱私與安全性 > 完整磁碟存取權限",
+        "ja": "システム設定 > プライバシーとセキュリティ > フルディスクアクセス",
+        "ko": "시스템 설정 > 개인정보 및 보안 > 전체 디스크 접근"
+    },
+    "该目录包含可执行文件路径引用，整体迁移可能导致命令行工具失效": {
+        "en": "This directory contains executable file path references, migrating may cause CLI tools to fail",
+        "zh-Hans": "该目录包含可执行文件路径引用，整体迁移可能导致命令行工具失效",
+        "zh-Hant": "該目錄包含可執行檔案路徑引用，整體遷移可能導致命令列工具失效",
+        "ja": "このディレクトリには実行ファイルパス参照が含まれており、移行するとCLIツールが使用できなくなる可能性があります"
+    },
+    "本地已存在同名文件": {
+        "en": "A file with the same name already exists locally", "zh-Hans": "本地已存在同名文件",
+        "zh-Hant": "本地已存在同名檔案", "ja": "同名のファイルがローカルに既に存在します"
+    },
+    "本地已存在同名真实文件，无法覆盖": {
+        "en": "A real file with the same name already exists locally, cannot overwrite",
+        "zh-Hans": "本地已存在同名真实文件，无法覆盖", "zh-Hant": "本地已存在同名真實檔案，無法覆寫",
+        "ja": "同名の実ファイルがローカルに既に存在し、上書きできません"
+    },
+    "本地已存在同名文件，无法覆盖": {
+        "en": "A file with the same name already exists locally, cannot overwrite",
+        "zh-Hans": "本地已存在同名文件，无法覆盖", "zh-Hant": "本地已存在同名檔案，無法覆寫",
+        "ja": "同名のファイルがローカルに既に存在し、上書きできません"
+    },
+    " 或 ": {"en": " or ", "zh-Hans": " 或 ", "zh-Hant": " 或 ", "ja": " または ", "ko": " 또는 "},
+    "尝试删除非链接文件": {
+        "en": "Attempted to delete non-link file", "zh-Hans": "尝试删除非链接文件",
+        "zh-Hant": "嘗試刪除非連結檔案", "ja": "リンクでないファイルの削除を試みました"
+    },
+    "diskutil错误": {"en": "diskutil error", "zh-Hans": "diskutil错误", "zh-Hant": "diskutil錯誤", "ja": "diskutilエラー"},
+    "（未知）": {"en": "(Unknown)", "zh-Hans": "（未知）", "zh-Hant": "（未知）", "ja": "（不明）", "ko": "(알 수 없음)"},
+    "发现新版本 %@。\\n%@": {
+        "en": "New version %@ found.\\n%@", "zh-Hans": "发现新版本 %@。\\n%@", "zh-Hant": "發現新版本 %@。\\n%@",
+        "ja": "新しいバージョン %@ が見つかりました。\\n%@", "ko": "새 버전 %@을(를) 발견했습니다.\\n%@"
+    },
+    "App Store 应用不支持迁移，因为迁移后将无法通过 App Store 更新。\\n\\n如需强制迁移，请在设置中启用相应选项。": {
+        "en": "App Store apps cannot be migrated because they won't be updatable via App Store after migration.\\n\\nTo force migration, enable the option in Settings.",
+        "zh-Hans": "App Store 应用不支持迁移，因为迁移后将无法通过 App Store 更新。\\n\\n如需强制迁移，请在设置中启用相应选项。",
+        "zh-Hant": "App Store 應用程式不支援遷移，因為遷移後將無法透過 App Store 更新。\\n\\n如需強制遷移，請在設定中啟用相應選項。",
+        "ja": "App Storeアプリは移行後にApp Store経由で更新できなくなるため、移行できません。\\n\\n強制移行するには、設定で対応するオプションを有効にしてください。"
+    },
+    "非原生 (iPhone/iPad) 应用不支持迁移。\\n\\n如需迁移，请在设置中启用「允许迁移非原生应用」选项。": {
+        "en": "Non-native (iPhone/iPad) apps cannot be migrated.\\n\\nTo migrate, enable 'Allow non-native app migration' in Settings.",
+        "zh-Hans": "非原生 (iPhone/iPad) 应用不支持迁移。\\n\\n如需迁移，请在设置中启用「允许迁移非原生应用」选项。",
+        "zh-Hant": "非原生 (iPhone/iPad) 應用程式不支援遷移。\\n\\n如需遷移，請在設定中啟用「允許遷移非原生應用程式」選項。",
+        "ja": "ネイティブでない (iPhone/iPad) アプリは移行できません。\\n\\n移行するには、設定で「非ネイティブアプリの移行を許可」オプションを有効にしてください。"
+    },
+    "选中的应用包含 App Store 应用和非原生应用。\\n\\n如需迁移，请在设置中启用相应选项。": {
+        "en": "Selected apps include App Store apps and non-native apps.\\n\\nTo migrate, enable the corresponding options in Settings.",
+        "zh-Hans": "选中的应用包含 App Store 应用和非原生应用。\\n\\n如需迁移，请在设置中启用相应选项。",
+        "zh-Hant": "選中的應用程式包含 App Store 應用程式和非原生應用程式。\\n\\n如需遷移，請在設定中啟用相應選項。",
+        "ja": "選択されたアプリにはApp Storeアプリと非ネイティブアプリが含まれています。\\n\\n移行するには、設定で対応するオプションを有効にしてください。"
+    },
+    "选中的 %lld 个应用均来自 App Store，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\\n\\n这是正常的，应用会被安全地移动到外部存储。": {
+        "en": "All %lld selected apps are from the App Store. They will be deleted via Finder during migration (you'll hear the trash sound).\\n\\nThis is normal, apps are safely moved to external storage.",
+        "zh-Hans": "选中的 %lld 个应用均来自 App Store，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\\n\\n这是正常的，应用会被安全地移动到外部存储。",
+        "zh-Hant": "選中的 %lld 個應用程式均來自 App Store，遷移時會使用 Finder 刪除，您會聽到垃圾桶的聲音。\\n\\n這是正常的，應用程式會被安全地移動到外部儲存。",
+        "ja": "選択された %lld 個のアプリはすべてApp Storeからのものです。移行時にFinderで削除されます（ゴミ箱の音がします）。\\n\\nこれは正常な動作で、アプリは安全に外部ストレージに移動されます。"
+    },
+    "腾讯 CodeBuddy 国内版数据": {"en": "Tencent CodeBuddy China version data", "zh-Hans": "腾讯 CodeBuddy 国内版数据", "zh-Hant": "騰訊 CodeBuddy 國內版資料"},
+    "灵码（Lingma）数据": {"en": "Lingma Data", "zh-Hans": "灵码（Lingma）数据", "zh-Hant": "靈碼（Lingma）資料"},
+    "应用缓存（可重建）": {"en": "App cache (rebuildable)", "zh-Hans": "应用缓存（可重建）", "zh-Hant": "應用程式快取（可重建）", "ja": "アプリキャッシュ（再構築可能）"},
+    "应用核心数据（设置、数据库等）": {"en": "Application core data (settings, databases, etc.)", "zh-Hans": "应用核心数据（设置、数据库等）", "zh-Hant": "應用程式核心資料（設定、資料庫等）", "ja": "アプリコアデータ（設定、データベースなど）"},
+    "沙盒容器数据（App Store 应用）": {"en": "Sandbox container data (App Store apps)", "zh-Hans": "沙盒容器数据（App Store 应用）", "zh-Hant": "沙盒容器資料（App Store 應用程式）", "ja": "サンドボックスコンテナデータ（App Storeアプリ）"},
+    ".config（工具配置）": {"en": ".config (Tool Config)", "zh-Hans": ".config（工具配置）", "zh-Hant": ".config（工具設定）", "ja": ".config（ツール設定）"},
 }
 
-xcstrings_format = {
-    "sourceLanguage": "zh-Hans",
-    "strings": {},
-    "version": "1.1"
-}
 
-for key, trans_dict in data.items():
-    string_entry = {
-        "extractionState": "manual",
-        "localizations": {}
+# Braille logic
+def to_braille(text):
+    mapping = {
+        'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑', 'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
+        'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕', 'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
+        'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽', 'z': '⠵',
+        'A': '⠠⠁', 'B': '⠠⠃', 'C': '⠠⠉', 'D': '⠠⠙', 'E': '⠠⠑', 'F': '⠠⠋', 'G': '⠠⠛', 'H': '⠠⠓', 'I': '⠠⠊', 'J': '⠠⠚',
+        'K': '⠠⠅', 'L': '⠠⠇', 'M': '⠠⠍', 'N': '⠠⠝', 'O': '⠠⠕', 'P': '⠠⠏', 'Q': '⠠⠟', 'R': '⠠⠗', 'S': '⠠⠎', 'T': '⠠⠞',
+        'U': '⠠⠥', 'V': '⠠⠧', 'W': '⠠⠺', 'X': '⠠⠭', 'Y': '⠠⠽', 'Z': '⠠⠵',
+        '1': '⠼⠁', '2': '⠼⠃', '3': '⠼⠉', '4': '⠼⠙', '5': '⠼⠑', '6': '⠼⠋', '7': '⠼⠛', '8': '⠼⠓', '9': '⠼⠊', '0': '⠼⠚',
+        ' ': ' ', '.': '⠲', ',': '⠂', '!': '⠖', '?': '⠦', '\'': '⠄', '-': '⠤',
+        '/': '⠌', '(': '⠐⠣', ')': '⠐⠜', ':': '⠒', ';': '⠆'
     }
-    for lang_code in langs:
-        val = ""
-        if lang_code == "br":
-            # Generate Braille from English source unless English is missing, then from Key
-            source_text = trans_dict.get("en", key)
-            val = to_braille(source_text)
-        else:
-            val = trans_dict.get(lang_code, key) # Fallback to key if missing
+    return "".join(mapping.get(char, char) for char in text)
+
+def scan_swift_strings():
+    strings = set()
+    pattern = re.compile(r'"([^"]*[\u4e00-\u9fa5]+[^"]*)"')
+    for root, _, files in os.walk(SWIFT_SCAN_DIR):
+        for file in files:
+            if file.endswith(".swift"):
+                try:
+                    with open(os.path.join(root, file), "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("//"): continue
+                            if any(x in line for x in ["AppLogger", "print(", ".log(", "level:"]): continue
+                            matches = pattern.findall(line)
+                            for m in matches:
+                                if "\\(" in m: continue
+                                strings.add(m)
+                except: continue
+    return strings
+
+def manage():
+    if os.path.exists(XCSTRINGS_PATH):
+        with open(XCSTRINGS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = {"sourceLanguage": "zh-Hans", "strings": {}, "version": "1.1"}
+    
+    found_strings = scan_swift_strings()
+    all_keys = set(data["strings"].keys()) | found_strings | set(DICT.keys())
+    
+    for key in all_keys:
+        if not key: continue
+        entry = data["strings"].get(key, {"extractionState": "manual", "localizations": {}})
+        locs = entry.get("localizations", {})
         
-        string_entry["localizations"][lang_code] = {
-            "stringUnit": {
-                "state": "translated",
-                "value": val
-            }
-        }
-    xcstrings_format["strings"][key] = string_entry
+        has_chinese_key = bool(re.search(r'[\u4e00-\u9fa5]', key))
+        
+        for lang in LANGS:
+            val = None
+            # 1. Explicit DICT entry takes priority
+            if key in DICT and lang in DICT[key]:
+                val = DICT[key][lang]
+            elif lang == "br":
+                # Braille: use English from DICT, or existing English, or key
+                source = DICT.get(key, {}).get("en") or locs.get("en", {}).get("stringUnit", {}).get("value") or key
+                val = to_braille(source)
+            elif lang == "zh-Hans":
+                val = DICT.get(key, {}).get("zh-Hans", key)
+            elif lang == "zh-Hant":
+                if key in DICT and "zh-Hant" in DICT[key]:
+                    val = DICT[key]["zh-Hant"]
+                else:
+                    # Preserve existing zh-Hant or generate from simplified
+                    existing = locs.get(lang, {}).get("stringUnit", {}).get("value")
+                    if existing and existing != key:
+                        val = existing
+                    else:
+                        val = key.replace("数据", "資料").replace("缓存", "快取").replace("设置", "設定").replace("应用", "應用程式").replace("运行", "執行").replace("迁移", "遷移").replace("链接", "連結").replace("目录", "目錄").replace("还原", "還原")
+            else:
+                # For all other languages (en, ja, ko, etc.)
+                existing = locs.get(lang, {}).get("stringUnit", {}).get("value")
+                if existing:
+                    # Keep existing if it's NOT Chinese (for non-CJK langs)
+                    if lang not in ("zh-Hans", "zh-Hant") and has_chinese_key and re.search(r'[\u4e00-\u9fa5]', existing):
+                        # Existing value is Chinese for a non-Chinese language - replace it
+                        val = None
+                    else:
+                        val = existing
+                
+                # If still no value, use English fallback (from DICT or existing)
+                if val is None:
+                    en_val = DICT.get(key, {}).get("en") or locs.get("en", {}).get("stringUnit", {}).get("value")
+                    if en_val and not (has_chinese_key and re.search(r'[\u4e00-\u9fa5]', en_val)):
+                        val = en_val
+                    elif not has_chinese_key:
+                        val = key  # Non-Chinese key can safely be used as fallback
+                    else:
+                        # Last resort: keep key but only for zh-Hans/zh-Hant
+                        val = key if lang in ("zh-Hans", "zh-Hant") else key
+                        # If we really have nothing, use the key (at least it won't crash)
+            
+            locs[lang] = {"stringUnit": {"state": "translated", "value": val}}
+        
+        entry["localizations"] = locs
+        data["strings"][key] = entry
 
-with open('Localizable.xcstrings', 'w') as f:
-    json.dump(xcstrings_format, f, indent=2, ensure_ascii=False)
+    with open(XCSTRINGS_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    print(f"Localization complete. {len(all_keys)} keys processed.")
 
-print("Generated Localizable.xcstrings successfully.")
+if __name__ == "__main__":
+    manage()

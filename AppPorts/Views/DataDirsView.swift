@@ -255,11 +255,11 @@ struct DataDirsView: View {
                     Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
 
                     if selectedApp == nil {
-                        ContentView.EmptyStateView(icon: "arrow.left.circle", text: "从左侧选择一个应用")
+                        ContentView.EmptyStateView(icon: "arrow.left.circle", text: "从左侧选择一个应用".localized)
                     } else if isScanning && libraryItems.isEmpty {
                         loadingView
                     } else if libraryItems.isEmpty {
-                        ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未找到关联数据目录")
+                        ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未找到关联数据目录".localized)
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 4) {
@@ -415,7 +415,7 @@ struct DataDirsView: View {
         }
 
         let destPath = dest.appendingPathComponent(item.type.rawValue).appendingPathComponent(item.path.lastPathComponent)
-        let sizeInfo = item.size.map { "，大小约 \($0)".localized } ?? ""
+        let sizeInfo = item.size.map { String(format: "，大小约 %@".localized, $0) } ?? ""
 
         confirmTitle = "迁移数据目录".localized
         confirmMessage = """
