@@ -31,6 +31,12 @@ import Foundation
 ///
 /// - Note: 使用 Actor 确保所有扫描操作在后台线程串行执行，不阻塞 UI
 actor AppScanner {
+    enum AppSizeMode {
+        /// 解析到真实 bundle 或目录后计算内容体积。
+        case logicalContent
+        /// 保留本地入口结构，仅统计 symlink 或 wrapper 自身占用。
+        case localPortal
+    }
     
     // MARK: - 公共 API
     
@@ -44,14 +50,35 @@ actor AppScanner {
     /// - Note:
     ///   - 普通目录：跳过内部符号链接，避免重复计算
     ///   - `.app` 包：会尽量解析入口 symlink 或 `Contents` 深层链接，得到真实体积
-    func calculateDirectorySize(at url: URL) -> Int64 {
+    func calculateDirectorySize(at url: URL, mode: AppSizeMode = .logicalContent) -> Int64 {
         let fileManager = FileManager.default
         var size: Int64 = 0
-        let scanURL = resolveSizeCalculationURL(for: url)
+        let scanURL: URL
+        let countsSymlinkEntries: Bool
+
+        switch mode {
+        case .logicalContent:
+            scanURL = resolveSizeCalculationURL(for: url)
+            countsSymlinkEntries = false
+        case .localPortal:
+            scanURL = url
+            countsSymlinkEntries = true
+        }
+
         guard fileManager.fileExists(atPath: scanURL.path) else { return 0 }
         
         // 需要获取的资源键
-        let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]
+        let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey, .isDirectoryKey]
+
+        if let rootValues = try? scanURL.resourceValues(forKeys: Set(resourceKeys)) {
+            if case .localPortal = mode, rootValues.isSymbolicLink == true {
+                return Int64(rootValues.fileSize ?? 0)
+            }
+
+            if rootValues.isDirectory != true {
+                return Int64(rootValues.fileSize ?? 0)
+            }
+        }
         
         // 创建目录枚举器（深度优先遍历）
         guard let enumerator = fileManager.enumerator(
@@ -64,10 +91,23 @@ actor AppScanner {
         // 累加所有文件大小
         for case let fileURL as URL in enumerator {
             let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys))
-            if resourceValues?.isSymbolicLink == true { continue }
+            if resourceValues?.isSymbolicLink == true {
+                if countsSymlinkEntries {
+                    size += Int64(resourceValues?.fileSize ?? 0)
+                }
+                continue
+            }
             if let fileSize = resourceValues?.fileSize { size += Int64(fileSize) }
         }
         return size
+    }
+
+    /// 根据显示场景选择应用体积计算方式。
+    ///
+    /// 本地列表中的“已链接”应用应显示本地入口大小，避免看起来像在本地保留了一整份实体副本。
+    func calculateDisplayedSize(for app: AppItem, isLocalEntry: Bool) -> Int64 {
+        let mode: AppSizeMode = (isLocalEntry && app.status == "已链接") ? .localPortal : .logicalContent
+        return calculateDirectorySize(at: app.path, mode: mode)
     }
     
     /// 扫描本地应用目录
@@ -86,6 +126,16 @@ actor AppScanner {
     ///   - 运行状态检测
     ///   - App Store 应用和 iOS 应用检测
     func scanLocalApps(at dir: URL, runningAppURLs: Set<URL>) -> [AppItem] {
+        let scanID = AppLogger.shared.makeOperationID(prefix: "app-scanner-local")
+        AppLogger.shared.logContext(
+            "AppScanner 开始扫描本地应用",
+            details: [
+                ("scan_id", scanID),
+                ("directory", dir.path),
+                ("running_app_count", String(runningAppURLs.count))
+            ],
+            level: "TRACE"
+        )
         let fileManager = FileManager.default
         var newApps: [AppItem] = []
         
@@ -114,6 +164,7 @@ actor AppScanner {
                 if !appsInFolder.isEmpty {
                     let folderName = itemURL.lastPathComponent
                     let appCount = appsInFolder.count
+                    let status = detectLocalFolderStatus(at: itemURL)
                     
                     // 检查文件夹内是否有正在运行的应用
                     let hasRunning = appsInFolder.contains { runningAppURLs.contains($0) }
@@ -121,7 +172,7 @@ actor AppScanner {
                     newApps.append(AppItem(
                         name: folderName,
                         path: itemURL,
-                        status: "本地",
+                        status: status,
                         isSystemApp: false,
                         isRunning: hasRunning,
                         isFolder: true,
@@ -130,7 +181,18 @@ actor AppScanner {
                 }
             }
         }
-        return sortApps(newApps)
+        let sortedApps = sortApps(newApps)
+        AppLogger.shared.logContext(
+            "AppScanner 完成本地应用扫描",
+            details: [
+                ("scan_id", scanID),
+                ("count", String(sortedApps.count)),
+                ("statuses", Dictionary(grouping: sortedApps, by: \.status).map { "\($0.key)=\($0.value.count)" }.sorted().joined(separator: ", ")),
+                ("running_count", String(sortedApps.filter(\.isRunning).count))
+            ],
+            level: "TRACE"
+        )
+        return sortedApps
     }
     
     // MARK: - 私有辅助方法
@@ -158,6 +220,14 @@ actor AppScanner {
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
         if let linkDest = resolveSymlinkDestination(of: resourcesURL) {
             return isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) ? "已链接" : "本地"
+        }
+
+        return "本地"
+    }
+
+    private func detectLocalFolderStatus(at folderURL: URL) -> String {
+        if let linkDest = resolveSymlinkDestination(of: folderURL) {
+            return isCrossVolumeLink(fromPortalAt: folderURL, to: linkDest) ? "已链接" : "本地"
         }
 
         return "本地"
@@ -202,6 +272,31 @@ actor AppScanner {
 
         let parent = url.deletingLastPathComponent()
         return URL(fileURLWithPath: rawPath, relativeTo: parent).standardizedFileURL
+    }
+
+    private func isLocalApp(_ localAppURL: URL, linkedTo externalAppURL: URL) -> Bool {
+        let standardizedExternalAppURL = externalAppURL.standardizedFileURL
+
+        if let linkDestination = resolveSymlinkDestination(of: localAppURL),
+           linkDestination == standardizedExternalAppURL {
+            return true
+        }
+
+        let localContentsURL = localAppURL.appendingPathComponent("Contents")
+        if let contentsDestination = resolveSymlinkDestination(of: localContentsURL),
+           contentsDestination == standardizedExternalAppURL.appendingPathComponent("Contents").standardizedFileURL {
+            return true
+        }
+
+        return false
+    }
+
+    private func isLocalFolder(_ localFolderURL: URL, linkedTo externalFolderURL: URL) -> Bool {
+        guard let linkDestination = resolveSymlinkDestination(of: localFolderURL) else {
+            return false
+        }
+
+        return linkDestination == externalFolderURL.standardizedFileURL
     }
 
     private func enclosingAppBundleURL(for url: URL) -> URL {
@@ -305,6 +400,16 @@ actor AppScanner {
     ///
     /// - Note: 通过检查本地是否存在同名符号链接来判断应用是否已链接
     func scanExternalApps(at dir: URL, localAppsDir: URL) -> [AppItem] {
+        let scanID = AppLogger.shared.makeOperationID(prefix: "app-scanner-external")
+        AppLogger.shared.logContext(
+            "AppScanner 开始扫描外部应用",
+            details: [
+                ("scan_id", scanID),
+                ("directory", dir.path),
+                ("local_apps_directory", localAppsDir.path)
+            ],
+            level: "TRACE"
+        )
         let fileManager = FileManager.default
         var newApps: [AppItem] = []
         let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isDirectoryKey]
@@ -317,29 +422,9 @@ actor AppScanner {
                 
                 // 检查本地是否存在符号链接
                 let localAppURL = localAppsDir.appendingPathComponent(appName)
-                if fileManager.fileExists(atPath: localAppURL.path) {
-                    // 1. 检查标准符号链接（整个 .app 是符号链接）
-                    if let resourceValues = try? localAppURL.resourceValues(forKeys: [.isSymbolicLinkKey]),
-                       resourceValues.isSymbolicLink == true {
-                        // 验证符号链接是否指向当前外部应用
-                        if let linkDest = try? fileManager.destinationOfSymbolicLink(atPath: localAppURL.path),
-                           linkDest == itemURL.path {
-                            status = "已链接"
-                        }
-                    } else if let resourceValues = try? localAppURL.resourceValues(forKeys: [.isDirectoryKey]),
-                              resourceValues.isDirectory == true {
-                        // 2. 检查深层符号链接（Contents 是符号链接）
-                        let localContentsURL = localAppURL.appendingPathComponent("Contents")
-                        if let contentsValues = try? localContentsURL.resourceValues(forKeys: [.isSymbolicLinkKey]),
-                           contentsValues.isSymbolicLink == true {
-                            // 验证 Contents 符号链接是否指向当前外部应用的 Contents
-                            let externalContentsURL = itemURL.appendingPathComponent("Contents")
-                            if let linkDest = try? fileManager.destinationOfSymbolicLink(atPath: localContentsURL.path),
-                               linkDest == externalContentsURL.path {
-                                status = "已链接"
-                            }
-                        }
-                    }
+                if fileManager.fileExists(atPath: localAppURL.path),
+                   isLocalApp(localAppURL, linkedTo: itemURL) {
+                    status = "已链接"
                 }
                 newApps.append(AppItem(name: appName, path: itemURL, status: status, isSystemApp: false, isRunning: false))
             }
@@ -351,28 +436,25 @@ actor AppScanner {
                 let appsInFolder = folderContents.filter { $0.pathExtension == "app" }
                 
                 if !appsInFolder.isEmpty {
-                    // 这是一个包含应用的文件夹
                     let folderName = itemURL.lastPathComponent
                     let appCount = appsInFolder.count
-                    
-                    // 检查文件夹内的应用有多少已链接到本地
-                    var linkedCount = 0
-                    for appURL in appsInFolder {
-                        let appName = appURL.lastPathComponent
-                        let localAppURL = localAppsDir.appendingPathComponent(appName)
-                        if fileManager.fileExists(atPath: localAppURL.path) {
-                            linkedCount += 1
-                        }
-                    }
-                    
-                   // 确定文件夹状态
                     let status: String
-                    if linkedCount == 0 {
-                        status = "未链接"
-                    } else if linkedCount == appCount {
+                    let localFolderURL = localAppsDir.appendingPathComponent(folderName)
+                    if fileManager.fileExists(atPath: localFolderURL.path),
+                       isLocalFolder(localFolderURL, linkedTo: itemURL) {
                         status = "已链接"
                     } else {
-                        status = "部分链接"
+                        var linkedCount = 0
+                        for appURL in appsInFolder {
+                            let appName = appURL.lastPathComponent
+                            let localAppURL = localAppsDir.appendingPathComponent(appName)
+                            if fileManager.fileExists(atPath: localAppURL.path),
+                               isLocalApp(localAppURL, linkedTo: appURL) {
+                                linkedCount += 1
+                            }
+                        }
+
+                        status = linkedCount == 0 ? "未链接" : "部分链接"
                     }
                     
                     newApps.append(AppItem(
@@ -387,7 +469,17 @@ actor AppScanner {
                 }
             }
         }
-        return sortApps(newApps)
+        let sortedApps = sortApps(newApps)
+        AppLogger.shared.logContext(
+            "AppScanner 完成外部应用扫描",
+            details: [
+                ("scan_id", scanID),
+                ("count", String(sortedApps.count)),
+                ("statuses", Dictionary(grouping: sortedApps, by: \.status).map { "\($0.key)=\($0.value.count)" }.sorted().joined(separator: ", "))
+            ],
+            level: "TRACE"
+        )
+        return sortedApps
     }
     
     /// 应用列表排序

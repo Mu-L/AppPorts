@@ -8,8 +8,19 @@
 
 ## 🧪 测试情况 | Testing
 - [ ] 已在本地 Xcode 环境运行通过 | Passed local Xcode build and run
+- [ ] 如有需要，已运行包含本地化审计在内的测试 | Ran tests including localization audit if needed
 - [ ] 核心功能经过手动验证 | Core functions manually verified
 - [ ] 修复了可能导致的权限或异常问题 | Fixed potential permission or exception issues
+
+## 🌐 本地化影响 | Localization Impact
+> 如本次 PR 涉及任何用户可见文案、菜单、弹窗、设置项、错误提示、日志导出文案或状态文案，欢迎同步完成本地化适配；当然可以暂时不做，也可以在 PR 说明里写清原因或后续计划。  
+> Localization is recommended for user-facing copy changes, but it is not mandatory for every PR. If you are not doing it in this PR, please briefly explain why or note a follow-up plan.
+
+- [ ] 本 PR 不涉及任何用户可见文案 | This PR does not change any user-facing copy
+- [ ] 如涉及用户可见文案，已同步更新 `Localizable.xcstrings` | If user-facing copy changed, `Localizable.xcstrings` was updated in this PR
+- [ ] 如涉及用户可见文案，本次暂未同步本地化，已在说明中写明原因或后续计划 | If user-facing copy changed and localization was not included, I documented the reason or follow-up plan
+- [ ] 如涉及用户可见文案，已检查至少 `zh-Hans` 与 `en` 的实际显示（可选） | If user-facing copy changed, I optionally verified the rendered result in at least `zh-Hans` and `en`
+- [ ] 如涉及用户可见文案，已运行 `LocalizationAuditTests` 或等效本地化检查（可选） | If user-facing copy changed, I optionally ran `LocalizationAuditTests` or an equivalent localization check
 
 ## 📸 屏幕截图 | Screenshots (Optional)
 <!-- [CN] 如果是 UI 相关的变更，请附上截图以供参考 -->

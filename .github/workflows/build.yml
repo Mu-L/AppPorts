@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build macOS App
+    name: PR Quality Gates
     runs-on: macos-latest
 
     steps:
@@ -17,6 +17,34 @@ jobs:
 
       - name: Set up Xcode version
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Run Required PR Tests
+        run: |
+          xcodebuild test \
+            -scheme "AppPorts" \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            -only-testing:"AppPortsTests/DataDirMoverTests" \
+            -only-testing:"AppPortsTests/DataDirScannerTests" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run Localization Audit (Advisory)
+        continue-on-error: true
+        run: |
+          xcodebuild test \
+            -scheme "AppPorts" \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            -only-testing:"AppPortsTests/LocalizationAuditTests" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Build App
         run: |

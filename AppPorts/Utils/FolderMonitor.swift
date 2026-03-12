@@ -65,20 +65,39 @@ class FolderMonitor {
     /// - Note: 回调在后台队列执行，需要在主线程更新 UI
     func startMonitoring(onChange: @escaping () -> Void) {
         self.onChange = onChange
+        AppLogger.shared.logContext("FolderMonitor 开始监控请求", details: [("path", url.path)], level: "TRACE")
         
         // 确保文件夹存在
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            AppLogger.shared.logError(
+                "FolderMonitor 启动失败：目录不存在",
+                context: [("path", url.path)],
+                relatedURLs: [("path", url)]
+            )
+            return
+        }
         
         // 打开目录获取文件描述符（只读模式）
         fileDescriptor = open(url.path, O_EVTONLY)
-        guard fileDescriptor != -1 else { return }
+        guard fileDescriptor != -1 else {
+            let error = NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSLocalizedDescriptionKey: String(cString: strerror(errno))])
+            AppLogger.shared.logError(
+                "FolderMonitor 启动失败：无法打开目录",
+                error: error,
+                context: [("path", url.path)],
+                relatedURLs: [("path", url)]
+            )
+            return
+        }
         
         // 创建文件系统监控源（监听写操作事件）
         dispatchSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: .write, queue: queue)
         
         // 设置事件处理器
         dispatchSource?.setEventHandler { [weak self] in
-            self?.onChange?()
+            guard let self else { return }
+            AppLogger.shared.logContext("FolderMonitor 检测到目录变化", details: [("path", self.url.path)], level: "TRACE")
+            self.onChange?()
         }
         
         // 设置取消处理器（清理资源）
@@ -91,12 +110,16 @@ class FolderMonitor {
         
         // 启动监控
         dispatchSource?.resume()
+        AppLogger.shared.logContext("FolderMonitor 已启动", details: [("path", url.path)], level: "TRACE")
     }
     
     /// 停止监控文件夹变化
     ///
     /// - Note: 会触发取消处理器，自动关闭文件描述符
     func stopMonitoring() {
+        if dispatchSource != nil {
+            AppLogger.shared.logContext("FolderMonitor 停止监控", details: [("path", url.path)], level: "TRACE")
+        }
         dispatchSource?.cancel()
         // 取消处理器会关闭文件描述符
     }

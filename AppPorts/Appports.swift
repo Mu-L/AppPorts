@@ -34,8 +34,7 @@ struct AppMoverApp: App {
     
     init() {
         // 应用启动时记录系统诊断信息
-        AppLogger.shared.log("========== AppPorts 启动 ==========")
-        AppLogger.shared.logSystemInfo()
+        AppLogger.shared.logLaunchSession()
     }
     
     var body: some Scene {
@@ -69,44 +68,27 @@ struct AppMoverApp: App {
             }
             
             CommandMenu("语言".localized) {
-                Button("跟随系统 (System)".localized) { languageManager.language = "system" }
+                Button(AppLanguageCatalog.systemOptionTitle) { languageManager.language = "system" }
                 .keyboardShortcut("0", modifiers: [.command, .option])
                 
                 Divider()
                 
-                Group {
-                    Button("🇺🇸 English") { languageManager.language = "en" }
-                    .keyboardShortcut("1", modifiers: [.command, .option])
-                    Button("🇨🇳 简体中文") { languageManager.language = "zh-Hans" }
-                    .keyboardShortcut("2", modifiers: [.command, .option])
-                    Button("🇭🇰 繁體中文") { languageManager.language = "zh-Hant" }
-                    .keyboardShortcut("3", modifiers: [.command, .option])
+                ForEach(AppLanguageCatalog.primaryLanguages) { option in
+                    if let shortcut = option.keyboardShortcut {
+                        Button(option.menuTitle) { languageManager.language = option.code }
+                            .keyboardShortcut(shortcut, modifiers: [.command, .option])
+                    } else {
+                        Button(option.menuTitle) { languageManager.language = option.code }
+                    }
                 }
 
                 Divider()
-                Text("AI Translated").font(.caption).foregroundColor(.secondary)
+                Text(AppLanguageCatalog.aiSectionTitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 
-                Group {
-                    Button("🇪🇸 Español (AI)") { languageManager.language = "es" }
-                    Button("🇫🇷 Français (AI)") { languageManager.language = "fr" }
-                    Button("🇵🇹 Português (AI)") { languageManager.language = "pt" }
-                    Button("🇮🇹 Italiano (AI)") { languageManager.language = "it" }
-                    Button("🇩🇪 Deutsch (AI)") { languageManager.language = "de" }
-                    Button("🇯🇵 日本語 (AI)") { languageManager.language = "ja" }
-                    Button("🇰🇷 한국어 (AI)") { languageManager.language = "ko" }
-                    Button("🇷🇺 Русский (AI)") { languageManager.language = "ru" }
-                }
-                Group {
-                    Button("🇸🇦 العربية (AI)") { languageManager.language = "ar" }
-                    Button("🇮🇳 हिन्दी (AI)") { languageManager.language = "hi" }
-                    Button("🇻🇳 Tiếng Việt (AI)") { languageManager.language = "vi" }
-                    Button("🇹🇭 ไทย (AI)") { languageManager.language = "th" }
-                    Button("🇹🇷 Türkçe (AI)") { languageManager.language = "tr" }
-                    Button("🇳🇱 Nederlands (AI)") { languageManager.language = "nl" }
-                    Button("🇵🇱 Polski (AI)") { languageManager.language = "pl" }
-                    Button("🇮🇩 Indonesia (AI)") { languageManager.language = "id" }
-                    Button("🏁 Esperanto (AI)") { languageManager.language = "eo" }
-                    Button("⠃⠗ Braille") { languageManager.language = "br" }
+                ForEach(AppLanguageCatalog.aiTranslatedLanguages) { option in
+                    Button(option.menuTitle) { languageManager.language = option.code }
                 }
             }
             
@@ -116,6 +98,10 @@ struct AppMoverApp: App {
                     AppLogger.shared.openLogInFinder()
                 }
                 .keyboardShortcut("L", modifiers: [.command, .shift])
+
+                Button("导出诊断包（菜单）".localized) {
+                    AppLogger.shared.exportDiagnosticPackageInteractively()
+                }
                 
                 Button("设置日志位置...".localized) {
                     let panel = NSOpenPanel()

@@ -1,12 +1,12 @@
-name: "🐛 Bug / 问题反馈"
-description: "Report a bug / 反馈一个问题"
+name: "🐛 问题反馈 / Bug Report"
+description: "提交问题反馈 / Report a bug"
 title: "[BUG] "
 labels: ["bug"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: "Problem / 问题描述"
+      label: "问题描述 / Problem"
       placeholder: "请清楚描述你遇到的问题 / Describe the issue clearly"
     validations:
       required: true
@@ -14,7 +14,7 @@ body:
   - type: textarea
     id: steps
     attributes:
-      label: "Steps to Reproduce / 复现步骤"
+      label: "复现步骤 / Steps to Reproduce"
       placeholder: |
         1. ...
         2. ...
@@ -25,59 +25,97 @@ body:
   - type: input
     id: os_version
     attributes:
-      label: "OS Version / 设备系统版本"
-      placeholder: "e.g. macOS 14.2"
+      label: "设备系统版本 / OS Version"
+      placeholder: "例如 macOS 14.2 / e.g. macOS 14.2"
     validations:
       required: true
 
   - type: input
     id: app_version
     attributes:
-      label: "App Version / 软件版本"
-      placeholder: "e.g. v1.3.0"
+      label: "软件版本 / App Version"
+      placeholder: "例如 v1.3.0 / e.g. v1.3.0"
     validations:
       required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### 诊断包 / Diagnostic Package
+
+        **AppPorts 1.6.1 及之后版本**：请优先附上诊断包。  
+        **AppPorts 1.6.1 and later**: please attach a diagnostic package first.
+
+        **导出方法 / How to export**
+        1. 打开 AppPorts
+        2. 点击 **`日志 > 导出诊断包...`**
+           或 **`设置 > 日志设置 > 导出诊断包`**
+        3. 将导出的 `.zip` 拖到下方“诊断包”区域
+        4. 如果暂时无法提供，请在下方说明原因；只有无法提供时再粘贴日志
+
+  - type: checkboxes
+    id: diagnostic_ack
+    attributes:
+      label: "诊断信息确认 / Diagnostics"
+      options:
+        - label: "我已附上诊断包；如无法提供，已在下方说明原因。 / I attached a diagnostic package or explained why it is unavailable."
+          required: true
+
+  - type: textarea
+    id: diagnostic_package
+    attributes:
+      label: "诊断包 / Diagnostic Package"
+      description: |
+        请将导出的 `.zip` 拖到这里；如无法提供，请说明原因。
+        Attach the exported `.zip` here. If unavailable, explain why.
+      placeholder: |
+        可拖拽导出的诊断包到这里，
+        或说明当前无法提供的原因。
+
+        Drag the exported diagnostic package here,
+        or explain why it is unavailable.
+    validations:
+      required: false
 
   - type: checkboxes
     id: external_storage_type
     attributes:
-      label: "External Storage Type / 外置存储设备类型"
-      description: "Select all that apply / 可多选"
+      label: "外置存储设备类型 / External Storage Type"
+      description: "可多选 / Select all that apply"
       options:
         - label: "NAS"
-        - label: "Portable External Drive / 移动硬盘"
-        - label: "Drive Enclosure / 移动硬盘盒"
-        - label: "Other / 其他"
+        - label: "移动硬盘 / Portable External Drive"
+        - label: "移动硬盘盒 / Drive Enclosure"
+        - label: "其他 / Other"
     validations:
       required: true
 
   - type: input
     id: external_storage_model
     attributes:
-      label: "External Storage Product Name / 外置存储设备产品名"
+      label: "外置存储设备产品名 / External Storage Product Name"
       description: |
+        如果使用移动硬盘盒，请填写【硬盘盒型号 + 内置硬盘型号】
         If using a drive enclosure, please provide BOTH:
         - Enclosure model
         - Installed drive model
-
-        如果使用移动硬盘盒，请填写【硬盘盒型号 + 内置硬盘型号】
-      placeholder: "e.g. ORICO M.2 Enclosure + Samsung 970 EVO Plus"
+      placeholder: "例如 ORICO M.2 Enclosure + Samsung 970 EVO Plus"
     validations:
       required: false
 
   - type: textarea
     id: screenshots
     attributes:
-      label: "Screenshots (Optional) / 截图（可选）"
-      placeholder: "Drag & drop images here / 可直接拖拽截图"
+      label: "截图（可选） / Screenshots (Optional)"
+      placeholder: "可直接拖拽截图 / Drag & drop images here"
     validations:
       required: false
 
   - type: textarea
     id: logs
     attributes:
-      label: "Logs (Optional) / 日志（可选）"
+      label: "日志（可选，仅在无诊断包时填写） / Logs (Optional, only if no diagnostic package)"
       render: shell
-      placeholder: "Paste logs here / 粘贴相关日志"
+      placeholder: "粘贴相关日志 / Paste logs here"
     validations:
       required: false

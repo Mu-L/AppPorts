@@ -22,7 +22,8 @@ import Foundation
 actor DataDirMover {
 
     private let fileManager = FileManager.default
-    private let homeDir = URL(fileURLWithPath: NSHomeDirectory())
+    private let homeDir: URL
+    private let failSymlinkCreation: Bool
     private let managedLinkMarkerFileName = ".appports-link-metadata.plist"
     private let managedLinkMetadataSidecarSuffix = ".appports-link-metadata.plist"
     private let managedLinkIdentifier = "com.shimoko.AppPorts"
@@ -34,6 +35,14 @@ actor DataDirMover {
         let sourcePath: String
         let destinationPath: String
         let dataDirType: String
+    }
+
+    init(
+        homeDir: URL = URL(fileURLWithPath: NSHomeDirectory()),
+        failSymlinkCreation: Bool = false
+    ) {
+        self.homeDir = homeDir.standardizedFileURL
+        self.failSymlinkCreation = failSymlinkCreation
     }
 
     // MARK: - 迁移
@@ -60,14 +69,50 @@ actor DataDirMover {
     ) async throws {
         let sourcePath = item.path
         let destPath = externalBaseURL.appendingPathComponent(sourcePath.lastPathComponent)
+        let operationID = AppLogger.shared.makeOperationID(prefix: "data-migrate")
+        let startedAt = Date()
+        var operationResult = "failed"
+        var operationErrorCode: String?
+
+        defer {
+            AppLogger.shared.logOperationSummary(
+                category: "data_migrate",
+                operationID: operationID,
+                result: operationResult,
+                startedAt: startedAt,
+                errorCode: operationErrorCode,
+                details: [
+                    ("item_name", item.name),
+                    ("type", item.type.rawValue),
+                    ("source_path", sourcePath.path),
+                    ("destination_path", destPath.path)
+                ]
+            )
+        }
 
         AppLogger.shared.log("===== 开始迁移数据目录 =====")
-        AppLogger.shared.log("目录名称: \(item.name)")
-        AppLogger.shared.log("源路径: \(sourcePath.path)")
-        AppLogger.shared.log("目标路径: \(destPath.path)")
+        AppLogger.shared.logContext(
+            "数据目录迁移上下文",
+            details: [
+                ("operation_id", operationID),
+                ("item_name", item.name),
+                ("type", item.type.rawValue),
+                ("priority", item.priority.rawValue),
+                ("status", item.status),
+                ("source_path", sourcePath.path),
+                ("destination_path", destPath.path)
+            ]
+        )
+        AppLogger.shared.logPathState("数据目录迁移前-本地源[\(operationID)]", url: sourcePath)
+        AppLogger.shared.logPathState("数据目录迁移前-外部目标[\(operationID)]", url: destPath)
 
         // 1. 确保目标父目录可写
-        try checkWritePermission(at: externalBaseURL)
+        do {
+            try checkWritePermission(at: externalBaseURL)
+        } catch {
+            operationErrorCode = "DATA-MIGRATE-PERMISSION-DENIED"
+            throw error
+        }
 
         // 2. 冲突检测
         if fileManager.fileExists(atPath: destPath.path) {
@@ -78,7 +123,13 @@ actor DataDirMover {
                 AppLogger.shared.log("已删除目标位置旧符号链接")
             } else {
                 // 真实目录/文件 → 拒绝
-                AppLogger.shared.logError("目标路径已存在真实目录，无法覆盖")
+                AppLogger.shared.logError(
+                    "目标路径已存在真实目录，无法覆盖",
+                    errorCode: "DATA-MIGRATE-DESTINATION-CONFLICT",
+                    context: [("operation_id", operationID)],
+                    relatedURLs: [("destination", destPath)]
+                )
+                operationErrorCode = "DATA-MIGRATE-DESTINATION-CONFLICT"
                 throw DataDirError.destinationExists(destPath)
             }
         }
@@ -86,17 +137,37 @@ actor DataDirMover {
         // 3. 复制到外部存储（带进度）
         AppLogger.shared.log("步骤1: 开始复制数据目录...")
         let copier = FileCopier()
-        try await copier.copyDirectory(from: sourcePath, to: destPath, progressHandler: progressHandler)
-        AppLogger.shared.log("步骤1: 复制完成")
+        do {
+            try await copier.copyDirectory(from: sourcePath, to: destPath, progressHandler: progressHandler)
+            AppLogger.shared.log("步骤1: 复制完成")
+            AppLogger.shared.logPathState("数据目录步骤1后-外部副本[\(operationID)]", url: destPath)
+        } catch {
+            AppLogger.shared.logError(
+                "步骤1: 复制失败，清理外部半成品目录",
+                error: error,
+                errorCode: "DATA-MIGRATE-COPY-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("source", sourcePath), ("destination_root", externalBaseURL), ("destination", destPath)]
+            )
+            cleanupFailedMigrationDestination(at: destPath, within: externalBaseURL, operationID: operationID)
+            operationErrorCode = "DATA-MIGRATE-COPY-FAILED"
+            throw DataDirError.copyFailed(error)
+        }
 
         // 3.5 写入 AppPorts 管理标记，用于后续精准识别受管链接
         do {
             try writeManagedLinkMetadata(sourcePath: sourcePath, destinationPath: destPath, type: item.type)
             AppLogger.shared.log("步骤1.5: 已写入 AppPorts 链接标记")
         } catch {
-            AppLogger.shared.logError("步骤1.5: 写入 AppPorts 链接标记失败，执行回滚", error: error)
-            try? removeManagedLinkMetadata(in: destPath)
-            try? fileManager.removeItem(at: destPath)
+            AppLogger.shared.logError(
+                "步骤1.5: 写入 AppPorts 链接标记失败，执行回滚",
+                error: error,
+                errorCode: "DATA-MIGRATE-METADATA-WRITE-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("source", sourcePath), ("destination", destPath)]
+            )
+            cleanupFailedMigrationDestination(at: destPath, within: externalBaseURL, operationID: operationID)
+            operationErrorCode = "DATA-MIGRATE-METADATA-WRITE-FAILED"
             throw DataDirError.metadataWriteFailed(error)
         }
 
@@ -105,34 +176,53 @@ actor DataDirMover {
         do {
             try fileManager.removeItem(at: sourcePath)
             AppLogger.shared.log("步骤2: 删除成功")
+            AppLogger.shared.logPathState("数据目录步骤2后-本地源[\(operationID)]", url: sourcePath)
         } catch {
             // 回滚：删除外部已复制的目录
-            AppLogger.shared.logError("步骤2: 删除失败，执行回滚", error: error)
-            try? removeManagedLinkMetadata(in: destPath)
-            try? fileManager.removeItem(at: destPath)
+            AppLogger.shared.logError(
+                "步骤2: 删除失败，执行回滚",
+                error: error,
+                errorCode: "DATA-MIGRATE-SOURCE-DELETE-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("source", sourcePath), ("destination", destPath)]
+            )
+            cleanupFailedMigrationDestination(at: destPath, within: externalBaseURL, operationID: operationID)
             AppLogger.shared.log("回滚：已删除外部副本")
+            operationResult = "rolled_back"
+            operationErrorCode = "DATA-MIGRATE-SOURCE-DELETE-FAILED"
             throw DataDirError.deletionFailed(error)
         }
 
         // 5. 在原路径创建符号链接
         AppLogger.shared.log("步骤3: 创建符号链接...")
         do {
-            try fileManager.createSymbolicLink(at: sourcePath, withDestinationURL: destPath)
+            try createSymbolicLink(at: sourcePath, withDestinationURL: destPath)
             AppLogger.shared.log("步骤3: 符号链接创建成功: \(sourcePath.path) → \(destPath.path)")
+            AppLogger.shared.logPathState("数据目录步骤3后-本地入口[\(operationID)]", url: sourcePath)
         } catch {
             // 符号链接创建失败是严重错误：数据已在外部，但原路径为空
             // 尝试把数据复制回来作为应急回滚
-            AppLogger.shared.logError("步骤3: 符号链接创建失败，紧急回滚", error: error)
+            AppLogger.shared.logError(
+                "步骤3: 符号链接创建失败，紧急回滚",
+                error: error,
+                errorCode: "DATA-MIGRATE-SYMLINK-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("source", sourcePath), ("destination", destPath)]
+            )
             let emergencyCopier = FileCopier()
             try? await emergencyCopier.copyDirectory(from: destPath, to: sourcePath, progressHandler: nil)
             try? removeManagedLinkMetadata(in: sourcePath)
-            try? removeManagedLinkMetadata(in: destPath)
-            try? fileManager.removeItem(at: destPath)
+            cleanupFailedMigrationDestination(at: destPath, within: externalBaseURL, operationID: operationID)
             AppLogger.shared.log("紧急回滚完成：数据已恢复到本地")
+            operationResult = "rolled_back"
+            operationErrorCode = "DATA-MIGRATE-SYMLINK-FAILED"
             throw DataDirError.symlinkFailed(error)
         }
 
         AppLogger.shared.log("===== 数据目录迁移完成 =====")
+        AppLogger.shared.logPathState("数据目录迁移完成-本地入口[\(operationID)]", url: sourcePath)
+        AppLogger.shared.logPathState("数据目录迁移完成-外部目标[\(operationID)]", url: destPath)
+        operationResult = "success"
     }
 
     // MARK: - 还原
@@ -156,26 +246,76 @@ actor DataDirMover {
         progressHandler: FileCopier.ProgressHandler?
     ) async throws {
         let localPath = item.path
+        let operationID = AppLogger.shared.makeOperationID(prefix: "data-restore")
+        let startedAt = Date()
+        var operationResult = "failed"
+        var operationErrorCode: String?
+
+        defer {
+            AppLogger.shared.logOperationSummary(
+                category: "data_restore",
+                operationID: operationID,
+                result: operationResult,
+                startedAt: startedAt,
+                errorCode: operationErrorCode,
+                details: [
+                    ("item_name", item.name),
+                    ("type", item.type.rawValue),
+                    ("local_path", localPath.path)
+                ]
+            )
+        }
 
         AppLogger.shared.log("===== 开始还原数据目录 =====")
-        AppLogger.shared.log("目录名称: \(item.name)")
-        AppLogger.shared.log("本地路径: \(localPath.path)")
+        AppLogger.shared.logContext(
+            "数据目录还原上下文",
+            details: [
+                ("operation_id", operationID),
+                ("item_name", item.name),
+                ("type", item.type.rawValue),
+                ("status", item.status),
+                ("local_path", localPath.path)
+            ]
+        )
+        AppLogger.shared.logPathState("数据目录还原前-本地入口[\(operationID)]", url: localPath)
 
         // 确认是符号链接
         guard let values = try? localPath.resourceValues(forKeys: [.isSymbolicLinkKey]),
               values.isSymbolicLink == true else {
+            AppLogger.shared.logError(
+                "数据目录还原前检查失败：本地路径不是符号链接",
+                errorCode: "DATA-RESTORE-NOT-A-SYMLINK",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath)]
+            )
+            operationErrorCode = "DATA-RESTORE-NOT-A-SYMLINK"
             throw DataDirError.notASymlink(localPath)
         }
 
         // 获取外部路径
         guard let externalPathStr = try? fileManager.destinationOfSymbolicLink(atPath: localPath.path) else {
+            AppLogger.shared.logError(
+                "数据目录还原前检查失败：无法读取符号链接目标",
+                errorCode: "DATA-RESTORE-INVALID-SYMLINK",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath)]
+            )
+            operationErrorCode = "DATA-RESTORE-INVALID-SYMLINK"
             throw DataDirError.invalidSymlink(localPath)
         }
         let externalPath = URL(fileURLWithPath: externalPathStr)
         AppLogger.shared.log("外部路径: \(externalPath.path)")
+        AppLogger.shared.logPathState("数据目录还原前-外部源[\(operationID)]", url: externalPath)
 
         // 确认外部目录存在
         guard fileManager.fileExists(atPath: externalPath.path) else {
+            AppLogger.shared.logError(
+                "数据目录还原前检查失败：外部目录不存在",
+                errorCode: "DATA-RESTORE-EXTERNAL-NOT-FOUND",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("external", externalPath)]
+            )
+            operationErrorCode = "DATA-RESTORE-EXTERNAL-NOT-FOUND"
             throw DataDirError.externalNotFound(externalPath)
         }
 
@@ -183,6 +323,7 @@ actor DataDirMover {
         AppLogger.shared.log("步骤1: 删除本地符号链接...")
         try fileManager.removeItem(at: localPath)
         AppLogger.shared.log("步骤1: 完成")
+        AppLogger.shared.logPathState("数据目录还原步骤1后-本地路径[\(operationID)]", url: localPath)
 
         // 2. 复制外部目录回本地
         AppLogger.shared.log("步骤2: 复制数据回本地...")
@@ -191,10 +332,18 @@ actor DataDirMover {
             try await copier.copyDirectory(from: externalPath, to: localPath, progressHandler: progressHandler)
             try? removeManagedLinkMetadata(in: localPath)
             AppLogger.shared.log("步骤2: 复制完成")
+            AppLogger.shared.logPathState("数据目录还原步骤2后-本地路径[\(operationID)]", url: localPath)
         } catch {
             // 复制失败：尝试把符号链接恢复
-            AppLogger.shared.logError("步骤2: 复制失败，尝试恢复符号链接", error: error)
-            try? fileManager.createSymbolicLink(at: localPath, withDestinationURL: externalPath)
+            AppLogger.shared.logError(
+                "步骤2: 复制失败，尝试恢复符号链接",
+                error: error,
+                errorCode: "DATA-RESTORE-COPY-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath), ("external", externalPath)]
+            )
+            try? createSymbolicLink(at: localPath, withDestinationURL: externalPath)
+            operationErrorCode = "DATA-RESTORE-COPY-FAILED"
             throw DataDirError.copyFailed(error)
         }
 
@@ -204,12 +353,25 @@ actor DataDirMover {
             try? removeManagedLinkMetadata(in: externalPath)
             try fileManager.removeItem(at: externalPath)
             AppLogger.shared.log("步骤3: 完成")
+            AppLogger.shared.logPathState("数据目录还原完成-外部路径[\(operationID)]", url: externalPath)
         } catch {
             // 删除外部失败不回滚（本地数据已安全），只记录警告
-            AppLogger.shared.logError("步骤3: 删除外部目录失败（本地还原已完成，可手动清理）", error: error)
+            AppLogger.shared.logError(
+                "步骤3: 删除外部目录失败（本地还原已完成，可手动清理）",
+                error: error,
+                errorCode: "DATA-RESTORE-EXTERNAL-CLEANUP-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath), ("external", externalPath)]
+            )
+            operationResult = "success_with_warning"
+            operationErrorCode = "DATA-RESTORE-EXTERNAL-CLEANUP-FAILED"
         }
 
         AppLogger.shared.log("===== 数据目录还原完成 =====")
+        AppLogger.shared.logPathState("数据目录还原完成-本地路径[\(operationID)]", url: localPath)
+        if operationResult != "success_with_warning" {
+            operationResult = "success"
+        }
     }
 
     // MARK: - 仅创建链接
@@ -224,10 +386,45 @@ actor DataDirMover {
     ///
     /// - Throws: 文件系统错误
     func createLink(localPath: URL, externalPath: URL) throws {
-        AppLogger.shared.log("创建符号链接: \(localPath.path) → \(externalPath.path)")
+        let operationID = AppLogger.shared.makeOperationID(prefix: "data-link")
+        let startedAt = Date()
+        var operationResult = "failed"
+        var operationErrorCode: String?
+
+        defer {
+            AppLogger.shared.logOperationSummary(
+                category: "data_link",
+                operationID: operationID,
+                result: operationResult,
+                startedAt: startedAt,
+                errorCode: operationErrorCode,
+                details: [
+                    ("local_path", localPath.path),
+                    ("external_path", externalPath.path)
+                ]
+            )
+        }
+
+        AppLogger.shared.logContext(
+            "创建数据目录符号链接",
+            details: [
+                ("operation_id", operationID),
+                ("local_path", localPath.path),
+                ("external_path", externalPath.path)
+            ]
+        )
+        AppLogger.shared.logPathState("创建数据目录链接前-本地路径[\(operationID)]", url: localPath)
+        AppLogger.shared.logPathState("创建数据目录链接前-外部路径[\(operationID)]", url: externalPath)
 
         // 确认外部目录存在
         guard fileManager.fileExists(atPath: externalPath.path) else {
+            AppLogger.shared.logError(
+                "创建数据目录符号链接失败：外部目录不存在",
+                errorCode: "DATA-LINK-EXTERNAL-NOT-FOUND",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("external", externalPath)]
+            )
+            operationErrorCode = "DATA-LINK-EXTERNAL-NOT-FOUND"
             throw DataDirError.externalNotFound(externalPath)
         }
 
@@ -244,6 +441,7 @@ actor DataDirMover {
 
         // 确认本地路径不存在真实内容
         if fileManager.fileExists(atPath: localPath.path) {
+            operationErrorCode = "DATA-LINK-DESTINATION-CONFLICT"
             throw DataDirError.destinationExists(localPath)
         }
 
@@ -251,17 +449,28 @@ actor DataDirMover {
             do {
                 try writeManagedLinkMetadata(sourcePath: localPath, destinationPath: externalPath, type: inferredType)
             } catch {
+                operationErrorCode = "DATA-LINK-METADATA-WRITE-FAILED"
                 throw DataDirError.metadataWriteFailed(error)
             }
         }
 
         do {
-            try fileManager.createSymbolicLink(at: localPath, withDestinationURL: externalPath)
+            try createSymbolicLink(at: localPath, withDestinationURL: externalPath)
             AppLogger.shared.log("符号链接创建成功")
+            AppLogger.shared.logPathState("创建数据目录链接完成-本地路径[\(operationID)]", url: localPath)
         } catch {
             try? removeManagedLinkMetadata(in: externalPath)
+            AppLogger.shared.logError(
+                "创建数据目录符号链接失败",
+                error: error,
+                errorCode: "DATA-LINK-SYMLINK-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath), ("external", externalPath)]
+            )
+            operationErrorCode = "DATA-LINK-SYMLINK-FAILED"
             throw DataDirError.symlinkFailed(error)
         }
+        operationResult = "success"
     }
 
     /// 将现有软链接纳入 AppPorts 管理，并在需要时迁移到规范路径。
@@ -272,34 +481,84 @@ actor DataDirMover {
         currentExternalPath: URL,
         normalizedExternalPath: URL
     ) throws {
+        let operationID = AppLogger.shared.makeOperationID(prefix: "data-normalize")
         let standardizedCurrent = currentExternalPath.standardizedFileURL
         let standardizedNormalized = normalizedExternalPath.standardizedFileURL
+        let startedAt = Date()
+        var operationResult = "failed"
+        var operationErrorCode: String?
 
-        AppLogger.shared.log("开始规范化管理: \(localPath.path)")
-        AppLogger.shared.log("当前外部路径: \(standardizedCurrent.path)")
-        AppLogger.shared.log("规范目标路径: \(standardizedNormalized.path)")
+        defer {
+            AppLogger.shared.logOperationSummary(
+                category: "data_normalize",
+                operationID: operationID,
+                result: operationResult,
+                startedAt: startedAt,
+                errorCode: operationErrorCode,
+                details: [
+                    ("local_path", localPath.path),
+                    ("current_external_path", standardizedCurrent.path),
+                    ("normalized_external_path", standardizedNormalized.path)
+                ]
+            )
+        }
+
+        AppLogger.shared.logContext(
+            "开始规范化受管数据目录链接",
+            details: [
+                ("operation_id", operationID),
+                ("local_path", localPath.path),
+                ("current_external_path", standardizedCurrent.path),
+                ("normalized_external_path", standardizedNormalized.path)
+            ]
+        )
+        AppLogger.shared.logPathState("规范化前-本地路径[\(operationID)]", url: localPath)
+        AppLogger.shared.logPathState("规范化前-当前外部路径[\(operationID)]", url: standardizedCurrent)
+        AppLogger.shared.logPathState("规范化前-规范目标[\(operationID)]", url: standardizedNormalized)
 
         guard fileManager.fileExists(atPath: standardizedCurrent.path) else {
+            AppLogger.shared.logError(
+                "规范化受管数据目录链接失败：当前外部路径不存在",
+                errorCode: "DATA-NORMALIZE-EXTERNAL-NOT-FOUND",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("external", standardizedCurrent)]
+            )
+            operationErrorCode = "DATA-NORMALIZE-EXTERNAL-NOT-FOUND"
             throw DataDirError.externalNotFound(standardizedCurrent)
         }
 
         if standardizedCurrent == standardizedNormalized {
             try createLink(localPath: localPath, externalPath: standardizedCurrent)
+            operationResult = "success"
             return
         }
 
         let normalizedParent = standardizedNormalized.deletingLastPathComponent()
-        try checkWritePermission(at: normalizedParent)
+        do {
+            try checkWritePermission(at: normalizedParent)
+        } catch {
+            operationErrorCode = "DATA-NORMALIZE-PERMISSION-DENIED"
+            throw error
+        }
 
         if fileManager.fileExists(atPath: standardizedNormalized.path) {
+            operationErrorCode = "DATA-NORMALIZE-DESTINATION-CONFLICT"
             throw DataDirError.destinationExists(standardizedNormalized)
         }
 
         do {
             try fileManager.moveItem(at: standardizedCurrent, to: standardizedNormalized)
             AppLogger.shared.log("规范化管理: 已移动外部数据到规范路径")
+            AppLogger.shared.logPathState("规范化步骤1后-规范目标[\(operationID)]", url: standardizedNormalized)
         } catch {
-            AppLogger.shared.logError("规范化管理: 移动外部数据失败", error: error)
+            AppLogger.shared.logError(
+                "规范化管理: 移动外部数据失败",
+                error: error,
+                errorCode: "DATA-NORMALIZE-MOVE-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("current_external", standardizedCurrent), ("normalized_external", standardizedNormalized)]
+            )
+            operationErrorCode = "DATA-NORMALIZE-MOVE-FAILED"
             throw DataDirError.copyFailed(error)
         }
 
@@ -307,7 +566,13 @@ actor DataDirMover {
             try createLink(localPath: localPath, externalPath: standardizedNormalized)
             AppLogger.shared.log("规范化管理: 已重建本地软链接")
         } catch {
-            AppLogger.shared.logError("规范化管理: 重建本地软链接失败，尝试回滚外部路径", error: error)
+            AppLogger.shared.logError(
+                "规范化管理: 重建本地软链接失败，尝试回滚外部路径",
+                error: error,
+                errorCode: "DATA-NORMALIZE-RELINK-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath), ("current_external", standardizedCurrent), ("normalized_external", standardizedNormalized)]
+            )
 
             if !fileManager.fileExists(atPath: standardizedCurrent.path),
                fileManager.fileExists(atPath: standardizedNormalized.path) {
@@ -315,8 +580,13 @@ actor DataDirMover {
             }
 
             try? createLink(localPath: localPath, externalPath: standardizedCurrent)
+            operationErrorCode = "DATA-NORMALIZE-RELINK-FAILED"
             throw error
         }
+
+        AppLogger.shared.logPathState("规范化完成-本地路径[\(operationID)]", url: localPath)
+        AppLogger.shared.logPathState("规范化完成-规范目标[\(operationID)]", url: standardizedNormalized)
+        operationResult = "success"
     }
 
     // MARK: - 私有辅助
@@ -326,11 +596,122 @@ actor DataDirMover {
         guard fileManager.fileExists(atPath: url.path) else {
             // 如果目录不存在，尝试创建
             try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+            AppLogger.shared.logContext("写权限检查：目标目录不存在，已自动创建", details: [("path", url.path)], level: "TRACE")
             return
         }
         guard fileManager.isWritableFile(atPath: url.path) else {
+            AppLogger.shared.logError(
+                "写权限检查失败",
+                context: [("path", url.path)],
+                relatedURLs: [("path", url)]
+            )
             throw DataDirError.permissionDenied(url)
         }
+        AppLogger.shared.logContext("写权限检查通过", details: [("path", url.path)], level: "TRACE")
+    }
+
+    private func cleanupFailedMigrationDestination(
+        at destinationURL: URL,
+        within cleanupRootURL: URL,
+        operationID: String
+    ) {
+        let standardizedDestination = destinationURL.standardizedFileURL
+        let standardizedCleanupRoot = cleanupRootURL.standardizedFileURL
+
+        do {
+            try? removeManagedLinkMetadata(in: standardizedDestination)
+
+            if fileManager.fileExists(atPath: standardizedDestination.path) {
+                try fileManager.removeItem(at: standardizedDestination)
+                AppLogger.shared.logContext(
+                    "迁移回滚：已删除外部半成品目录",
+                    details: [
+                        ("operation_id", operationID),
+                        ("path", standardizedDestination.path)
+                    ]
+                )
+            }
+        } catch {
+            AppLogger.shared.logError(
+                "迁移回滚：删除外部半成品目录失败",
+                error: error,
+                context: [("operation_id", operationID)],
+                relatedURLs: [("destination", standardizedDestination)]
+            )
+        }
+
+        pruneEmptyDirectories(
+            startingAt: standardizedDestination.deletingLastPathComponent(),
+            upToIncluding: standardizedCleanupRoot,
+            operationID: operationID
+        )
+    }
+
+    private func pruneEmptyDirectories(
+        startingAt directoryURL: URL,
+        upToIncluding cleanupRootURL: URL,
+        operationID: String
+    ) {
+        let standardizedCleanupRoot = cleanupRootURL.standardizedFileURL
+        var currentURL = directoryURL.standardizedFileURL
+
+        guard isDescendantOrSame(currentURL, of: standardizedCleanupRoot) else { return }
+
+        while true {
+            guard fileManager.fileExists(atPath: currentURL.path) else {
+                if currentURL == standardizedCleanupRoot { break }
+                currentURL = currentURL.deletingLastPathComponent()
+                guard isDescendantOrSame(currentURL, of: standardizedCleanupRoot) else { break }
+                continue
+            }
+
+            do {
+                let contents = try fileManager.contentsOfDirectory(atPath: currentURL.path)
+                guard contents.isEmpty else { break }
+
+                try fileManager.removeItem(at: currentURL)
+                AppLogger.shared.logContext(
+                    "迁移回滚：已删除空父目录",
+                    details: [
+                        ("operation_id", operationID),
+                        ("path", currentURL.path)
+                    ],
+                    level: "TRACE"
+                )
+            } catch {
+                AppLogger.shared.logError(
+                    "迁移回滚：删除空父目录失败",
+                    error: error,
+                    context: [("operation_id", operationID)],
+                    relatedURLs: [("directory", currentURL)]
+                )
+                break
+            }
+
+            if currentURL == standardizedCleanupRoot { break }
+
+            currentURL = currentURL.deletingLastPathComponent()
+            guard isDescendantOrSame(currentURL, of: standardizedCleanupRoot) else { break }
+        }
+    }
+
+    private func isDescendantOrSame(_ candidate: URL, of root: URL) -> Bool {
+        let candidatePath = candidate.standardizedFileURL.path
+        let rootPath = root.standardizedFileURL.path
+
+        return candidatePath == rootPath || candidatePath.hasPrefix(rootPath + "/")
+    }
+
+    private func createSymbolicLink(at localPath: URL, withDestinationURL externalPath: URL) throws {
+        if failSymlinkCreation {
+            throw NSError(
+                domain: "AppPorts.DataDirMover",
+                code: 9001,
+                userInfo: [NSLocalizedDescriptionKey: "forced symlink failure"]
+            )
+        }
+
+        try fileManager.createSymbolicLink(at: localPath, withDestinationURL: externalPath)
     }
 
     private func writeManagedLinkMetadata(sourcePath: URL, destinationPath: URL, type: DataDirType) throws {

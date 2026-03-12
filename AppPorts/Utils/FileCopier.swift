@@ -102,7 +102,19 @@ actor FileCopier {
         to destination: URL,
         progressHandler: ProgressHandler?
     ) async throws {
+        let operationID = AppLogger.shared.makeOperationID(prefix: "file-copy")
         let sourceValues = try source.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        AppLogger.shared.logContext(
+            "FileCopier 开始复制",
+            details: [
+                ("operation_id", operationID),
+                ("source", source.path),
+                ("destination", destination.path),
+                ("source_is_regular_file", sourceValues.isRegularFile == true ? "true" : "false"),
+                ("source_is_directory", sourceValues.isDirectory == true ? "true" : "false")
+            ],
+            level: "TRACE"
+        )
 
         if sourceValues.isRegularFile == true {
             let totalBytes = Int64(sourceValues.fileSize ?? 0)
@@ -119,6 +131,16 @@ actor FileCopier {
             if let handler = progressHandler {
                 await handler(Progress(copiedBytes: totalBytes, totalBytes: totalBytes, currentFile: source.lastPathComponent))
             }
+            AppLogger.shared.logContext(
+                "FileCopier 完成单文件复制",
+                details: [
+                    ("operation_id", operationID),
+                    ("bytes", String(totalBytes)),
+                    ("source", source.path),
+                    ("destination", destination.path)
+                ],
+                level: "TRACE"
+            )
             return
         }
 
@@ -146,6 +168,17 @@ actor FileCopier {
         if let handler = progressHandler {
             await handler(Progress(copiedBytes: state.copiedBytes, totalBytes: totalBytes, currentFile: ""))
         }
+        AppLogger.shared.logContext(
+            "FileCopier 完成目录复制",
+            details: [
+                ("operation_id", operationID),
+                ("copied_bytes", String(state.copiedBytes)),
+                ("total_bytes", String(totalBytes)),
+                ("source", source.path),
+                ("destination", destination.path)
+            ],
+            level: "TRACE"
+        )
     }
     
     // MARK: - 私有类型
@@ -300,36 +333,77 @@ actor FileCopier {
 
             let destItemURL = destination.appendingPathComponent(itemName)
             
-            let resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
+            let resourceValues: URLResourceValues
+            do {
+                resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
+            } catch {
+                AppLogger.shared.logError(
+                    "FileCopier 读取资源属性失败",
+                    error: error,
+                    context: [("item", itemURL.path), ("destination", destItemURL.path)],
+                    relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
+                )
+                throw error
+            }
             
             // 处理符号链接
             if resourceValues.isSymbolicLink == true {
-                let linkDest = try fileManager.destinationOfSymbolicLink(atPath: itemURL.path)
-                try fileManager.createSymbolicLink(atPath: destItemURL.path, withDestinationPath: linkDest)
+                do {
+                    let linkDest = try fileManager.destinationOfSymbolicLink(atPath: itemURL.path)
+                    try fileManager.createSymbolicLink(atPath: destItemURL.path, withDestinationPath: linkDest)
+                } catch {
+                    AppLogger.shared.logError(
+                        "FileCopier 复制符号链接失败",
+                        error: error,
+                        context: [("item", itemURL.path), ("destination", destItemURL.path)],
+                        relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
+                    )
+                    throw error
+                }
                 continue
             }
             
             // 处理目录（递归复制）
             if resourceValues.isDirectory == true {
-                // 获取原目录的属性（权限、时间戳等）
-                let sourceAttributes = try fileManager.attributesOfItem(atPath: itemURL.path)
-                try fileManager.createDirectory(at: destItemURL, withIntermediateDirectories: false, attributes: sourceAttributes)
-                
-                // 复制扩展属性（包括 Finder 图标、标签等）
-                copyExtendedAttributes(from: itemURL, to: destItemURL)
-                
-                // 递归复制子目录内容
-                try await copyContents(
-                    from: itemURL,
-                    to: destItemURL,
-                    state: &state,
-                    progressHandler: progressHandler
-                )
+                do {
+                    // 获取原目录的属性（权限、时间戳等）
+                    let sourceAttributes = try fileManager.attributesOfItem(atPath: itemURL.path)
+                    try fileManager.createDirectory(at: destItemURL, withIntermediateDirectories: false, attributes: sourceAttributes)
+                    
+                    // 复制扩展属性（包括 Finder 图标、标签等）
+                    copyExtendedAttributes(from: itemURL, to: destItemURL)
+                    
+                    // 递归复制子目录内容
+                    try await copyContents(
+                        from: itemURL,
+                        to: destItemURL,
+                        state: &state,
+                        progressHandler: progressHandler
+                    )
+                } catch {
+                    AppLogger.shared.logError(
+                        "FileCopier 复制目录失败",
+                        error: error,
+                        context: [("item", itemURL.path), ("destination", destItemURL.path)],
+                        relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
+                    )
+                    throw error
+                }
                 continue
             }
             
             // 处理常规文件
-            try fileManager.copyItem(at: itemURL, to: destItemURL)
+            do {
+                try fileManager.copyItem(at: itemURL, to: destItemURL)
+            } catch {
+                AppLogger.shared.logError(
+                    "FileCopier 复制文件失败",
+                    error: error,
+                    context: [("item", itemURL.path), ("destination", destItemURL.path)],
+                    relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
+                )
+                throw error
+            }
             
             // 更新进度统计
             if let fileSize = resourceValues.fileSize {

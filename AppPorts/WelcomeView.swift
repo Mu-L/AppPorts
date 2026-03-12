@@ -232,66 +232,27 @@ struct LanguageSwitcher: View {
     
     var body: some View {
         Menu {
-            Button("跟随系统 (System)") { withAnimation { languageManager.language = "system" } }
+            Button(AppLanguageCatalog.systemOptionTitle) {
+                withAnimation { languageManager.language = "system" }
+            }
             
-            Group {
-                Button("🇺🇸 English") { withAnimation { languageManager.language = "en" } }
-                Button("🇨🇳 简体中文") { withAnimation { languageManager.language = "zh-Hans" } }
-                Button("🇭🇰 繁體中文") { withAnimation { languageManager.language = "zh-Hant" } }
+            ForEach(AppLanguageCatalog.primaryLanguages) { option in
+                Button(option.menuTitle) {
+                    withAnimation { languageManager.language = option.code }
+                }
             }
             
             Divider()
-            Section("AI Translated") {
-                Button("🇪🇸 Español") { withAnimation { languageManager.language = "es" } }
-                Button("🇫🇷 Français") { withAnimation { languageManager.language = "fr" } }
-                Button("🇩🇪 Deutsch") { withAnimation { languageManager.language = "de" } }
-                Button("🇮🇹 Italiano") { withAnimation { languageManager.language = "it" } }
-                Button("🇵🇹 Português") { withAnimation { languageManager.language = "pt" } }
-                Button("🇷🇺 Русский") { withAnimation { languageManager.language = "ru" } }
-                Button("🇯🇵 日本語") { withAnimation { languageManager.language = "ja" } }
-                Button("🇰🇷 한국어") { withAnimation { languageManager.language = "ko" } }
-                Button("🇻🇳 Tiếng Việt") { withAnimation { languageManager.language = "vi" } }
-                Button("🇹🇭 ไทย") { withAnimation { languageManager.language = "th" } }
-                Button("🇹🇷 Türkçe") { withAnimation { languageManager.language = "tr" } }
-                Button("🇳🇱 Nederlands") { withAnimation { languageManager.language = "nl" } }
-                Button("🇵🇱 Polski") { withAnimation { languageManager.language = "pl" } }
-                Button("🇮🇩 Indonesia") { withAnimation { languageManager.language = "id" } }
-                Button("🇸🇦 العربية") { withAnimation { languageManager.language = "ar" } }
-                Button("🇮🇳 हिन्दी") { withAnimation { languageManager.language = "hi" } }
-                Button("🏁 Esperanto") { withAnimation { languageManager.language = "eo" } }
-                Button("⠃⠗ Braille") { withAnimation { languageManager.language = "br" } }
+            Section(AppLanguageCatalog.aiSectionTitle) {
+                ForEach(AppLanguageCatalog.aiTranslatedLanguages) { option in
+                    Button(option.menuTitle) {
+                        withAnimation { languageManager.language = option.code }
+                    }
+                }
             }
         } label: {
             HStack(spacing: 6) {
-                // Determine flag based on language
-                let flag: String = {
-                    switch languageManager.language {
-                    case "en": return "🇺🇸"
-                    case "zh-Hans": return "🇨🇳"
-                    case "zh-Hant": return "🇭🇰"
-                    case "es": return "🇪🇸"
-                    case "fr": return "🇫🇷"
-                    case "de": return "🇩🇪"
-                    case "it": return "🇮🇹"
-                    case "pt": return "🇵🇹"
-                    case "ru": return "🇷🇺"
-                    case "ja": return "🇯🇵"
-                    case "ko": return "🇰🇷"
-                    case "vi": return "🇻🇳"
-                    case "th": return "🇹🇭"
-                    case "tr": return "🇹🇷"
-                    case "nl": return "🇳🇱"
-                    case "pl": return "🇵🇱"
-                    case "id": return "🇮🇩"
-                    case "ar": return "🇸🇦"
-                    case "hi": return "🇮🇳"
-                    case "eo": return "🏁"
-                    case "br": return "⠃⠗"
-                    default: return "🌐"
-                    }
-                }()
-                
-                Text(flag).font(.subheadline)
+                Text(currentLanguageFlag).font(.subheadline)
                 Text(currentLanguageName)
                     .font(.subheadline)
                     .fontWeight(.medium)
@@ -309,31 +270,16 @@ struct LanguageSwitcher: View {
         .focusable(false)
     }
     
+    var currentLanguageOption: AppLanguageOption? {
+        AppLanguageCatalog.option(for: languageManager.language)
+    }
+
+    var currentLanguageFlag: String {
+        currentLanguageOption?.flag ?? "🌐"
+    }
+
     var currentLanguageName: String {
-        switch languageManager.language {
-        case "en": return "English"
-        case "zh-Hans": return "简体中文"
-        case "zh-Hant": return "繁體中文"
-        case "es": return "Español (AI)"
-        case "fr": return "Français (AI)"
-        case "de": return "Deutsch (AI)"
-        case "it": return "Italiano (AI)"
-        case "pt": return "Português (AI)"
-        case "ru": return "Русский (AI)"
-        case "ja": return "日本語 (AI)"
-        case "ko": return "한국어 (AI)"
-        case "vi": return "Tiếng Việt (AI)"
-        case "th": return "ไทย (AI)"
-        case "tr": return "Türkçe (AI)"
-        case "nl": return "Nederlands (AI)"
-        case "pl": return "Polski (AI)"
-        case "id": return "Indonesia (AI)"
-        case "ar": return "العربية (AI)"
-        case "hi": return "हिन्दी (AI)"
-        case "eo": return "Esperanto (AI)"
-        case "br": return "Braille (⠃⠗)"
-        default: return "Auto"
-        }
+        currentLanguageOption?.selectionTitle ?? AppLanguageCatalog.automaticSelectionTitle
     }
 }
 

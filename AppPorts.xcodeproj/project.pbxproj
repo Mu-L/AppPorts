@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		B10000012F00100000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A6892E72ECB9A7D0074F02E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2A6892EE2ECB9A7D0074F02E;
+			remoteInfo = AppPorts;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		2A6892EF2ECB9A7D0074F02E /* AppPorts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppPorts.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000012F00100000000001 /* AppPortsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppPortsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = AppPorts;
 			sourceTree = "<group>";
 		};
+		B10000012F00100000000002 /* AppPortsTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppPortsTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		2A6892EC2ECB9A7D0074F02E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000012F00100000000003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				2A6892F12ECB9A7D0074F02E /* AppPorts */,
+				B10000012F00100000000002 /* AppPortsTests */,
 				2A6892F02ECB9A7D0074F02E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				2A6892EF2ECB9A7D0074F02E /* AppPorts.app */,
+				B10000012F00100000000001 /* AppPortsTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,29 @@
 			productReference = 2A6892EF2ECB9A7D0074F02E /* AppPorts.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B10000012F00100000000004 /* AppPortsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000012F00100000000007 /* Build configuration list for PBXNativeTarget "AppPortsTests" */;
+			buildPhases = (
+				B10000012F00100000000006 /* Sources */,
+				B10000012F00100000000003 /* Frameworks */,
+				B10000012F00100000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B10000012F00100000000009 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B10000012F00100000000002 /* AppPortsTests */,
+			);
+			name = AppPortsTests;
+			packageProductDependencies = (
+			);
+			productName = AppPortsTests;
+			productReference = B10000012F00100000000001 /* AppPortsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +130,10 @@
 				TargetAttributes = {
 					2A6892EE2ECB9A7D0074F02E = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					B10000012F00100000000004 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 2A6892EE2ECB9A7D0074F02E;
 					};
 				};
 			};
@@ -101,12 +153,20 @@
 			projectRoot = "";
 			targets = (
 				2A6892EE2ECB9A7D0074F02E /* AppPorts */,
+				B10000012F00100000000004 /* AppPortsTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		2A6892ED2ECB9A7D0074F02E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000012F00100000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -123,7 +183,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000012F00100000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B10000012F00100000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2A6892EE2ECB9A7D0074F02E /* AppPorts */;
+			targetProxy = B10000012F00100000000008 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		2A6892F82ECB9A7E0074F02E /* Debug */ = {
@@ -332,6 +407,65 @@
 			};
 			name = Release;
 		};
+		B10000012F0010000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPortsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AppPorts.app/Contents/MacOS/AppPorts";
+				TEST_TARGET_NAME = AppPorts;
+			};
+			name = Debug;
+		};
+		B10000012F0010000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPortsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AppPorts.app/Contents/MacOS/AppPorts";
+				TEST_TARGET_NAME = AppPorts;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -349,6 +483,15 @@
 			buildConfigurations = (
 				2A6892FB2ECB9A7E0074F02E /* Debug */,
 				2A6892FC2ECB9A7E0074F02E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000012F00100000000007 /* Build configuration list for PBXNativeTarget "AppPortsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000012F0010000000000A /* Debug */,
+				B10000012F0010000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

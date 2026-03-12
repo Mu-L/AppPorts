@@ -67,8 +67,7 @@ private struct AppDataSearchConfig {
 actor DataDirScanner {
 
     private let fileManager = FileManager.default
-    private let homeDir = URL(fileURLWithPath: NSHomeDirectory())
-    private var historicalManagedLinksCache: Set<String>? = nil
+    private let homeDir: URL
     private let managedLinkMarkerFileName = ".appports-link-metadata.plist"
     private let managedLinkMetadataSidecarSuffix = ".appports-link-metadata.plist"
     private let managedLinkIdentifier = "com.shimoko.AppPorts"
@@ -80,6 +79,10 @@ actor DataDirScanner {
         let sourcePath: String
         let destinationPath: String
         let dataDirType: String
+    }
+
+    init(homeDir: URL = URL(fileURLWithPath: NSHomeDirectory())) {
+        self.homeDir = homeDir.standardizedFileURL
     }
 
     // MARK: - 内置已知 dotFolder 列表
@@ -292,6 +295,12 @@ actor DataDirScanner {
     ///
     /// - Returns: 存在于磁盘上的已知 dotFolder 列表（未计算大小）
     func scanKnownDotFolders() -> [DataDirItem] {
+        let scanID = AppLogger.shared.makeOperationID(prefix: "scanner-dot-folders")
+        AppLogger.shared.logContext(
+            "DataDirScanner 开始扫描工具目录",
+            details: [("scan_id", scanID), ("known_count", String(knownDotFolders.count))],
+            level: "TRACE"
+        )
         var results: [DataDirItem] = []
 
         for known in knownDotFolders {
@@ -316,7 +325,17 @@ actor DataDirScanner {
             results.append(item)
         }
 
-        return results.sorted { $0.priority < $1.priority }
+        let sortedResults = results.sorted { $0.priority < $1.priority }
+        AppLogger.shared.logContext(
+            "DataDirScanner 完成工具目录扫描",
+            details: [
+                ("scan_id", scanID),
+                ("result_count", String(sortedResults.count)),
+                ("statuses", Dictionary(grouping: sortedResults, by: \.status).map { "\($0.key)=\($0.value.count)" }.sorted().joined(separator: ", "))
+            ],
+            level: "TRACE"
+        )
+        return sortedResults
     }
 
     /// 扫描指定应用的关联数据目录
@@ -329,11 +348,26 @@ actor DataDirScanner {
     /// - Returns: 找到的关联数据目录列表（未计算大小）
     func scanLibraryDirs(for app: AppItem, externalRootURL: URL? = nil) -> [DataDirItem] {
         guard !app.isFolder else { return [] }
+        let scanID = AppLogger.shared.makeOperationID(prefix: "scanner-library-dirs")
 
         // 从 Info.plist 读取 BundleID
         let bundleID = readBundleID(from: app.path)
         let appName = app.name.replacingOccurrences(of: ".app", with: "")
         let matchProfile = buildMatchProfile(bundleID: bundleID, appName: appName)
+        AppLogger.shared.logContext(
+            "DataDirScanner 开始扫描应用数据目录",
+            details: [
+                ("scan_id", scanID),
+                ("app_name", appName),
+                ("app_path", app.path.path),
+                ("bundle_id", bundleID),
+                ("external_root", externalRootURL?.path),
+                ("exact_match_count", String(matchProfile.exactMatches.count)),
+                ("contains_match_count", String(matchProfile.containsMatches.count)),
+                ("short_prefix_match_count", String(matchProfile.shortPrefixMatches.count))
+            ],
+            level: "TRACE"
+        )
 
         var resultsByPath: [String: DataDirItem] = [:]
 
@@ -401,12 +435,23 @@ actor DataDirScanner {
             resultsByPath[item.path.standardizedFileURL.path] = item
         }
 
-        return Array(resultsByPath.values).sorted {
+        let sortedResults = Array(resultsByPath.values).sorted {
             if $0.priority != $1.priority {
                 return $0.priority < $1.priority
             }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+        AppLogger.shared.logContext(
+            "DataDirScanner 完成应用数据目录扫描",
+            details: [
+                ("scan_id", scanID),
+                ("app_name", appName),
+                ("result_count", String(sortedResults.count)),
+                ("statuses", Dictionary(grouping: sortedResults, by: \.status).map { "\($0.key)=\($0.value.count)" }.sorted().joined(separator: ", "))
+            ],
+            level: "TRACE"
+        )
+        return sortedResults
     }
 
     /// 异步计算单个目录大小
@@ -1062,13 +1107,28 @@ actor DataDirScanner {
         if values.isSymbolicLink == true {
             let linkedDestination = resolveSymlinkDestination(at: url)
             guard let linkedDestination else {
+                AppLogger.shared.logError(
+                    "DataDirScanner 检测到无法解析目标的软链",
+                    context: [("path", url.path), ("type", type.rawValue)],
+                    relatedURLs: [("path", url)]
+                )
                 return ("现有软链", nil)
             }
 
             if isAppPortsManagedLink(from: url, to: linkedDestination, type: type) {
+                AppLogger.shared.logContext(
+                    "DataDirScanner 识别到受管软链",
+                    details: [("path", url.path), ("target", linkedDestination.path), ("type", type.rawValue)],
+                    level: "TRACE"
+                )
                 return ("已链接", linkedDestination)
             }
 
+            AppLogger.shared.logContext(
+                "DataDirScanner 识别到现有软链",
+                details: [("path", url.path), ("target", linkedDestination.path), ("type", type.rawValue)],
+                level: "TRACE"
+            )
             return ("现有软链", linkedDestination)
         }
 
@@ -1085,8 +1145,10 @@ actor DataDirScanner {
     }
 
     /// AppPorts 管理的数据目录链接会落在：
-    /// 1. 目标目录中存在 AppPorts 写入的隐藏元数据
-    /// 2. 或者命中历史日志中的迁移记录（兼容旧版本）
+    /// AppPorts 管理的数据目录链接必须命中目标目录中的元数据标记。
+    ///
+    /// 历史日志会轮转、截断，也可能被复制到其他机器，不能作为受管状态的权威来源。
+    /// 这里宁可把缺少标记的旧链接降级成“现有软链”，也不能误判成受管对象。
     private func isAppPortsManagedLink(from sourceURL: URL, to destinationURL: URL, type: DataDirType) -> Bool {
         let standardizedSource = sourceURL.standardizedFileURL
         let standardizedDestination = destinationURL.standardizedFileURL
@@ -1099,74 +1161,13 @@ actor DataDirScanner {
                 && metadata.dataDirType == type.rawValue
         }
 
-        return historicalManagedLinks().contains(linkRecordKey(source: standardizedSource.path, destination: standardizedDestination.path))
+        return false
     }
 
     private func readManagedLinkMetadata(in destinationURL: URL) -> ManagedLinkMetadata? {
         let markerURL = markerURL(for: destinationURL)
         guard let data = try? Data(contentsOf: markerURL) else { return nil }
         return try? PropertyListDecoder().decode(ManagedLinkMetadata.self, from: data)
-    }
-
-    private func historicalManagedLinks() -> Set<String> {
-        if let historicalManagedLinksCache {
-            return historicalManagedLinksCache
-        }
-
-        let logURL = AppLogger.shared.logFileURL
-        guard let data = try? Data(contentsOf: logURL),
-              let content = String(data: data, encoding: .utf8) else {
-            historicalManagedLinksCache = []
-            return []
-        }
-
-        var records = Set<String>()
-        for line in content.components(separatedBy: .newlines) {
-            guard let (sourcePath, destinationPath) = parseManagedLinkRecord(from: line) else { continue }
-            records.insert(linkRecordKey(source: sourcePath, destination: destinationPath))
-        }
-
-        historicalManagedLinksCache = records
-        return records
-    }
-
-    private func parseManagedLinkRecord(from line: String) -> (String, String)? {
-        let prefixes = [
-            "步骤3: 符号链接创建成功: ",
-            "创建符号链接: "
-        ]
-
-        for prefix in prefixes {
-            guard let range = line.range(of: prefix) else { continue }
-            let payload = String(line[range.upperBound...])
-            if let (sourcePath, destinationPath) = splitLoggedLinkPayload(payload) {
-                let source = URL(fileURLWithPath: sourcePath).standardizedFileURL.path
-                let destination = URL(fileURLWithPath: destinationPath).standardizedFileURL.path
-                return (source, destination)
-            }
-        }
-
-        return nil
-    }
-
-    private func splitLoggedLinkPayload(_ payload: String) -> (String, String)? {
-        let separators = [" → ", " -> "]
-
-        for separator in separators {
-            guard let range = payload.range(of: separator) else { continue }
-            let source = String(payload[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let destination = String(payload[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !source.isEmpty && !destination.isEmpty {
-                return (source, destination)
-            }
-        }
-
-        return nil
-    }
-
-    private func linkRecordKey(source: String, destination: String) -> String {
-        source + "\n" + destination
     }
 
     private func markerURL(for directoryURL: URL) -> URL {
