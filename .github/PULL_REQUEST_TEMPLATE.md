@@ -8,9 +8,12 @@
 
 ## 🧪 测试情况 | Testing
 - [ ] 已在本地 Xcode 环境运行通过 | Passed local Xcode build and run
-- [ ] 如有需要，已运行包含本地化审计在内的测试 | Ran tests including localization audit if needed
+- [ ] 如有需要，已运行专项测试（如数据目录或本地化检查） | Ran focused tests if needed (for example data-directory or localization checks)
 - [ ] 核心功能经过手动验证 | Core functions manually verified
 - [ ] 修复了可能导致的权限或异常问题 | Fixed potential permission or exception issues
+
+> PR 默认只要求通过编译烟雾检查。专项测试更适合在改动确实触及对应模块时主动补跑，而不是把所有创新型改动都挡在门外。  
+> PRs are only required to pass the smoke build by default. Focused tests are encouraged when the PR touches the relevant module, instead of blocking all exploratory changes.
 
 ## 🌐 本地化影响 | Localization Impact
 > 如本次 PR 涉及任何用户可见文案、菜单、弹窗、设置项、错误提示、日志导出文案或状态文案，欢迎同步完成本地化适配；当然可以暂时不做，也可以在 PR 说明里写清原因或后续计划。  
