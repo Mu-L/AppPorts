@@ -269,6 +269,8 @@ struct WarningBanner: View {
     }
 }
 
-#Preview {
-    AppStoreSettingsView()
+struct AppStoreSettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        AppStoreSettingsView()
+    }
 }
