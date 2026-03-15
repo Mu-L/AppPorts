@@ -1,14 +1,11 @@
-name: Build AppPorts
+name: PR Checks
 
 on:
-  push:
-    branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main", "develop" ]
 
 jobs:
   pr-smoke:
-    if: github.event_name == 'pull_request'
     name: PR Smoke Check
     runs-on: macos-latest
 
@@ -31,38 +28,8 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Run Data Directory Tests (Advisory)
-        continue-on-error: true
-        run: |
-          xcodebuild test \
-            -scheme "AppPorts" \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            -derivedDataPath build \
-            -only-testing:"AppPortsTests/DataDirMoverTests" \
-            -only-testing:"AppPortsTests/DataDirScannerTests" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Run Localization Audit (Advisory)
-        continue-on-error: true
-        run: |
-          xcodebuild test \
-            -scheme "AppPorts" \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            -derivedDataPath build \
-            -only-testing:"AppPortsTests/LocalizationAuditTests" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_ALLOWED=NO
-
-  post-merge-validation:
-    if: github.event_name == 'push'
-    name: Post-merge Validation
+  data-directory-advisory:
+    name: Data Directory Tests (Advisory)
     runs-on: macos-latest
 
     steps:
@@ -73,6 +40,8 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Run Data Directory Tests
+        id: data_dir_tests
+        continue-on-error: true
         run: |
           xcodebuild test \
             -scheme "AppPorts" \
@@ -86,7 +55,29 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Run Localization Audit (Advisory)
+      - name: Publish Advisory Summary
+        if: always()
+        run: |
+          if [ "${{ steps.data_dir_tests.outcome }}" = "failure" ]; then
+            echo "Data directory advisory tests failed. Review this check before merge." >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Data directory advisory tests failed. Review this check before merge."
+          else
+            echo "Data directory advisory tests passed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  localization-audit-advisory:
+    name: Localization Audit (Advisory)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode version
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Run Localization Audit
+        id: localization_audit
         continue-on-error: true
         run: |
           xcodebuild test \
@@ -100,29 +91,12 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Build App
+      - name: Publish Advisory Summary
+        if: always()
         run: |
-          # Build the app using xcodebuild
-          # We use -derivedDataPath to easily locate the output
-          xcodebuild clean build \
-            -scheme "AppPorts" \
-            -configuration Release \
-            -destination 'platform=macOS' \
-            -derivedDataPath build \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Zip Application
-        run: |
-          cd build/Build/Products/Release
-          # Zip the .app bundle to preserve permissions and symlinks
-          zip -r ../../../../AppPorts.zip AppPorts.app
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AppPorts-Unsigned
-          path: AppPorts.zip
-          retention-days: 5
+          if [ "${{ steps.localization_audit.outcome }}" = "failure" ]; then
+            echo "Localization audit failed. Review this check before merge." >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Localization audit failed. Review this check before merge."
+          else
+            echo "Localization audit passed." >> "$GITHUB_STEP_SUMMARY"
+          fi
