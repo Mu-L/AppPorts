@@ -23,7 +23,7 @@
 
 /* Begin PBXFileReference section */
 		2A2693812F667A0E0044F015 /* icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = icon.icon; sourceTree = "<group>"; };
-		2A2693842F667A3D0044F015 /* AppPorts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = AppPorts.app; path = /Users/wangheng/Documents/AppPorts/build/Debug/AppPorts.app; sourceTree = "<absolute>"; };
+		2A2693852F667C1B0044F015 /* AppPorts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppPorts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000012F00100000000001 /* AppPortsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = AppPortsTests.xctest; path = /Users/wangheng/Documents/AppPorts/build/Debug/AppPorts.app/Contents/PlugIns/AppPortsTests.xctest; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
@@ -64,6 +64,7 @@
 				2A6892F12ECB9A7D0074F02E /* AppPorts */,
 				B10000012F00100000000002 /* AppPortsTests */,
 				2A2693812F667A0E0044F015 /* icon.icon */,
+				2A2693852F667C1B0044F015 /* AppPorts.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -89,7 +90,7 @@
 			packageProductDependencies = (
 			);
 			productName = TempApp;
-			productReference = 2A2693842F667A3D0044F015 /* AppPorts.app */;
+			productReference = 2A2693852F667C1B0044F015 /* AppPorts.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B10000012F00100000000004 /* AppPortsTests */ = {
@@ -353,7 +354,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.5.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPorts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -392,7 +393,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.5.2;
+				MARKETING_VERSION = 1.5.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPorts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
