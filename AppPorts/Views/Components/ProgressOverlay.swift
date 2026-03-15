@@ -85,12 +85,9 @@ struct ProgressOverlay: View {
     ///   - totalBytes: 总字节数
     /// - Returns: 格式化后的字符串，如 "1.2 GB / 3.5 GB"
     private func formatProgress(copiedBytes: Int64, totalBytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB, .useGB]
-        formatter.countStyle = .file
         if totalBytes == 0 {
-            return "计算中..."
+            return "计算中...".localized
         }
-        return "\(formatter.string(fromByteCount: copiedBytes)) / \(formatter.string(fromByteCount: totalBytes))"
+        return "\(LocalizedByteCountFormatter.string(fromByteCount: copiedBytes, allowedUnits: [.mb, .gb])) / \(LocalizedByteCountFormatter.string(fromByteCount: totalBytes, allowedUnits: [.mb, .gb]))"
     }
 }

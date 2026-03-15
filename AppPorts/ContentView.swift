@@ -61,40 +61,6 @@ struct ContentView: View {
 
     private let fileManager = FileManager.default
 
-    /// 某些会自更新的应用（如 VS Code / Cursor / Electron + Squirrel / Sparkle）
-    /// 对 bundle 结构假设更强，使用 Contents 深层链接时更容易在更新后损坏入口。
-    /// 这类应用回退到整个 .app 的传统符号链接兼容性更好。
-    private func prefersWholeAppSymlink(for appURL: URL) -> Bool {
-        let frameworkCandidates = [
-            "Contents/Frameworks/Squirrel.framework",
-            "Contents/Frameworks/Sparkle.framework"
-        ]
-
-        for relativePath in frameworkCandidates {
-            if fileManager.fileExists(atPath: appURL.appendingPathComponent(relativePath).path) {
-                return true
-            }
-        }
-
-        let nameCandidates = ["shipit", "autoupdate", "updater", "update"]
-        let searchRoots = [
-            appURL.appendingPathComponent("Contents/MacOS"),
-            appURL.appendingPathComponent("Contents/Frameworks")
-        ]
-
-        for root in searchRoots {
-            let items = (try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
-            if items.contains(where: { item in
-                let name = item.lastPathComponent.lowercased()
-                return nameCandidates.contains(where: { name.contains($0) })
-            }) {
-                return true
-            }
-        }
-
-        return false
-    }
-
     // Monitors
     @State private var localMonitor: FolderMonitor?
     @State private var externalMonitor: FolderMonitor?
@@ -321,10 +287,21 @@ struct ContentView: View {
                 var isDir: ObjCBool = false
                 if fileManager.fileExists(atPath: savedPath, isDirectory: &isDir), isDir.boolValue {
                     self.externalDriveURL = url
+                    AppLogger.shared.logContext(
+                        "恢复已保存的外部路径",
+                        details: [("path", savedPath), ("is_directory", isDir.boolValue ? "true" : "false")]
+                    )
                     AppLogger.shared.logExternalDriveInfo(at: url)
+                } else {
+                    AppLogger.shared.logContext(
+                        "已保存的外部路径无效，忽略",
+                        details: [("path", savedPath)],
+                        level: "WARN"
+                    )
                 }
             }
             
+            AppLogger.shared.log("主界面已出现，开始初始化扫描与监控")
             scanLocalApps()
             
             // Start local monitoring
@@ -334,7 +311,13 @@ struct ContentView: View {
             Task {
                 do {
                     if let release = try await UpdateChecker.shared.checkForUpdates() {
-                        print("New version found: \(release.tagName)")
+                        AppLogger.shared.logContext(
+                            "检测到新版本",
+                            details: [
+                                ("tag", release.tagName),
+                                ("url", release.htmlUrl)
+                            ]
+                        )
                         await MainActor.run {
                             self.alertTitle = "发现新版本".localized
                             self.alertMessage = String(format: "发现新版本 %@。\n%@".localized, release.tagName, release.body)
@@ -343,11 +326,18 @@ struct ContentView: View {
                         }
                     }
                 } catch {
-                    print("Update check failed: \(error)")
+                    AppLogger.shared.logError("检查更新失败", error: error)
                 }
             }
         }
         .onChange(of: externalDriveURL) { oldValue, newValue in
+            AppLogger.shared.logContext(
+                "外部路径变更",
+                details: [
+                    ("old_path", oldValue?.path),
+                    ("new_path", newValue?.path)
+                ]
+            )
             // Persistence
             if let url = newValue {
                 UserDefaults.standard.set(url.path, forKey: "ExternalDrivePath")
@@ -384,7 +374,7 @@ struct ContentView: View {
                 pendingAppStoreApps = []
             }
         } message: {
-            let count = Int64(pendingAppStoreApps.filter { isAppStoreApp(at: $0.path) }.count)
+            let count = Int64(pendingAppStoreApps.filter { isAppStoreApp(at: $0.displayURL) }.count)
             let totalCount = Int64(pendingAppStoreApps.count)
             if count == totalCount {
                 Text(String(format: "选中的 %lld 个应用均来自 App Store，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。".localized, totalCount))
@@ -419,14 +409,18 @@ struct ContentView: View {
     
     var filteredLocalApps: [AppItem] {
         let apps = localApps
-        let filtered = searchText.isEmpty ? apps : apps.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        let filtered = searchText.isEmpty ? apps : apps.filter {
+            $0.displayName.localizedCaseInsensitiveContains(searchText) || $0.name.localizedCaseInsensitiveContains(searchText)
+        }
         
         return sortApps(filtered)
     }
     
     var filteredExternalApps: [AppItem] {
         let apps = externalApps
-        let filtered = searchText.isEmpty ? apps : apps.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        let filtered = searchText.isEmpty ? apps : apps.filter {
+            $0.displayName.localizedCaseInsensitiveContains(searchText) || $0.name.localizedCaseInsensitiveContains(searchText)
+        }
         
         return sortApps(filtered)
     }
@@ -441,7 +435,7 @@ struct ContentView: View {
                  // Keep "Linked" on top? Maybe not for size sort. Let's strict size sort.
                  // Or, if user wants size, we just sort by size.
                  if $0.sizeBytes == $1.sizeBytes {
-                     return $0.name < $1.name
+                     return $0.displayName < $1.displayName
                  }
                  return $0.sizeBytes > $1.sizeBytes // Descending
             }
@@ -646,8 +640,49 @@ struct ContentView: View {
         let urls = runningApps.compactMap { $0.bundleURL }
         return Set(urls)
     }
+
+    nonisolated func joinedAppNames(_ apps: [AppItem]) -> String {
+        guard !apps.isEmpty else { return "(none)" }
+        return apps.map(\.displayName).joined(separator: ", ")
+    }
+
+    nonisolated func summarizeStatuses(for apps: [AppItem]) -> String {
+        guard !apps.isEmpty else { return "(none)" }
+        let counts = Dictionary(grouping: apps, by: \.status).map { key, value in
+            "\(key)=\(value.count)"
+        }
+        return counts.sorted().joined(separator: ", ")
+    }
+
+    nonisolated func migrationSkipReason(
+        for app: AppItem,
+        allowAppStoreMigration: Bool,
+        allowIOSAppMigration: Bool
+    ) -> String? {
+        if app.isSystemApp {
+            return "system_app"
+        }
+        if app.isRunning {
+            return "running"
+        }
+        if app.status == "已链接" {
+            return "already_linked"
+        }
+        if app.isIOSApp && !allowIOSAppMigration {
+            return "ios_migration_disabled"
+        }
+        if app.isAppStoreApp && !allowAppStoreMigration {
+            return "app_store_migration_disabled"
+        }
+        return nil
+    }
     
     func scanLocalApps() {
+        let scanID = AppLogger.shared.makeOperationID(prefix: "scan-local-apps")
+        AppLogger.shared.logContext(
+            "开始扫描本地应用",
+            details: [("scan_id", scanID), ("directory", localAppsURL.path)]
+        )
         // Run on background task to avoid blocking Main Thread
         Task.detached(priority: .userInitiated) {
             // Gather data needed for scanning
@@ -662,6 +697,14 @@ struct ContentView: View {
             await MainActor.run {
                 self.localApps = newApps
             }
+            AppLogger.shared.logContext(
+                "本地应用扫描完成",
+                details: [
+                    ("scan_id", scanID),
+                    ("count", String(newApps.count)),
+                    ("status_summary", self.summarizeStatuses(for: newApps))
+                ]
+            )
             
             // Calculate sizes progressively using the same scanner actor
             await self.calculateSizesProgressive(for: newApps, isLocal: true, scanner: scanner)
@@ -669,7 +712,21 @@ struct ContentView: View {
     }
     
     func scanExternalApps() {
-        guard let dir = externalDriveURL else { self.externalApps = []; return }
+        guard let dir = externalDriveURL else {
+            AppLogger.shared.log("未选择外部路径，清空外部应用列表", level: "TRACE")
+            self.externalApps = []
+            return
+        }
+        
+        let scanID = AppLogger.shared.makeOperationID(prefix: "scan-external-apps")
+        AppLogger.shared.logContext(
+            "开始扫描外部应用",
+            details: [
+                ("scan_id", scanID),
+                ("directory", dir.path),
+                ("local_directory", "/Applications")
+            ]
+        )
         
         Task.detached(priority: .userInitiated) {
             let scanDir = dir
@@ -681,6 +738,14 @@ struct ContentView: View {
             await MainActor.run {
                 self.externalApps = newApps
             }
+            AppLogger.shared.logContext(
+                "外部应用扫描完成",
+                details: [
+                    ("scan_id", scanID),
+                    ("count", String(newApps.count)),
+                    ("status_summary", self.summarizeStatuses(for: newApps))
+                ]
+            )
              
             // Calculate sizes progressively
             await self.calculateSizesProgressive(for: newApps, isLocal: false, scanner: scanner)
@@ -689,16 +754,10 @@ struct ContentView: View {
     
     func calculateSizesProgressive(for apps: [AppItem], isLocal: Bool, scanner: AppScanner) async {
         for app in apps {
-             let sizeBytes = await scanner.calculateDirectorySize(at: app.path)
+             let sizeBytes = await scanner.calculateDisplayedSize(for: app, isLocalEntry: isLocal)
              
              await MainActor.run {
-                 let formatter = MeasurementFormatter()
-                 formatter.unitOptions = .naturalScale
-                 formatter.unitStyle = .short
-                 formatter.locale = LanguageManager.shared.locale
-                 
-                 let measurement = Measurement(value: Double(sizeBytes), unit: UnitInformationStorage.bytes)
-                 let sizeString = formatter.string(from: measurement)
+                 let sizeString = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
                  
                  if isLocal {
                      if let index = self.localApps.firstIndex(where: { $0.id == app.id }) {
@@ -721,18 +780,27 @@ struct ContentView: View {
     
     func openPanelForExternalDrive() {
         let openPanel = NSOpenPanel()
-        openPanel.prompt = "选择文件夹"
+        openPanel.prompt = "选择文件夹".localized
         openPanel.allowsMultipleSelection = false
         openPanel.canChooseDirectories = true
         openPanel.canChooseFiles = false
+        AppLogger.shared.log("打开外部路径选择面板")
         if openPanel.runModal() == .OK, let url = openPanel.urls.first {
             self.externalDriveURL = url
+            AppLogger.shared.logContext("用户选择外部路径", details: [("path", url.path)])
             // 记录外接硬盘信息
             AppLogger.shared.logExternalDriveInfo(at: url)
+        } else {
+            AppLogger.shared.log("用户取消选择外部路径", level: "TRACE")
         }
     }
     
     func showError(title: String, message: String) {
+        AppLogger.shared.logContext(
+            "向用户展示错误",
+            details: [("title", title), ("message", message)],
+            level: "ERROR"
+        )
         self.alertTitle = title
         self.alertMessage = message
         self.showAlert = true
@@ -789,320 +857,31 @@ struct ContentView: View {
         return false
     }
 
-    func checkApplicationsFolderWritePermission() throws {
-        let testFile = localAppsURL.appendingPathComponent(".permission_check_\(UUID().uuidString)")
-        do {
-            try "test".write(to: testFile, atomically: true, encoding: .utf8)
-            try fileManager.removeItem(at: testFile)
-        } catch {
-            throw AppMoverError.permissionDenied(error)
-        }
-    }
-    
-    /// 使用 AppleScript 调用 Finder 删除文件 (用于 App Store 应用)
-    /// 使用 Process 调用 osascript，更可能触发权限请求
-    func removeItemViaFinder(at url: URL) throws {
-        let escapedPath = url.path.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "tell application \"Finder\" to delete POSIX file \"\(escapedPath)\""
-        
-        AppLogger.shared.log("执行 AppleScript: \(script)")
-        
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-        
-        do {
-            try process.run()
-            process.waitUntilExit()
-            
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-            
-            if process.terminationStatus != 0 {
-                AppLogger.shared.logError("osascript 退出码: \(process.terminationStatus), 错误: \(errorOutput)")
-                throw NSError(domain: "AppleScript", code: Int(process.terminationStatus), 
-                             userInfo: [NSLocalizedDescriptionKey: errorOutput.isEmpty ? "Finder 删除失败" : errorOutput])
-            }
-            
-            AppLogger.shared.log("Finder 删除成功")
-        } catch {
-            AppLogger.shared.logError("Process 执行失败", error: error)
-            throw error
-        }
-    }
-
     func moveAndLink(appToMove: AppItem, destinationURL: URL, progressHandler: FileCopier.ProgressHandler?) async throws {
-        AppLogger.shared.log("===== 开始迁移应用 =====")
-        AppLogger.shared.log("应用名称: \(appToMove.name)")
-        AppLogger.shared.log("源路径: \(appToMove.path.path)")
-        AppLogger.shared.log("目标路径: \(destinationURL.path)")
-        
-        try checkApplicationsFolderWritePermission()
-        AppLogger.shared.log("权限检查通过")
-        
-        if isAppRunning(url: appToMove.path) {
-            AppLogger.shared.logError("应用正在运行，无法迁移")
-            throw AppMoverError.appIsRunning
-        }
-        
-        // 1. Check destination
-        if fileManager.fileExists(atPath: destinationURL.path) {
-            AppLogger.shared.log("目标位置已存在文件，检查是否为符号链接")
-            let existingItemResourceValues = try? destinationURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-            if existingItemResourceValues?.isSymbolicLink == true {
-                try fileManager.removeItem(at: destinationURL)
-                AppLogger.shared.log("已删除目标位置的符号链接")
-            } else {
-                AppLogger.shared.logError("目标位置存在真实文件，无法覆盖")
-                throw AppMoverError.generalError(NSError(domain: "AppMover", code: 3, userInfo: [NSLocalizedDescriptionKey: "目标已存在真实文件"]))
-            }
-        }
-        
-        // 2. Move original app to external drive (Copy with Progress + Delete with Rollback)
-        do {
-            // A. Copy to destination with progress tracking
-            AppLogger.shared.log("步骤1: 开始复制应用到外部存储...")
-            let copier = FileCopier()
-            try await copier.copyDirectory(
-                from: appToMove.path,
-                to: destinationURL,
-                progressHandler: progressHandler
-            )
-            AppLogger.shared.log("步骤1: 复制成功")
-            
-            // B. Attempt to delete source
-            AppLogger.shared.log("步骤2: 尝试删除源文件 (普通方式)...")
-            do {
-                try fileManager.removeItem(at: appToMove.path)
-                AppLogger.shared.log("步骤2: 普通删除成功")
-            } catch let normalError {
-                // 普通删除失败，尝试使用 Finder 删除 (适用于 App Store 应用)
-                AppLogger.shared.logError("步骤2: 普通删除失败，尝试使用 Finder...", error: normalError)
-                do {
-                    try removeItemViaFinder(at: appToMove.path)
-                    AppLogger.shared.log("步骤2: Finder 删除成功")
-                } catch let finderError {
-                    // !!! CRITICAL ROLLBACK !!!
-                    AppLogger.shared.logError("步骤2: Finder 删除也失败，执行回滚", error: finderError)
-                    try? fileManager.removeItem(at: destinationURL)
-                    AppLogger.shared.log("回滚: 已删除外部存储中的副本")
-                    throw AppMoverError.appStoreAppError(finderError)
-                }
-            }
-        } catch {
-             // Re-throw any error from Copy or Delete (that wasn't suppressed)
-             AppLogger.shared.logError("迁移过程出错", error: error)
-             throw error
-        }
-        
-        // 3. Create Symlink Structure based on app type
-        if appToMove.isFolder {
-            // 文件夹类型：将文件夹内的每个 .app 单独链接回本地 /Applications
-            AppLogger.shared.log("迁移策略: 应用文件夹 (内部应用逐个链接)", level: "STRATEGY")
-            let folderContents = (try? fileManager.contentsOfDirectory(at: destinationURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
-            let appsInFolder = folderContents.filter { $0.pathExtension == "app" }
-            let localAppsDir = appToMove.path.deletingLastPathComponent()
-            
-            for appURL in appsInFolder {
-                let appName = appURL.lastPathComponent
-                let localAppURL = localAppsDir.appendingPathComponent(appName)
-                
-                // 创建深层符号链接（Contents 级别）
-                try fileManager.createDirectory(at: localAppURL, withIntermediateDirectories: false, attributes: nil)
-                let localContentsURL = localAppURL.appendingPathComponent("Contents")
-                let externalContentsURL = appURL.appendingPathComponent("Contents")
-                try fileManager.createSymbolicLink(at: localContentsURL, withDestinationURL: externalContentsURL)
-                AppLogger.shared.log("已链接文件夹内应用: \(appName)")
-            }
-        } else {
-            // 检测是否为 iOS 应用（使用 WrappedBundle 结构）
-            let wrappedBundleURL = destinationURL.appendingPathComponent("WrappedBundle")
-            let isIOSApp = fileManager.fileExists(atPath: wrappedBundleURL.path)
-            let shouldUseWholeAppSymlink = prefersWholeAppSymlink(for: destinationURL)
-            
-            if isIOSApp {
-                // iOS 应用：使用直接符号链接（整个 .app）
-                // 注意：iOS 应用无法使用深度链接策略，Finder 中会显示箭头
-                AppLogger.shared.log("迁移策略: iOS 应用 (直接符号链接)", level: "STRATEGY")
-                try fileManager.createSymbolicLink(at: appToMove.path, withDestinationURL: destinationURL)
-                AppLogger.shared.log("已创建符号链接: \(appToMove.path.path) -> \(destinationURL.path)")
-            } else if shouldUseWholeAppSymlink {
-                // 某些自更新应用（如 Squirrel / Sparkle）更依赖完整 bundle 结构。
-                // 对它们使用传统整体符号链接，兼容性比 Contents 深链更好。
-                AppLogger.shared.log("迁移策略: 自更新应用 (整体符号链接兼容模式)", level: "STRATEGY")
-                try fileManager.createSymbolicLink(at: appToMove.path, withDestinationURL: destinationURL)
-                AppLogger.shared.log("已创建符号链接: \(appToMove.path.path) -> \(destinationURL.path)")
-            } else {
-                // Mac 原生应用：使用 Contents 深度符号链接（隐藏 Finder 箭头）
-                AppLogger.shared.log("迁移策略: Mac 原生应用 (Contents 深度链接)", level: "STRATEGY")
-                
-                // Step A: Create the local .app directory (fake bundle)
-                try fileManager.createDirectory(at: appToMove.path, withIntermediateDirectories: false, attributes: nil)
-                
-                // Step B: Create symlink for Contents inside the fake bundle
-                let localContentsURL = appToMove.path.appendingPathComponent("Contents")
-                let destinationContentsURL = destinationURL.appendingPathComponent("Contents")
-                
-                try fileManager.createSymbolicLink(at: localContentsURL, withDestinationURL: destinationContentsURL)
-                AppLogger.shared.log("已创建 Contents 符号链接: \(localContentsURL.path) -> \(destinationContentsURL.path)")
-                
-                // Step C: (Optional but recommended) touch the directory to update timestamp for Launchpad
-                try? fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: appToMove.path.path)
-            }
-        }
-        
-        // 锁定外部结构，防止被应用内自动更新机制 (如 Sparkle/ShipIt) 意外移至废纸篓
-        AppLogger.shared.log("锁定外部项目，防止被修改或删除...")
-        try? fileManager.setAttributes([.immutable: true], ofItemAtPath: destinationURL.path)
+        let service = AppMigrationService()
+        try await service.moveAndLink(
+            appToMove: appToMove,
+            destinationURL: destinationURL,
+            isRunning: isAppRunning(url: appToMove.displayURL),
+            deleteSourceFallback: AppMigrationService.removeItemViaFinder(at:),
+            progressHandler: progressHandler
+        )
     }
 
     func linkApp(appToLink: AppItem, destinationURL: URL) throws {
-        try checkApplicationsFolderWritePermission()
-
-        // 1. Check local destination
-        if fileManager.fileExists(atPath: destinationURL.path) {
-            // Check if it is a symlink (old style) or a directory (potentially new style or real app)
-            let resourceValues = try? destinationURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
-            
-            if resourceValues?.isSymbolicLink == true {
-                // Old style symlink, safe to remove
-                try fileManager.removeItem(at: destinationURL)
-            } else if resourceValues?.isDirectory == true {
-                // Check if it's our deep symlink wrapper
-                let contentsURL = destinationURL.appendingPathComponent("Contents")
-                let contentsResourceValues = try? contentsURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-                
-                if contentsResourceValues?.isSymbolicLink == true {
-                    // It is a deep symlink wrapper, safe to remove (recursively)
-                    try fileManager.removeItem(at: destinationURL)
-                } else {
-                    // It's a real directory/app, abort!
-                    throw AppMoverError.generalError(NSError(domain: "AppMover", code: 1, userInfo: [NSLocalizedDescriptionKey: "本地已存在同名真实应用"]))
-                }
-            } else {
-                throw AppMoverError.generalError(NSError(domain: "AppMover", code: 1, userInfo: [NSLocalizedDescriptionKey: "本地已存在同名文件"]))
-            }
-        }
-        
-        let shouldUseWholeAppSymlink = prefersWholeAppSymlink(for: appToLink.path)
-
-        if shouldUseWholeAppSymlink {
-            AppLogger.shared.log("链接策略: 自更新应用 (整体符号链接兼容模式)", level: "STRATEGY")
-            try fileManager.createSymbolicLink(at: destinationURL, withDestinationURL: appToLink.path)
-        } else {
-            // 2. Create Deep Symlink Structure
-            try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: false, attributes: nil)
-
-            let localContentsURL = destinationURL.appendingPathComponent("Contents")
-            let externalContentsURL = appToLink.path.appendingPathComponent("Contents")
-
-            try fileManager.createSymbolicLink(at: localContentsURL, withDestinationURL: externalContentsURL)
-        }
-
-        try? fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: destinationURL.path)
+        try AppMigrationService().linkApp(appToLink: appToLink, destinationURL: destinationURL)
     }
     
     func deleteLink(app: AppItem) throws {
-        try checkApplicationsFolderWritePermission()
-
-        // Handle both old symlink and new deep symlink
-        let resourceValues = try? app.path.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
-        
-        if resourceValues?.isSymbolicLink == true {
-            // Old style: just remove the file
-            try fileManager.removeItem(at: app.path)
-        } else if resourceValues?.isDirectory == true {
-            // New style: remove the whole directory wrapper
-            // Double check it contains a symlinked Contents to be safe?
-            // For now, assuming if status is "Link", logic allows removal.
-            try fileManager.removeItem(at: app.path)
-        } else {
-             throw AppMoverError.generalError(NSError(domain: "AppMover", code: 5, userInfo: [NSLocalizedDescriptionKey: "尝试删除非链接文件"]))
-        }
+        try AppMigrationService().deleteLink(app: app)
     }
     
     func moveBack(app: AppItem, localDestinationURL: URL, progressHandler: FileCopier.ProgressHandler?) async throws {
-        AppLogger.shared.log("===== 开始还原应用 =====")
-        AppLogger.shared.log("应用名称: \(app.name)")
-        AppLogger.shared.log("源路径 (外部): \(app.path.path)")
-        AppLogger.shared.log("目标路径 (本地): \(localDestinationURL.path)")
-        
-        try checkApplicationsFolderWritePermission()
-        AppLogger.shared.log("权限检查通过")
-        
-        // 1. Clean up local spot
-        if fileManager.fileExists(atPath: localDestinationURL.path) {
-            AppLogger.shared.log("本地存在同名项目，正在清理...")
-            let resourceValues = try? localDestinationURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
-            
-            if resourceValues?.isSymbolicLink == true {
-                try fileManager.removeItem(at: localDestinationURL)
-                AppLogger.shared.log("已清理本地符号链接")
-            } else if resourceValues?.isDirectory == true {
-                 // Check for our fake bundle structure
-                 let contentsURL = localDestinationURL.appendingPathComponent("Contents")
-                 let contentsResourceValues = try? contentsURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-                 
-                 // Also check for Wrapper symlink (iOS apps)
-                 let wrapperURL = localDestinationURL.appendingPathComponent("Wrapper")
-                 let wrapperResourceValues = try? wrapperURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-                 
-                 if contentsResourceValues?.isSymbolicLink == true || wrapperResourceValues?.isSymbolicLink == true {
-                     try fileManager.removeItem(at: localDestinationURL)
-                     AppLogger.shared.log("已清理本地假壳/符号链接结构")
-                 } else {
-                     let error = NSError(domain: "AppMover", code: 6, userInfo: [NSLocalizedDescriptionKey: "本地已存在同名真实文件，无法覆盖"])
-                     AppLogger.shared.logError("还原失败", error: error)
-                     throw AppMoverError.generalError(error)
-                 }
-            } else {
-                 let error = NSError(domain: "AppMover", code: 6, userInfo: [NSLocalizedDescriptionKey: "本地已存在同名文件，无法覆盖"])
-                 AppLogger.shared.logError("还原失败", error: error)
-                 throw AppMoverError.generalError(error)
-            }
-        }
-        
-        // 2. Copy app back with progress
-        AppLogger.shared.log("步骤1: 开始复制应用回本地...")
-        let startTime = Date()
-        let copier = FileCopier()
-        
-        // 获取源文件大小用于日志
-        let sourceSize = (try? fileManager.attributesOfItem(atPath: app.path.path)[.size] as? Int64) ?? 0
-        
-        try await copier.copyDirectory(
-            from: app.path,
-            to: localDestinationURL,
+        try await AppMigrationService().moveBack(
+            app: app,
+            localDestinationURL: localDestinationURL,
             progressHandler: progressHandler
         )
-        let duration = Date().timeIntervalSince(startTime)
-        AppLogger.shared.log("步骤1: 复制成功")
-        
-        // 记录性能日志
-        AppLogger.shared.logMigrationPerformance(
-            appName: app.name,
-            size: sourceSize > 0 ? sourceSize : 0, // 这里的 size 可能不准确因为是文件夹，但作为参考
-            duration: duration,
-            sourcePath: app.path.path,
-            destPath: localDestinationURL.path
-        )
-        
-        // 3. Delete original from external drive
-        AppLogger.shared.log("步骤2: 解锁并删除外部存储源文件...")
-        do {
-            try? fileManager.setAttributes([.immutable: false], ofItemAtPath: app.path.path)
-            try fileManager.removeItem(at: app.path)
-            AppLogger.shared.log("步骤2: 删除成功")
-            AppLogger.shared.log("===== 还原完成 =====")
-        } catch {
-            AppLogger.shared.logError("步骤2: 删除外部文件失败 (但不影响还原)", error: error)
-            // 不抛出错误，因为还原已经完成
-        }
     }
     
     func performMoveOut() {
@@ -1148,6 +927,34 @@ struct ContentView: View {
             return false
         }
         
+        let selectedApps = selectedLocalApps.compactMap { id in
+            localApps.first { $0.id == id }
+        }
+        let skippedDetails = selectedApps.compactMap { app -> String? in
+            guard let reason = migrationSkipReason(
+                for: app,
+                allowAppStoreMigration: allowAppStoreMigration,
+                allowIOSAppMigration: allowIOSAppMigration
+            ) else {
+                return nil
+            }
+            return "\(app.displayName)=\(reason)"
+        }
+        AppLogger.shared.logContext(
+            "用户请求迁移应用",
+            details: [
+                ("selected_count", String(selectedApps.count)),
+                ("selected_apps", joinedAppNames(selectedApps)),
+                ("valid_count", String(validApps.count)),
+                ("valid_apps", joinedAppNames(validApps)),
+                ("skipped_count", String(skippedApps.count)),
+                ("skipped_details", skippedDetails.isEmpty ? "(none)" : skippedDetails.joined(separator: "; ")),
+                ("destination", dest.path),
+                ("allow_app_store", allowAppStoreMigration ? "true" : "false"),
+                ("allow_ios", allowIOSAppMigration ? "true" : "false")
+            ]
+        )
+        
         if !skippedApps.isEmpty && validApps.isEmpty {
             // 生成提示信息
             var message = ""
@@ -1175,6 +982,16 @@ struct ContentView: View {
     /// 批量迁移应用
     func executeBatchMove(apps: [AppItem], destination: URL) {
         guard !apps.isEmpty else { return }
+        let batchID = AppLogger.shared.makeOperationID(prefix: "batch-move-out")
+        AppLogger.shared.logContext(
+            "开始批量迁移应用",
+            details: [
+                ("batch_id", batchID),
+                ("count", String(apps.count)),
+                ("apps", joinedAppNames(apps)),
+                ("destination", destination.path)
+            ]
+        )
         
         isMigrating = true
         progressTotal = apps.count
@@ -1193,6 +1010,11 @@ struct ContentView: View {
                 }
                 
                 let destURL = destination.appendingPathComponent(app.name)
+                AppLogger.shared.logContext(
+                    "批量迁移单项开始",
+                    details: [("batch_id", batchID), ("app_name", app.displayName), ("destination", destURL.path)],
+                    level: "TRACE"
+                )
                 
                 do {
                     try await moveAndLink(appToMove: app, destinationURL: destURL) { progress in
@@ -1201,8 +1023,18 @@ struct ContentView: View {
                             self.progressTotalBytes = progress.totalBytes
                         }
                     }
+                    AppLogger.shared.logContext(
+                        "批量迁移单项成功",
+                        details: [("batch_id", batchID), ("app_name", app.displayName)]
+                    )
                 } catch {
                     errors.append("\(app.name): \(error.localizedDescription)")
+                    AppLogger.shared.logError(
+                        "批量迁移单项失败",
+                        error: error,
+                        context: [("batch_id", batchID), ("app_name", app.displayName), ("destination", destURL.path)],
+                        relatedURLs: [("source", app.path), ("destination", destURL)]
+                    )
                 }
             }
             
@@ -1217,6 +1049,14 @@ struct ContentView: View {
                     showError(title: "部分迁移失败", message: errors.joined(separator: "\n"))
                 }
             }
+            AppLogger.shared.logContext(
+                "批量迁移应用结束",
+                details: [
+                    ("batch_id", batchID),
+                    ("success_count", String(apps.count - errors.count)),
+                    ("failure_count", String(errors.count))
+                ]
+            )
         }
     }
     
@@ -1233,19 +1073,18 @@ struct ContentView: View {
         
         var errors: [String] = []
         
-        // 展开文件夹，收集所有需要链接的单个 .app
-        var appsToLink: [(app: AppItem, sourcePath: URL)] = []
-        for app in validApps {
-            if app.isFolder {
-                // 文件夹：遍历内部的每个 .app
-                let folderContents = (try? fileManager.contentsOfDirectory(at: app.path, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
-                for itemURL in folderContents where itemURL.pathExtension == "app" {
-                    appsToLink.append((app: app, sourcePath: itemURL))
-                }
-            } else {
-                appsToLink.append((app: app, sourcePath: app.path))
-            }
-        }
+        let appsToLink = validApps.map { (app: $0, sourcePath: $0.path) }
+        let batchID = AppLogger.shared.makeOperationID(prefix: "batch-link-in")
+        AppLogger.shared.logContext(
+            "开始批量链接应用",
+            details: [
+                ("batch_id", batchID),
+                ("selected_count", String(validApps.count)),
+                ("selected_items", joinedAppNames(validApps)),
+                ("expanded_app_count", String(appsToLink.count)),
+                ("expanded_sources", appsToLink.map { $0.sourcePath.lastPathComponent }.joined(separator: ", "))
+            ]
+        )
         
         progressTotal = appsToLink.count
         progressCurrent = 0
@@ -1259,12 +1098,35 @@ struct ContentView: View {
                 }
                 
                 let destination = localAppsURL.appendingPathComponent(appName)
-                let tempAppItem = AppItem(name: appName, path: item.sourcePath, status: "未链接")
+                let tempAppItem = AppItem(
+                    name: appName,
+                    path: item.sourcePath,
+                    bundleURL: item.app.bundleURL,
+                    status: "未链接",
+                    isFolder: item.app.isFolder,
+                    containerKind: item.app.containerKind,
+                    appCount: item.app.appCount
+                )
+                AppLogger.shared.logContext(
+                    "批量链接单项开始",
+                    details: [("batch_id", batchID), ("app_name", appName), ("destination", destination.path)],
+                    level: "TRACE"
+                )
                 
                 do {
                     try linkApp(appToLink: tempAppItem, destinationURL: destination)
+                    AppLogger.shared.logContext(
+                        "批量链接单项成功",
+                        details: [("batch_id", batchID), ("app_name", appName)]
+                    )
                 } catch {
                     errors.append("\(appName): \(error.localizedDescription)")
+                    AppLogger.shared.logError(
+                        "批量链接单项失败",
+                        error: error,
+                        context: [("batch_id", batchID), ("app_name", appName), ("folder_item", item.app.displayName)],
+                        relatedURLs: [("source", item.sourcePath), ("destination", destination)]
+                    )
                 }
                 
                 try? await Task.sleep(nanoseconds: 100_000_000)
@@ -1281,18 +1143,48 @@ struct ContentView: View {
                     showError(title: "部分链接失败", message: errors.joined(separator: "\n"))
                 }
             }
+            AppLogger.shared.logContext(
+                "批量链接应用结束",
+                details: [
+                    ("batch_id", batchID),
+                    ("success_count", String(appsToLink.count - errors.count)),
+                    ("failure_count", String(errors.count))
+                ]
+            )
         }
     }
     
     func performDeleteLink(app: AppItem) {
+        AppLogger.shared.logContext(
+            "用户请求删除本地入口",
+            details: [("app_name", app.displayName), ("path", app.path.path), ("status", app.status)]
+        )
         do {
             try deleteLink(app: app)
             scanLocalApps(); scanExternalApps()
-        } catch { showError(title: "错误", message: error.localizedDescription) }
+        } catch {
+            AppLogger.shared.logError(
+                "删除本地入口失败",
+                error: error,
+                context: [("app_name", app.displayName)],
+                relatedURLs: [("path", app.path)]
+            )
+            showError(title: "错误", message: error.localizedDescription)
+        }
     }
     
     
     func performMoveBack(app: AppItem) {
+        let operationID = AppLogger.shared.makeOperationID(prefix: "single-move-back")
+        AppLogger.shared.logContext(
+            "用户请求还原单个应用",
+            details: [
+                ("operation_id", operationID),
+                ("app_name", app.displayName),
+                ("source", app.path.path),
+                ("destination", localAppsURL.appendingPathComponent(app.name).path)
+            ]
+        )
         isMigrating = true
         progressTotal = 1
         progressCurrent = 1
@@ -1310,7 +1202,17 @@ struct ContentView: View {
                         self.progressTotalBytes = progress.totalBytes
                     }
                 }
+                AppLogger.shared.logContext(
+                    "单个应用还原成功",
+                    details: [("operation_id", operationID), ("app_name", app.displayName)]
+                )
             } catch {
+                AppLogger.shared.logError(
+                    "单个应用还原失败",
+                    error: error,
+                    context: [("operation_id", operationID), ("app_name", app.displayName)],
+                    relatedURLs: [("source", app.path), ("destination", destination)]
+                )
                 await MainActor.run {
                     showError(title: "错误", message: error.localizedDescription)
                 }
@@ -1333,6 +1235,15 @@ struct ContentView: View {
         }
         
         guard !validApps.isEmpty else { return }
+        let batchID = AppLogger.shared.makeOperationID(prefix: "batch-move-back")
+        AppLogger.shared.logContext(
+            "开始批量还原应用",
+            details: [
+                ("batch_id", batchID),
+                ("count", String(validApps.count)),
+                ("apps", joinedAppNames(validApps))
+            ]
+        )
         
         isMigrating = true
         progressTotal = validApps.count
@@ -1351,6 +1262,11 @@ struct ContentView: View {
                 }
                 
                 let destination = localAppsURL.appendingPathComponent(app.name)
+                AppLogger.shared.logContext(
+                    "批量还原单项开始",
+                    details: [("batch_id", batchID), ("app_name", app.displayName), ("destination", destination.path)],
+                    level: "TRACE"
+                )
                 
                 do {
                     try await moveBack(app: app, localDestinationURL: destination) { progress in
@@ -1359,8 +1275,18 @@ struct ContentView: View {
                             self.progressTotalBytes = progress.totalBytes
                         }
                     }
+                    AppLogger.shared.logContext(
+                        "批量还原单项成功",
+                        details: [("batch_id", batchID), ("app_name", app.displayName)]
+                    )
                 } catch {
                     errors.append("\(app.displayName): \(error.localizedDescription)")
+                    AppLogger.shared.logError(
+                        "批量还原单项失败",
+                        error: error,
+                        context: [("batch_id", batchID), ("app_name", app.displayName)],
+                        relatedURLs: [("source", app.path), ("destination", destination)]
+                    )
                 }
             }
             
@@ -1375,6 +1301,14 @@ struct ContentView: View {
                     showError(title: "部分迁移失败", message: errors.joined(separator: "\n"))
                 }
             }
+            AppLogger.shared.logContext(
+                "批量还原应用结束",
+                details: [
+                    ("batch_id", batchID),
+                    ("success_count", String(validApps.count - errors.count)),
+                    ("failure_count", String(errors.count))
+                ]
+            )
         }
     }
     
@@ -1395,12 +1329,13 @@ struct ContentView: View {
     func startMonitoringLocal() {
         // Stop existing if any (though usually one)
         localMonitor?.stopMonitoring()
+        AppLogger.shared.logContext("启动本地目录监控", details: [("path", localAppsURL.path)])
         
         let monitor = FolderMonitor(url: localAppsURL)
         monitor.startMonitoring {
             // Debounce or just trigger?
             // Re-scan
-            print("Local folder changed, scanning...")
+            AppLogger.shared.logContext("检测到本地目录变化", details: [("path", self.localAppsURL.path)], level: "TRACE")
             Task { @MainActor in
                 self.scanLocalApps()
             }
@@ -1410,10 +1345,11 @@ struct ContentView: View {
     
     func startMonitoringExternal(url: URL) {
         externalMonitor?.stopMonitoring()
+        AppLogger.shared.logContext("启动外部目录监控", details: [("path", url.path)])
         
         let monitor = FolderMonitor(url: url)
         monitor.startMonitoring {
-            print("External folder changed, scanning...")
+            AppLogger.shared.logContext("检测到外部目录变化", details: [("path", url.path)], level: "TRACE")
             Task { @MainActor in
                 self.scanExternalApps()
             }
@@ -1422,6 +1358,7 @@ struct ContentView: View {
     }
     
     func stopMonitoringExternal() {
+        AppLogger.shared.log("停止外部目录监控", level: "TRACE")
         externalMonitor?.stopMonitoring()
         externalMonitor = nil
     }

@@ -14,6 +14,7 @@ import Combine
 ///
 /// 管理应用的多语言设置，支持系统语言跟随和手动语言选择。
 /// 使用 `@Published` 属性自动触发 UI 更新。
+/// 具体支持的语言列表由 `AppLanguageCatalog` 统一维护。
 ///
 /// ## 使用示例
 /// ```swift

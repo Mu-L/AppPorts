@@ -196,6 +196,10 @@ struct AppStoreSettingsView: View {
                         Button("在 Finder 中查看".localized) {
                             AppLogger.shared.openLogInFinder()
                         }
+
+                        Button("导出诊断包".localized) {
+                            AppLogger.shared.exportDiagnosticPackageInteractively()
+                        }
                         
                         Spacer()
                         
@@ -265,6 +269,8 @@ struct WarningBanner: View {
     }
 }
 
-#Preview {
-    AppStoreSettingsView()
+struct AppStoreSettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        AppStoreSettingsView()
+    }
 }

@@ -7,7 +7,7 @@
 An application migration and linking tool designed specifically for macOS.
 Easily migrate large applications to external storage while maintaining seamless system functionality.
 
-[简体中文](README_CN.md)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+[简体中文](README_CN.md)｜[Official Website](https://appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <div style="display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
   <a href="https://www.producthunt.com/products/appports/launches/appports?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-appports" target="_blank" rel="noopener noreferrer">
@@ -43,30 +43,26 @@ To fix this, please run the following command in Terminal to remove the quaranti
 xattr -rd com.apple.quarantine /Applications/AppPorts.app
 ```
 
+## 📸 Screenshots
+
+| Welcome Screen | Main Interface |
+|:---:|:---:|
+| ![Welcome](https://pic.cdn.shimoko.com/appports/huanying.png) | ![Main](https://pic.cdn.shimoko.com/appports/zhuyemian.png) |
+
+| Dark Mode | Language Switching |
+|:---:|:---:|
+| ![Dark](https://pic.cdn.shimoko.com/appports/shensemoshi.png) | ![Lang](https://pic.cdn.shimoko.com/appports/yuyan.png) |
+
 ## 🚀 Key Features
 
-* **📦 App Slimming**: One-click migration of multi-gigabyte applications (e.g., Logic Pro, Xcode, games) to an external drive.
-* **🔗 Contents Linking**: A linking strategy optimized for macOS structure.
-    *   **Mechanism**: Retains the `.app` directory structure locally and symlinks only the internal `Contents` data directory to the external drive.
-    *   **Storage Usage**: Locally occupies only the filesystem metadata for the directory (negligible size).
-    *   **Compatibility**: Displays **no arrow icon** in Finder and supports the **"App Menu"** in macOS 26.
-* **🛡️ Safety First**:
-    * Automatically identifies and locks **System Apps** to prevent accidental system corruption.
-    * Checks the **Running Status** before migration to avoid corrupting active applications.
-* **↩️ Restore Anytime**: Simply click "Restore" to move the application back to the local disk, automatically removing the symbolic link.
-* **🎨 Modern UI**:
-    * Developed natively with SwiftUI for a smooth, fluid experience.
-    * Perfect compatibility with **Dark Mode**.
-    * Supports **Bi-lingual** (English/Chinese), switchable via system or in-app menu.
-*   **♿️ Accessibility Plus**:
-    *   **VoiceOver Optimization**: Smart row announcements and custom Rotor actions.
-    *   **Semantic UI**: Hides decorative icons and ensures status badges are read clearly.
-    *   **Braille Support**: Added **Braille** language option, displaying UI text directly in Braille dots.
-*   **🌍 Global Ready**:
-    *   **20+ Languages Supported**:
-        🇺🇸 English, 🇨🇳 Simplified Chinese, 🇭🇰 Traditional Chinese, 🇯🇵 Japanese, 🇰🇷 Korean, 🇩🇪 German, 🇫🇷 French, 🇪🇸 Spanish, 🇮🇹 Italian, 🇵🇹 Portuguese, 🇷🇺 Russian, 🇸🇦 Arabic, 🇮🇳 Hindi, 🇻🇳 Vietnamese, 🇹🇭 Thai, 🇹🇷 Turkish, 🇳🇱 Dutch, 🇵🇱 Polish, 🇮🇩 Indonesian, 🏁 Esperanto, ⠃⠗ Braille
-    *   **Localized Formatting**: File sizes automatically respect regional formatting.
-*   **🔍 Quick Search**: Built-in search bar to quickly locate local or external applications.
+* **📦 App Slimming**: One-click migration of multi-gigabyte applications such as Logic Pro, Xcode, and games to external storage.
+* **🔗 Contents Linking**: Keeps the `.app` bundle structure locally and links only the internal `Contents` directory to the external drive. Local disk usage is usually negligible, Finder shows no shortcut arrow, and the result works with the **"App Menu"** in macOS 26.
+* **🛡️ Safety First**: Automatically identifies and locks **System Apps**, and checks the **Running Status** before migration to avoid damaging active applications.
+* **↩️ Restore Anytime**: Click **Restore** to move the application back to the local disk and remove the symbolic link automatically.
+* **🎨 Modern UI**: Built natively with SwiftUI, fully supports **Dark Mode**, and supports **Bi-lingual** (English/Chinese) switching via system or in-app menu.
+* **♿️ Accessibility Plus**: Includes **VoiceOver**-friendly row announcements, clearer semantic UI, and a **Braille** language option that displays interface text directly in Braille dots.
+* **🌍 Global Ready**: Supports 20+ languages including 🇺🇸 English, 🇨🇳 Simplified Chinese, 🇭🇰 Traditional Chinese, 🇯🇵 Japanese, 🇰🇷 Korean, 🇩🇪 German, 🇫🇷 French, 🇪🇸 Spanish, 🇮🇹 Italian, 🇵🇹 Portuguese, 🇷🇺 Russian, 🇸🇦 Arabic, 🇮🇳 Hindi, 🇻🇳 Vietnamese, 🇹🇭 Thai, 🇹🇷 Turkish, 🇳🇱 Dutch, 🇵🇱 Polish, 🇮🇩 Indonesian, 🏁 Esperanto, and ⠃⠗ Braille. File sizes also respect localized formatting rules.
+* **🔍 Quick Search**: Built-in search bar for quickly locating local or external applications.
 
 ## 🏆 Why AppPorts?
 
@@ -80,15 +76,20 @@ Compared to other solutions, AppPorts uses the unique **Contents Linking** techn
 | **FS Cleanliness** | ✅ **Clean (1 Link)** | ✅ Clean (1 Link) |
 | **Maintenance** | ✅ **Instant** | ✅ Instant |
 
-## 📸 Screenshots
+## 🧭 Migration Strategy
 
-| Welcome Screen | Main Interface |
-|:---:|:---:|
-| ![Welcome](https://pic.cdn.shimoko.com/appports/huanying.png) | ![Main](https://pic.cdn.shimoko.com/appports/zhuyemian.png) |
+AppPorts does not migrate every app in the same way. It picks a local portal strategy based on the app's structure and update behavior.
 
-| Dark Mode | Language Switching |
-|:---:|:---:|
-| ![Dark](https://pic.cdn.shimoko.com/appports/shensemoshi.png) | ![Lang](https://pic.cdn.shimoko.com/appports/yuyan.png) |
+| App Type | Default Strategy | Default Availability | Notes |
+| :--- | :--- | :--- | :--- |
+| Native macOS apps | Keep a local `.app` wrapper and link `Contents` | Enabled | The default strategy for most regular apps |
+| Self-updating apps | Symlink the whole app bundle | Enabled | Better suited for apps that ship updater components such as Sparkle or Squirrel |
+| iPhone/iPad apps on Mac | Symlink the whole app bundle | Disabled by default | Can be enabled manually in settings |
+| Mac App Store apps | Migrate only after opt-in, then follow the detected bundle strategy | Disabled by default | More sensitive to system protections and update flow |
+| App suites or folders containing multiple apps | Move and symlink the whole folder | Enabled | Better suited for suite-style distributions |
+| System apps | Not migrated | Blocked | Protected to avoid damaging the system |
+| Running apps | Not migrated | Blocked | Quit the app before migrating |
+| Already linked apps | Not migrated again | Blocked | Prevents double-linking and broken states |
 
 ## 🛠️ Installation
 
@@ -96,7 +97,7 @@ Compared to other solutions, AppPorts uses the unique **Contents Linking** techn
 * macOS 14.0 (Sonoma) or newer.
 
 ### Download and Installation
-Please visit the [Releases](https://github.com/wzh4869/AppPorts/releases) page to download the latest `AppPorts.dmg`.
+Please visit the [official website](https://appports.shimoko.com/) or the [Releases](https://github.com/wzh4869/AppPorts/releases) page to download the latest `AppPorts.dmg`.
 
 
 ### ⚠️ Permissions

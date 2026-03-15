@@ -1442,6 +1442,72 @@ DICT = {
     "应用核心数据（设置、数据库等）": {"en": "Application core data (settings, databases, etc.)", "zh-Hans": "应用核心数据（设置、数据库等）", "zh-Hant": "應用程式核心資料（設定、資料庫等）", "ja": "アプリコアデータ（設定、データベースなど）"},
     "沙盒容器数据（App Store 应用）": {"en": "Sandbox container data (App Store apps)", "zh-Hans": "沙盒容器数据（App Store 应用）", "zh-Hant": "沙盒容器資料（App Store 應用程式）", "ja": "サンドボックスコンテナデータ（App Storeアプリ）"},
     ".config（工具配置）": {"en": ".config (Tool Config)", "zh-Hans": ".config（工具配置）", "zh-Hant": ".config（工具設定）", "ja": ".config（ツール設定）"},
+    "========== 系统诊断信息 ==========": {"en": "========== System Diagnostics ==========", "zh-Hans": "========== 系统诊断信息 ==========", "zh-Hant": "========== 系統診斷資訊 =========="},
+    "========== 外接硬盘信息 ==========": {"en": "========== External Drive Diagnostics ==========", "zh-Hans": "========== 外接硬盘信息 ==========", "zh-Hant": "========== 外接硬碟資訊 =========="},
+    "Mac": {"en": "Mac", "zh-Hans": "Mac", "zh-Hant": "Mac"},
+    "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）": {
+        "en": "Data directories split out from inside the container for migration (such as chat history, downloads, or runtime data)",
+        "zh-Hans": "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）",
+        "zh-Hant": "容器內部拆分遷移的資料目錄（如聊天記錄、下載檔案或執行時資料）"
+    },
+    "整理": {"en": "Normalize", "zh-Hans": "整理", "zh-Hant": "整理"},
+    "将已接管的链接整理到 AppPorts 规范路径": {
+        "en": "Move managed links to the AppPorts canonical path",
+        "zh-Hans": "将已接管的链接整理到 AppPorts 规范路径",
+        "zh-Hant": "將已接管的連結整理到 AppPorts 規範路徑"
+    },
+    "链接详情": {"en": "Link Details", "zh-Hans": "链接详情", "zh-Hant": "連結詳情"},
+    "查看现有软链路径，并可将其纳入 AppPorts 管理": {
+        "en": "View the existing symlink target and optionally bring it under AppPorts management",
+        "zh-Hans": "查看现有软链路径，并可将其纳入 AppPorts 管理",
+        "zh-Hant": "查看現有軟連結路徑，並可將其納入 AppPorts 管理"
+    },
+    "检测到已有符号链接，非 AppPorts 迁移结果": {
+        "en": "An existing symbolic link was detected. It was not created by AppPorts",
+        "zh-Hans": "检测到已有符号链接，非 AppPorts 迁移结果",
+        "zh-Hant": "偵測到現有符號連結，並非 AppPorts 遷移結果"
+    },
+    "接回": {"en": "Relink", "zh-Hans": "接回", "zh-Hant": "接回"},
+    "外部目录已存在，在原路径补建符号链接": {
+        "en": "The external directory already exists. Recreate a symbolic link at the original path",
+        "zh-Hans": "外部目录已存在，在原路径补建符号链接",
+        "zh-Hant": "外部目錄已存在，於原路徑補建符號連結"
+    },
+    "确认规范化管理": {"en": "Confirm Normalization", "zh-Hans": "确认规范化管理", "zh-Hant": "確認規範化管理"},
+    "确认": {"en": "Confirm", "zh-Hans": "确认", "zh-Hant": "確認"},
+    "没有匹配当前筛选条件的数据目录": {
+        "en": "No data directories match the current filters",
+        "zh-Hans": "没有匹配当前筛选条件的数据目录",
+        "zh-Hant": "沒有符合目前篩選條件的資料目錄"
+    },
+    "%lld 个待整理": {"en": "%lld to normalize", "zh-Hans": "%lld 个待整理", "zh-Hant": "%lld 個待整理"},
+    "%lld 个现有软链": {"en": "%lld existing symlinks", "zh-Hans": "%lld 个现有软链", "zh-Hant": "%lld 個現有軟連結"},
+    "%lld 个待接回": {"en": "%lld pending relink", "zh-Hans": "%lld 个待接回", "zh-Hant": "%lld 個待接回"},
+    "无法读取现有软链的目标路径": {
+        "en": "Unable to read the target path of the existing symlink",
+        "zh-Hans": "无法读取现有软链的目标路径",
+        "zh-Hant": "無法讀取現有軟連結的目標路徑"
+    },
+    "现有软链": {"en": "Existing Symlink", "zh-Hans": "现有软链", "zh-Hant": "現有軟連結"},
+    "规范化管理": {"en": "Normalize", "zh-Hans": "规范化管理", "zh-Hant": "規範化管理"},
+    "无法读取已链接目录的目标路径": {
+        "en": "Unable to read the target path of the linked directory",
+        "zh-Hans": "无法读取已链接目录的目标路径",
+        "zh-Hant": "無法讀取已連結目錄的目標路徑"
+    },
+    "整理已链接目录": {"en": "Normalize Linked Directory", "zh-Hans": "整理已链接目录", "zh-Hant": "整理已連結目錄"},
+    "当前路径已经符合 AppPorts 的规范路径。": {
+        "en": "The current path already matches the AppPorts canonical path.",
+        "zh-Hans": "当前路径已经符合 AppPorts 的规范路径。",
+        "zh-Hant": "目前路徑已符合 AppPorts 的規範路徑。"
+    },
+    "当前路径与规范路径不同。本次操作会将外部数据移动到规范路径，并重建本地软链接。": {
+        "en": "The current path differs from the AppPorts canonical path. This operation will move the external data to the canonical path and recreate the local symlink.",
+        "zh-Hans": "当前路径与规范路径不同。本次操作会将外部数据移动到规范路径，并重建本地软链接。",
+        "zh-Hant": "目前路徑與規範路徑不同。本次操作會將外部資料移動到規範路徑，並重建本地軟連結。"
+    },
+    "无法读取外部目录路径": {"en": "Unable to read the external directory path", "zh-Hans": "无法读取外部目录路径", "zh-Hant": "無法讀取外部目錄路徑"},
+    "接回外部数据": {"en": "Relink External Data", "zh-Hans": "接回外部数据", "zh-Hant": "接回外部資料"},
 }
 
 

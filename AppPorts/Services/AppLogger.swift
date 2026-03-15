@@ -41,25 +41,52 @@ import AppKit
 /// ```
 ///
 /// - Note: 所有日志同时输出到控制台和文件（如果启用）
-class AppLogger {
+final class AppLogger: @unchecked Sendable {
+    struct OperationSummaryRecord: Codable, Sendable {
+        let operationID: String
+        let category: String
+        let result: String
+        let errorCode: String?
+        let startedAt: String?
+        let endedAt: String
+        let durationMs: Int?
+        let sessionID: String
+        let details: [String: String]
+    }
+
     /// 单例实例
-    static let shared = AppLogger()
+    nonisolated(unsafe) static let shared = AppLogger()
     
     // MARK: - 私有属性
     
     /// 日期格式化器（格式：yyyy-MM-dd HH:mm:ss）
-    private let dateFormatter: DateFormatter
+    nonisolated(unsafe) private let dateFormatter: DateFormatter
     
     /// 文件管理器
-    private let fileManager = FileManager.default
+    nonisolated(unsafe) private let fileManager = FileManager.default
+
+    /// 串行日志队列，避免多线程写文件交错
+    nonisolated(unsafe) private let writeQueue = DispatchQueue(label: "com.shimoko.AppPorts.logger")
+
+    /// 当前启动会话 ID，便于用户粘贴日志后快速关联一次运行
+    nonisolated private let sessionID: String
+
+    /// 当前进程 ID
+    nonisolated private let processID: Int32 = ProcessInfo.processInfo.processIdentifier
+
+    /// 最近操作摘要，导出诊断包时直接复用
+    nonisolated(unsafe) private var recentOperationSummaries: [OperationSummaryRecord] = []
     
     /// UserDefaults 存储键
-    private let logPathKey = "LogFilePath"         // 日志文件路径
-    private let maxLogSizeKey = "MaxLogSizeBytes"  // 最大日志大小
-    private let logEnabledKey = "LogEnabled"       // 日志启用状态
+    nonisolated private let logPathKey = "LogFilePath"         // 日志文件路径
+    nonisolated private let maxLogSizeKey = "MaxLogSizeBytes"  // 最大日志大小
+    nonisolated private let logEnabledKey = "LogEnabled"       // 日志启用状态
     
     /// 默认最大日志大小: 2MB
-    private let defaultMaxSize: Int64 = 2 * 1024 * 1024
+    nonisolated private let defaultMaxSize: Int64 = 2 * 1024 * 1024
+
+    /// 最多保留最近 100 条操作摘要，避免无限增长
+    nonisolated private let maxOperationSummaryCount = 100
     
     // MARK: - 公共属性
     
@@ -70,7 +97,7 @@ class AppLogger {
     /// - 不会写入日志文件（节省磁盘空间）
     ///
     /// - Note: 默认为启用状态
-    var isLoggingEnabled: Bool {
+    nonisolated var isLoggingEnabled: Bool {
         get {
             // 默认为开启 (true)
             UserDefaults.standard.object(forKey: logEnabledKey) == nil ? true : UserDefaults.standard.bool(forKey: logEnabledKey)
@@ -92,7 +119,7 @@ class AppLogger {
     /// 2. 默认路径：`~/Library/Application Support/AppPorts/AppPorts_Log.txt`
     ///
     /// - Note: 如果目录不存在会自动创建
-    var logFileURL: URL {
+    nonisolated var logFileURL: URL {
         if let savedPath = UserDefaults.standard.string(forKey: logPathKey) {
             return URL(fileURLWithPath: savedPath)
         }
@@ -113,7 +140,7 @@ class AppLogger {
     /// - 10 MB = 10,485,760 字节
     ///
     /// - Note: 默认为 2 MB
-    var maxLogSize: Int64 {
+    nonisolated var maxLogSize: Int64 {
         get {
             let saved = UserDefaults.standard.integer(forKey: maxLogSizeKey)
             return saved > 0 ? Int64(saved) : defaultMaxSize
@@ -128,18 +155,49 @@ class AppLogger {
     /// 私有初始化（单例模式）
     ///
     /// 配置日期格式化器用于日志时间戳
-    private init() {
+    nonisolated private init() {
         dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        sessionID = String(UUID().uuidString.prefix(8))
+    }
+
+    nonisolated func logLaunchSession() {
+        log("========== AppPorts 启动 ==========")
+        logContext(
+            "启动会话",
+            details: [
+                ("session_id", sessionID),
+                ("pid", String(processID)),
+                ("bundle_id", Bundle.main.bundleIdentifier ?? "未知"),
+                ("bundle_path", Bundle.main.bundleURL.path),
+                ("current_directory", fileManager.currentDirectoryPath),
+                ("log_enabled", isLoggingEnabled ? "true" : "false"),
+                ("log_file", logFileURL.path),
+                ("max_log_size", formatBytes(maxLogSize)),
+                ("app_language", selectedAppLanguageCode()),
+                ("app_locale", selectedAppLocaleIdentifier()),
+                ("locale", Locale.current.identifier),
+                ("timezone", TimeZone.current.identifier),
+                ("preferred_languages", Locale.preferredLanguages.joined(separator: ", "))
+            ],
+            level: "DIAG"
+        )
+        logSystemInfo()
+    }
+
+    nonisolated func makeOperationID(prefix: String) -> String {
+        let compactPrefix = prefix.replacingOccurrences(of: " ", with: "-")
+        return "\(compactPrefix)-\(String(UUID().uuidString.prefix(8)))"
     }
     
     /// 设置日志文件路径
-    func setLogPath(_ url: URL) {
+    nonisolated func setLogPath(_ url: URL) {
         UserDefaults.standard.set(url.path, forKey: logPathKey)
-        log("日志路径已更改为: \(url.path)".localized)
+        logContext("日志路径已更改", details: [("path", url.path)])
     }
     
     /// 在 Finder 中打开日志文件
+    @MainActor
     func openLogInFinder() {
         let url = logFileURL
         if fileManager.fileExists(atPath: url.path) {
@@ -151,42 +209,79 @@ class AppLogger {
     }
     
     /// 清空日志
-    func clearLog() {
+    nonisolated func clearLog() {
         try? fileManager.removeItem(at: logFileURL)
         log("日志已清空".localized)
     }
-    
-    func log(_ message: String, level: String = "INFO") {
-        let timestamp = dateFormatter.string(from: Date())
-        let logLine = "[\(timestamp)] [\(level)] \(message)\n"
-        
-        print(logLine) // 同时打印到控制台
-        
-        // 如果日志被禁用，则不写入文件
-        guard isLoggingEnabled else { return }
-        
-        let url = logFileURL
-        
-        // 检查并执行日志轮转
-        rotateLogIfNeeded()
-        
-        if let data = logLine.data(using: .utf8) {
-            if fileManager.fileExists(atPath: url.path) {
-                if let fileHandle = try? FileHandle(forWritingTo: url) {
-                    fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
-                    fileHandle.closeFile()
-                }
-            } else {
-                // 确保目录存在
-                try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? data.write(to: url)
-            }
+
+    @MainActor
+    func exportDiagnosticPackageInteractively() {
+        let savePanel = NSSavePanel()
+        savePanel.title = "导出诊断包".localized
+        savePanel.prompt = "导出".localized
+        savePanel.nameFieldStringValue = defaultDiagnosticArchiveName()
+        savePanel.allowedFileTypes = ["zip"]
+        savePanel.canCreateDirectories = true
+
+        guard savePanel.runModal() == .OK, let destinationURL = savePanel.url else {
+            return
         }
+
+        do {
+            let archiveURL = try createDiagnosticArchive()
+
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+
+            try fileManager.copyItem(at: archiveURL, to: destinationURL)
+            logContext(
+                "诊断包导出完成".localized,
+                details: [
+                    ("destination", destinationURL.path),
+                    ("redaction_mode", "share_safe")
+                ],
+                level: "DIAG"
+            )
+            NSWorkspace.shared.activateFileViewerSelecting([destinationURL])
+        } catch {
+            logError("导出诊断包失败".localized, error: error, errorCode: "LOG-EXPORT-FAILED")
+            let alert = NSAlert()
+            alert.messageText = "导出诊断包失败".localized
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "好的".localized)
+            alert.runModal()
+        }
+    }
+
+    nonisolated func log(_ message: String, level: String = "INFO") {
+        let logLine = buildLogLine(message: message, level: level)
+
+        writeQueue.sync {
+            print(logLine, terminator: "")
+
+            guard isLoggingEnabled else { return }
+
+            rotateLogIfNeeded()
+            writeLogLine(logLine)
+        }
+    }
+
+    nonisolated func logContext(_ title: String, details: [(String, String?)], level: String = "INFO") {
+        log(title, level: level)
+
+        for (key, value) in details.sorted(by: { $0.0 < $1.0 }) {
+            guard let value, !value.isEmpty else { continue }
+            log("  \(key): \(value)", level: level)
+        }
+    }
+
+    nonisolated func logPathState(_ label: String, url: URL, level: String = "TRACE") {
+        logContext("路径状态[\(label)]", details: pathStateDetails(for: url), level: level)
     }
     
     /// 日志轮转：当日志超过最大大小时，删除旧内容
-    private func rotateLogIfNeeded() {
+    nonisolated private func rotateLogIfNeeded() {
         let url = logFileURL
         guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
               let fileSize = attributes[.size] as? Int64,
@@ -201,52 +296,114 @@ class AppLogger {
             let keepLines = lines.suffix(lines.count / 2) // 保留后半部分
             let newContent = keepLines.joined(separator: "\n")
             try? newContent.write(to: url, atomically: true, encoding: .utf8)
+            writeLogLine(
+                buildLogLine(
+                    message: "日志轮转已执行，原大小: \(formatBytes(fileSize))，阈值: \(formatBytes(maxLogSize))",
+                    level: "DIAG"
+                )
+            )
         }
     }
     
-    func logError(_ message: String, error: Error? = nil) {
-        var fullMessage = message
-        if let error = error {
-            fullMessage += " | 错误: \(error.localizedDescription) | 类型: \(type(of: error))"
-            if let nsError = error as NSError? {
-                fullMessage += " | Domain: \(nsError.domain) | Code: \(nsError.code)"
-                if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-                    fullMessage += " | 底层错误: \(underlying)".localized
-                }
+    nonisolated func logError(
+        _ message: String,
+        error: Error? = nil,
+        errorCode: String? = nil,
+        context: [(String, String?)] = [],
+        relatedURLs: [(String, URL)] = []
+    ) {
+        var details = context
+
+        if let errorCode, !errorCode.isEmpty {
+            details.append(("error_code", errorCode))
+        }
+
+        if let error {
+            details.append(contentsOf: errorDetails(for: error))
+        }
+
+        logContext(message, details: details, level: "ERROR")
+
+        for (label, url) in relatedURLs {
+            logPathState(label, url: url, level: "ERROR")
+        }
+    }
+
+    nonisolated func logOperationSummary(
+        category: String,
+        operationID: String,
+        result: String,
+        startedAt: Date? = nil,
+        errorCode: String? = nil,
+        details: [(String, String?)] = []
+    ) {
+        let endedAt = Date()
+        let durationMs = startedAt.map { Int(endedAt.timeIntervalSince($0) * 1000) }
+        let filteredDetails = details.reduce(into: [String: String]()) { partialResult, item in
+            guard let value = item.1, !value.isEmpty else { return }
+            partialResult[item.0] = value
+        }
+
+        let record = OperationSummaryRecord(
+            operationID: operationID,
+            category: category,
+            result: result,
+            errorCode: errorCode,
+            startedAt: startedAt.map(timestampString(for:)),
+            endedAt: timestampString(for: endedAt),
+            durationMs: durationMs,
+            sessionID: sessionID,
+            details: filteredDetails
+        )
+
+        writeQueue.sync {
+            recentOperationSummaries.append(record)
+            if recentOperationSummaries.count > maxOperationSummaryCount {
+                recentOperationSummaries.removeFirst(recentOperationSummaries.count - maxOperationSummaryCount)
             }
         }
-        log(fullMessage, level: "ERROR")
+
+        var summaryDetails: [(String, String?)] = [
+            ("operation_id", operationID),
+            ("category", category),
+            ("result", result),
+            ("error_code", errorCode),
+            ("duration_ms", durationMs.map(String.init))
+        ]
+        summaryDetails.append(contentsOf: details)
+        logContext("操作结束摘要", details: summaryDetails, level: logLevel(forOperationResult: result))
     }
-    
+
     /// 获取日志大小的可读字符串
-    func getLogSizeString() -> String {
+    nonisolated func getLogSizeString() -> String {
         let url = logFileURL
         guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
               let fileSize = attributes[.size] as? Int64 else {
             return "0 KB"
         }
-        
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: fileSize)
+
+        return LocalizedByteCountFormatter.string(fromByteCount: fileSize, allowedUnits: [.kb, .mb])
     }
     
     // MARK: - 系统诊断信息
     
     /// 记录应用启动时的系统信息
-    func logSystemInfo() {
-        log("========== 系统诊断信息 ==========".localized, level: "DIAG")
-        log("App 版本: \(getAppVersion())".localized, level: "DIAG")
-        log("macOS 版本: \(getMacOSVersion())".localized, level: "DIAG")
-        log("设备型号: \(getDeviceModel())".localized, level: "DIAG")
-        log("处理器: \(getProcessorInfo())".localized, level: "DIAG")
-        log("内存: \(getMemoryInfo())".localized, level: "DIAG")
-        log("======================================".localized, level: "DIAG")
+    nonisolated func logSystemInfo() {
+        logContext(
+            "========== 系统诊断信息 ==========".localized,
+            details: [
+                ("app_version", getAppVersion()),
+                ("macos_version", getMacOSVersion()),
+                ("device_model", getDeviceModel()),
+                ("processor", getProcessorInfo()),
+                ("memory", getMemoryInfo())
+            ],
+            level: "DIAG"
+        )
     }
     
     /// 记录外接硬盘信息
-    func logExternalDriveInfo(at url: URL) {
+    nonisolated func logExternalDriveInfo(at url: URL) {
         log("========== 外接硬盘信息 ==========".localized, level: "DISK")
         
         // 获取卷信息
@@ -261,31 +418,35 @@ class AppLogger {
             log("\(key): \(value)", level: "DISK")
         }
         
-        log("====================================".localized, level: "DISK")
+        log("====================================", level: "DISK")
     }
     
     /// 记录迁移性能信息
-    func logMigrationPerformance(appName: String, size: Int64, duration: TimeInterval, sourcePath: String, destPath: String) {
+    nonisolated func logMigrationPerformance(appName: String, size: Int64, duration: TimeInterval, sourcePath: String, destPath: String) {
         let speed = duration > 0 ? Double(size) / duration / 1024 / 1024 : 0
-        log("========== 迁移性能报告 ==========".localized, level: "PERF")
-        log(String(format: "应用: %@".localized, appName), level: "PERF")
-        log(String(format: "大小: %@".localized, formatBytes(size)), level: "PERF")
-        log(String(format: "耗时: %@ 秒".localized, String(format: "%.2f", duration)), level: "PERF")
-        log(String(format: "速度: %@ MB/s".localized, String(format: "%.2f", speed)), level: "PERF")
-        log("源路径: \(sourcePath)".localized, level: "PERF")
-        log("目标: \(destPath)".localized, level: "PERF")
-        log("====================================".localized, level: "PERF")
+        logContext(
+            "========== 迁移性能报告 ==========".localized,
+            details: [
+                ("app_name", appName),
+                ("size", formatBytes(size)),
+                ("duration_seconds", String(format: "%.2f", duration)),
+                ("speed_mb_per_s", String(format: "%.2f", speed)),
+                ("source_path", sourcePath),
+                ("destination_path", destPath)
+            ],
+            level: "PERF"
+        )
     }
     
     // MARK: - 获取系统信息的辅助方法
     
-    private func getAppVersion() -> String {
+    nonisolated private func getAppVersion() -> String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知".localized
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知".localized
         return "\(version) (\(build))"
     }
     
-    private func getMacOSVersion() -> String {
+    nonisolated private func getMacOSVersion() -> String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         let versionString = "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
         
@@ -304,7 +465,7 @@ class AppLogger {
         return "\(macOSName) \(versionString)"
     }
     
-    private func getDeviceModel() -> String {
+    nonisolated private func getDeviceModel() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
         var model = [CChar](repeating: 0, count: size)
@@ -316,7 +477,7 @@ class AppLogger {
         return "\(friendlyName) (\(modelString))"
     }
     
-    private func getMarketingModelName(_ identifier: String) -> String {
+    nonisolated private func getMarketingModelName(_ identifier: String) -> String {
         // 常见 Mac 型号映射
         let models: [String: String] = [
             "Mac14,2": "MacBook Air (M2, 2022)",
@@ -353,7 +514,7 @@ class AppLogger {
         return models[identifier] ?? "Mac".localized
     }
     
-    private func getProcessorInfo() -> String {
+    nonisolated private func getProcessorInfo() -> String {
         var size = 0
         sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
         var brand = [CChar](repeating: 0, count: size)
@@ -365,20 +526,19 @@ class AppLogger {
         let activeCount = ProcessInfo.processInfo.activeProcessorCount
         
         if brandString.isEmpty {
-            // Apple Silicon
-            return "Apple Silicon (\(processorCount) 核心, \(activeCount) 活跃)".localized
+            return "Apple Silicon (\(processorCount) cores, \(activeCount) active)"
         }
-        return "\(brandString) (\(activeCount)/\(processorCount) 核心)".localized
+        return "\(brandString) (\(activeCount)/\(processorCount) cores)"
     }
     
-    private func getMemoryInfo() -> String {
+    nonisolated private func getMemoryInfo() -> String {
         let physicalMemory = ProcessInfo.processInfo.physicalMemory
         return formatBytes(Int64(physicalMemory))
     }
     
     // MARK: - 获取磁盘信息的辅助方法
     
-    private func getVolumeInfo(at url: URL) -> [(String, String)] {
+    nonisolated private func getVolumeInfo(at url: URL) -> [(String, String)] {
         var info: [(String, String)] = []
         
         do {
@@ -416,7 +576,7 @@ class AppLogger {
         return info
     }
     
-    private func getDiskInterfaceInfo(at url: URL) -> [(String, String)] {
+    nonisolated private func getDiskInterfaceInfo(at url: URL) -> [(String, String)] {
         var info: [(String, String)] = []
         
         // 1. 使用 diskutil info -plist 获取基础信息
@@ -483,7 +643,7 @@ class AppLogger {
         return info
     }
     
-    private func getConnectionSpeedInfo(volumeName: String, diskIdentifier: String, physicalStore: String) -> [(String, String)] {
+    nonisolated private func getConnectionSpeedInfo(volumeName: String, diskIdentifier: String, physicalStore: String) -> [(String, String)] {
         var info: [(String, String)] = []
         let searchTerms = [volumeName, diskIdentifier, physicalStore].filter { !$0.isEmpty }
         
@@ -526,7 +686,7 @@ class AppLogger {
         return info
     }
     
-    private func runSystemProfiler(dataType: String) -> [String: Any]? {
+    nonisolated private func runSystemProfiler(dataType: String) -> [String: Any]? {
         let task = Process()
         task.launchPath = "/usr/sbin/system_profiler"
         task.arguments = [dataType, "-json"]
@@ -546,7 +706,7 @@ class AppLogger {
     }
     
     // 通用递归搜索
-    private func searchDeviceRecursive(in devices: [[String: Any]], searchTerms: [String], type: String) -> [(String, String)]? {
+    nonisolated private func searchDeviceRecursive(in devices: [[String: Any]], searchTerms: [String], type: String) -> [(String, String)]? {
         for device in devices {
             // Check current device
             let deviceName = (device["_name"] as? String ?? "").lowercased()
@@ -609,10 +769,347 @@ class AppLogger {
         return nil
     }
     
-    private func formatBytes(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB, .useTB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
+    nonisolated private func formatBytes(_ bytes: Int64) -> String {
+        LocalizedByteCountFormatter.string(fromByteCount: bytes)
+    }
+
+    nonisolated private func timestampString(for date: Date) -> String {
+        dateFormatter.string(from: date)
+    }
+
+    nonisolated private func logLevel(forOperationResult result: String) -> String {
+        switch result {
+        case "success":
+            return "INFO"
+        case "success_with_warning", "rolled_back":
+            return "WARN"
+        default:
+            return "ERROR"
+        }
+    }
+
+    nonisolated private func selectedAppLanguageCode() -> String {
+        UserDefaults.standard.string(forKey: "selectedLanguage") ?? "system"
+    }
+
+    nonisolated private func selectedAppLocaleIdentifier() -> String {
+        let selectedLanguage = selectedAppLanguageCode()
+        if selectedLanguage == "system" {
+            return Locale.current.identifier
+        }
+        return Locale(identifier: selectedLanguage).identifier
+    }
+
+    nonisolated private func defaultDiagnosticArchiveName() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return "AppPorts-Diagnostic-\(formatter.string(from: Date())).zip"
+    }
+
+    nonisolated private func createDiagnosticArchive() throws -> URL {
+        let tempRootURL = fileManager.temporaryDirectory.appendingPathComponent("AppPorts-Diagnostic-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: tempRootURL, withIntermediateDirectories: true)
+
+        let packageURL = try buildDiagnosticPackage(in: tempRootURL)
+        let archiveURL = tempRootURL.appendingPathComponent("\(packageURL.lastPathComponent).zip")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", packageURL.path, archiveURL.path]
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "AppPorts.AppLogger",
+                code: 7001,
+                userInfo: [NSLocalizedDescriptionKey: "无法压缩诊断包".localized]
+            )
+        }
+
+        return archiveURL
+    }
+
+    nonisolated func buildDiagnosticPackage(in rootURL: URL) throws -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let packageURL = rootURL.appendingPathComponent("AppPorts-Diagnostic-\(formatter.string(from: Date()))", isDirectory: true)
+        try fileManager.createDirectory(at: packageURL, withIntermediateDirectories: true)
+
+        let currentLogContent = (try? String(contentsOf: logFileURL, encoding: .utf8)) ?? "日志文件不存在或暂时不可读取".localized
+        let redactedLogContent = redactedDiagnosticText(from: currentLogContent)
+        let operationSummaries = recentOperationSummariesSnapshot()
+        let recentFailures = operationSummaries.filter { ["failed", "rolled_back", "success_with_warning"].contains($0.result) }
+
+        let metadata: [String: String] = [
+            "generated_at": timestampString(for: Date()),
+            "session_id": sessionID,
+            "pid": String(processID),
+            "app_version": getAppVersion(),
+            "bundle_id": Bundle.main.bundleIdentifier ?? "未知".localized,
+            "app_language": selectedAppLanguageCode(),
+            "app_locale": selectedAppLocaleIdentifier(),
+            "system_locale": Locale.current.identifier,
+            "timezone": TimeZone.current.identifier,
+            "log_file_name": logFileURL.lastPathComponent,
+            "log_file_size": getLogSizeString(),
+            "redaction_mode": "share_safe",
+            "recent_operation_count": String(operationSummaries.count),
+            "recent_failure_count": String(recentFailures.count)
+        ]
+
+        try writeJSON(metadata, to: packageURL.appendingPathComponent("diagnostic-summary.json"))
+        try writeJSON(operationSummaries, to: packageURL.appendingPathComponent("recent-operations.json"))
+        try writeJSON(recentFailures.suffix(20), to: packageURL.appendingPathComponent("recent-failures.json"))
+
+        let summaryText = buildDiagnosticSummaryText(
+            metadata: metadata,
+            lastFailure: recentFailures.last,
+            operationCount: operationSummaries.count
+        )
+        try summaryText.write(
+            to: packageURL.appendingPathComponent("diagnostic-summary.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try redactedLogContent.write(
+            to: packageURL.appendingPathComponent("AppPorts_Log.share-safe.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        return packageURL
+    }
+
+    nonisolated func redactedDiagnosticText(from rawText: String) -> String {
+        var sanitized = rawText
+        let homeDirectory = NSHomeDirectory()
+
+        if !homeDirectory.isEmpty {
+            sanitized = sanitized.replacingOccurrences(of: homeDirectory, with: "~")
+        }
+
+        let redactionRules: [(pattern: String, replacement: String)] = [
+            (#"/Users/[^/\s]+"#, "/Users/<redacted-user>"),
+            (#"/Volumes/[^/\s]+"#, "/Volumes/<redacted-volume>")
+        ]
+
+        for rule in redactionRules {
+            guard let regex = try? NSRegularExpression(pattern: rule.pattern) else { continue }
+            let range = NSRange(sanitized.startIndex..<sanitized.endIndex, in: sanitized)
+            sanitized = regex.stringByReplacingMatches(in: sanitized, range: range, withTemplate: rule.replacement)
+        }
+
+        return sanitized
+    }
+
+    nonisolated func recentOperationSummariesSnapshot() -> [OperationSummaryRecord] {
+        writeQueue.sync { recentOperationSummaries }
+    }
+
+    nonisolated func resetDiagnosticStateForTesting() {
+        writeQueue.sync {
+            recentOperationSummaries.removeAll()
+        }
+    }
+
+    nonisolated private func buildLogLine(message: String, level: String) -> String {
+        let timestamp = dateFormatter.string(from: Date())
+        return "[\(timestamp)] [\(level)] [session:\(sessionID)] [pid:\(processID)] \(message)\n"
+    }
+
+    nonisolated private func writeLogLine(_ logLine: String) {
+        guard let data = logLine.data(using: .utf8) else { return }
+
+        let url = logFileURL
+        if fileManager.fileExists(atPath: url.path) {
+            if let fileHandle = try? FileHandle(forWritingTo: url) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+                try? fileHandle.close()
+            }
+        } else {
+            try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url)
+        }
+    }
+
+    nonisolated private func pathStateDetails(for url: URL) -> [(String, String?)] {
+        let standardizedURL = url.standardizedFileURL
+        let exists = fileManager.fileExists(atPath: standardizedURL.path)
+        var details: [(String, String?)] = [
+            ("path", url.path),
+            ("standardized_path", standardizedURL.path),
+            ("exists", exists ? "true" : "false")
+        ]
+
+        guard exists else {
+            let parentURL = standardizedURL.deletingLastPathComponent()
+            details.append(("parent_path", parentURL.path))
+            details.append(("parent_exists", fileManager.fileExists(atPath: parentURL.path) ? "true" : "false"))
+            details.append(("parent_writable", fileManager.isWritableFile(atPath: parentURL.path) ? "true" : "false"))
+            return details
+        }
+
+        let resourceKeys: Set<URLResourceKey> = [
+            .isDirectoryKey,
+            .isRegularFileKey,
+            .isSymbolicLinkKey,
+            .fileSizeKey,
+            .creationDateKey,
+            .contentModificationDateKey,
+            .volumeNameKey,
+            .isWritableKey
+        ]
+        let values = try? standardizedURL.resourceValues(forKeys: resourceKeys)
+        details.append(("kind", describeFileKind(values)))
+        details.append(("writable", (values?.isWritable ?? fileManager.isWritableFile(atPath: standardizedURL.path)) ? "true" : "false"))
+
+        if let fileSize = values?.fileSize {
+            details.append(("size", formatBytes(Int64(fileSize))))
+        }
+        if let volumeName = values?.volumeName {
+            details.append(("volume", volumeName))
+        }
+        if let createdAt = values?.creationDate {
+            details.append(("created_at", dateFormatter.string(from: createdAt)))
+        }
+        if let modifiedAt = values?.contentModificationDate {
+            details.append(("modified_at", dateFormatter.string(from: modifiedAt)))
+        }
+
+        if let attributes = try? fileManager.attributesOfItem(atPath: standardizedURL.path) {
+            if let permissions = attributes[.posixPermissions] as? NSNumber {
+                details.append(("posix_permissions", String(format: "%#o", permissions.intValue)))
+            }
+            if let immutable = attributes[.immutable] as? Bool {
+                details.append(("immutable", immutable ? "true" : "false"))
+            }
+        }
+
+        if let symlinkTarget = resolveSymlinkDestination(at: standardizedURL) {
+            details.append(("symlink_target", symlinkTarget.path))
+        }
+
+        let contentsURL = standardizedURL.appendingPathComponent("Contents")
+        if let contentsTarget = resolveSymlinkDestination(at: contentsURL) {
+            details.append(("contents_symlink_target", contentsTarget.path))
+        }
+
+        let macOSURL = contentsURL.appendingPathComponent("MacOS")
+        if let macOSTarget = resolveSymlinkDestination(at: macOSURL) {
+            details.append(("macos_symlink_target", macOSTarget.path))
+        }
+
+        return details
+    }
+
+    nonisolated private func describeFileKind(_ values: URLResourceValues?) -> String {
+        if values?.isSymbolicLink == true { return "symlink" }
+        if values?.isDirectory == true { return "directory" }
+        if values?.isRegularFile == true { return "file" }
+        return "unknown"
+    }
+
+    nonisolated private func resolveSymlinkDestination(at url: URL) -> URL? {
+        guard let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey]),
+              values.isSymbolicLink == true,
+              let rawPath = try? fileManager.destinationOfSymbolicLink(atPath: url.path) else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: rawPath, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
+    }
+
+    nonisolated private func errorDetails(for error: Error, prefix: String = "error") -> [(String, String?)] {
+        let nsError = error as NSError
+        var details: [(String, String?)] = [
+            ("\(prefix)_description", error.localizedDescription),
+            ("\(prefix)_type", String(describing: type(of: error))),
+            ("\(prefix)_domain", nsError.domain),
+            ("\(prefix)_code", String(nsError.code))
+        ]
+
+        if let failureReason = nsError.localizedFailureReason, !failureReason.isEmpty {
+            details.append(("\(prefix)_failure_reason", failureReason))
+        }
+        if let recoverySuggestion = nsError.localizedRecoverySuggestion, !recoverySuggestion.isEmpty {
+            details.append(("\(prefix)_recovery_suggestion", recoverySuggestion))
+        }
+        if let helpAnchor = nsError.helpAnchor, !helpAnchor.isEmpty {
+            details.append(("\(prefix)_help_anchor", helpAnchor))
+        }
+        if let filePath = nsError.userInfo[NSFilePathErrorKey] as? String {
+            details.append(("\(prefix)_file_path", filePath))
+        }
+        if let url = nsError.userInfo[NSURLErrorKey] as? URL {
+            details.append(("\(prefix)_url", url.path))
+        }
+
+        let interestingUserInfoKeys = [
+            "NSSourceFilePathErrorKey",
+            "NSDestinationFilePath",
+            "NSURLPathKey",
+            "NSDebugDescription"
+        ]
+        for key in interestingUserInfoKeys {
+            if let value = nsError.userInfo[key] {
+                details.append(("\(prefix)_\(key)", String(describing: value)))
+            }
+        }
+
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+            details.append(contentsOf: errorDetails(for: underlying, prefix: "\(prefix)_underlying"))
+        }
+
+        if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError] {
+            for (index, nestedError) in detailedErrors.enumerated() {
+                details.append(contentsOf: errorDetails(for: nestedError, prefix: "\(prefix)_detailed_\(index)"))
+            }
+        }
+
+        return details
+    }
+
+    nonisolated private func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(value)
+        try data.write(to: url, options: .atomic)
+    }
+
+    nonisolated private func buildDiagnosticSummaryText(
+        metadata: [String: String],
+        lastFailure: OperationSummaryRecord?,
+        operationCount: Int
+    ) -> String {
+        var lines: [String] = [
+            "AppPorts 诊断摘要".localized,
+            "generated_at: \(metadata["generated_at"] ?? "unknown")",
+            "session_id: \(metadata["session_id"] ?? "unknown")",
+            "app_version: \(metadata["app_version"] ?? "unknown")",
+            "app_language: \(metadata["app_language"] ?? "unknown")",
+            "app_locale: \(metadata["app_locale"] ?? "unknown")",
+            "system_locale: \(metadata["system_locale"] ?? "unknown")",
+            "timezone: \(metadata["timezone"] ?? "unknown")",
+            "log_file_size: \(metadata["log_file_size"] ?? "unknown")",
+            "redaction_mode: share_safe",
+            "recent_operation_count: \(operationCount)"
+        ]
+
+        if let lastFailure {
+            lines.append("last_failure_operation_id: \(lastFailure.operationID)")
+            lines.append("last_failure_category: \(lastFailure.category)")
+            lines.append("last_failure_result: \(lastFailure.result)")
+            lines.append("last_failure_error_code: \(lastFailure.errorCode ?? "none")")
+            if let durationMs = lastFailure.durationMs {
+                lines.append("last_failure_duration_ms: \(durationMs)")
+            }
+        } else {
+            lines.append("last_failure: none")
+        }
+
+        return lines.joined(separator: "\n") + "\n"
     }
 }

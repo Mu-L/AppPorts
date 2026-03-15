@@ -7,7 +7,7 @@
 一款专为 macOS 设计的应用程序迁移与链接工具。  
 轻松将庞大的应用程序迁移至外部存储，同时保持系统无感运行。
 
-[English](README.md)｜[简体中文](README_CN.md)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+[English](README.md)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <div style="display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;">
   <a href="https://www.producthunt.com/products/appports/launches/appports?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-appports" target="_blank" rel="noopener noreferrer">
@@ -41,30 +41,26 @@ Mac 的内置存储空间寸土寸金。**AppPorts** 允许您一键将 `/Applic
 xattr -rd com.apple.quarantine /Applications/AppPorts.app
 ```
 
+## 📸 截图
+
+| 欢迎页 | 主界面 |
+|:---:|:---:|
+| ![Welcome](https://pic.cdn.shimoko.com/appports/huanying.png) | ![Main](https://pic.cdn.shimoko.com/appports/zhuyemian.png) |
+
+| 深色模式 | 语言切换 |
+|:---:|:---:|
+| ![Dark](https://pic.cdn.shimoko.com/appports/shensemoshi.png) | ![Lang](https://pic.cdn.shimoko.com/appports/yuyan.png) |
+
 ## 🚀 核心功能
 
-* **📦 应用瘦身**：一键将几十 GB 的大型应用（如 Logic Pro, Xcode, 游戏等）迁移至外置硬盘。
-* **🔗 Contents 链接**：采用 **Contents 目录链接** 方案，专为适配 macOS 机制设计。
-    *   **原理**：在本地保留 `.app` 文件夹结构，仅将内部的 `Contents` 数据目录链接至外部存储。
-    *   **空间占用**：本地仅保留文件夹索引信息，占用空间受文件系统块大小限制（通常可忽略不计）。
-    *   **兼容性**：Finder 不会显示快捷方式小箭头，且支持 macOS 26 的 **"App 菜单"** 显示。
-* **🛡️ 安全机制**：
-    * 自动识别并锁定 **系统应用**，防止误操作破坏系统。
-    * 迁移前检测 **运行状态**，防止损坏正在运行的应用。
+* **📦 应用瘦身**：一键将几十 GB 的大型应用（如 Logic Pro、Xcode、游戏等）迁移至外置硬盘。
+* **🔗 Contents 链接**：采用 **Contents 目录链接** 方案，专为适配 macOS 机制设计。在本地保留 `.app` 文件夹结构，仅将内部 `Contents` 目录链接至外部存储；本地占用通常可以忽略不计；Finder 不会显示快捷方式小箭头，且支持 macOS 26 的 **"App 菜单"** 显示。
+* **🛡️ 安全机制**：自动识别并锁定 **系统应用**，并在迁移前检测 **运行状态**，防止误操作破坏系统或损坏正在运行的应用。
 * **↩️ 随时还原**：只需点击“还原”，即可将应用完整迁回本地磁盘，符号链接自动移除。
-* **🎨 现代 UI**：
-    * 原生 SwiftUI 开发，丝滑流畅。
-    * 完美适配 **深色模式**。
-    * 支持 **中英双语**，可随系统或手动切换。
-*   **♿️ 无障碍优化**：
-    *   **VoiceOver 深度适配**：支持列表行整体朗读、转子快捷操作。
-    *   **语义化界面**：屏蔽装饰性图标干扰，状态标签支持清晰的语音播报。
-    *   **盲文支持**：新增 **Braille** 语言选项，界面文字可直接显示为点字。
-*   **🌍 全球化支持**：
-    *   **20+ 种语言支持**：
-        🇺🇸 English, 🇨🇳 简体中文, 🇭🇰 繁體中文, 🇯🇵 日本語, 🇰🇷 한국어, 🇩🇪 Deutsch, 🇫🇷 Français, 🇪🇸 Español, 🇮🇹 Italiano, 🇵🇹 Português, 🇷🇺 Русский, 🇸🇦 العربية, 🇮🇳 हिन्दी, 🇻🇳 Tiếng Việt, 🇹🇭 ไทย, 🇹🇷 Türkçe, 🇳🇱 Nederlands, 🇵🇱 Polski, 🇮🇩 Indonesia, 🏁 Esperanto, ⠃⠗ Braille
-    *   **本地化单位**：文件大小会自动遵循当前语言的数字和单位格式习惯。
-*   **🔍 快速检索**：内置搜索栏，快速定位本地或外部应用。
+* **🎨 现代 UI**：原生 SwiftUI 开发，丝滑流畅，完美适配 **深色模式**，并支持 **中英双语** 随系统或手动切换。
+* **♿️ 无障碍优化**：支持 **VoiceOver** 列表行整体朗读与转子快捷操作，使用更清晰的语义化界面，并提供 **Braille** 语言选项，可直接显示点字界面文本。
+* **🌍 全球化支持**：支持 20+ 种语言，包括 🇺🇸 English、🇨🇳 简体中文、🇭🇰 繁體中文、🇯🇵 日本語、🇰🇷 한국어、🇩🇪 Deutsch、🇫🇷 Français、🇪🇸 Español、🇮🇹 Italiano、🇵🇹 Português、🇷🇺 Русский、🇸🇦 العربية、🇮🇳 हिन्दी、🇻🇳 Tiếng Việt、🇹🇭 ไทย、🇹🇷 Türkçe、🇳🇱 Nederlands、🇵🇱 Polski、🇮🇩 Indonesia、🏁 Esperanto、⠃⠗ Braille。文件大小也会遵循当前语言的本地化格式。
+* **🔍 快速检索**：内置搜索栏，快速定位本地或外部应用。
 
 ## 🏆 为什么选择 AppPorts？
 
@@ -78,15 +74,20 @@ xattr -rd com.apple.quarantine /Applications/AppPorts.app
 | **文件系统整洁度** | ✅ **极佳 (仅1个链接)** | ✅ 极佳 (仅1个链接) |
 | **维护与还原** | ✅ **毫秒级** | ✅ 毫秒级 |
 
-## 📸 截图
+## 🧭 迁移策略
 
-| 欢迎页 | 主界面 |
-|:---:|:---:|
-| ![Welcome](https://pic.cdn.shimoko.com/appports/huanying.png) | ![Main](https://pic.cdn.shimoko.com/appports/zhuyemian.png) |
+AppPorts 不会把所有应用都按同一种方式处理，而是会根据应用结构和更新方式选择本地入口方案。
 
-| 深色模式 | 语言切换 |
-|:---:|:---:|
-| ![Dark](https://pic.cdn.shimoko.com/appports/shensemoshi.png) | ![Lang](https://pic.cdn.shimoko.com/appports/yuyan.png) |
+| 软件类型 | 默认迁移策略 | 默认是否允许迁移 | 说明 |
+| :--- | :--- | :--- | :--- |
+| 普通原生 macOS 应用 | 保留本地 `.app` 外壳，只链接 `Contents` | 默认开启 | 这是大多数常规应用的默认方案 |
+| 自更新应用 | 整个应用包做软链 | 默认开启 | 更适合带 Sparkle、Squirrel 等更新组件的应用 |
+| iPhone / iPad 应用（运行在 Mac 上） | 整个应用包做软链 | 默认关闭 | 需要在设置中手动开启 |
+| Mac App Store 应用 | 手动开启后，再按检测到的 bundle 策略迁移 | 默认关闭 | 这类应用对系统保护和更新流程更敏感 |
+| 应用套件 / 多应用文件夹 | 整个文件夹一起迁移并软链 | 默认开启 | 更适合 Office、Adobe 这类目录式分发 |
+| 系统应用 | 不迁移 | 强制阻止 | 避免破坏系统 |
+| 正在运行的应用 | 不迁移 | 强制阻止 | 需要先退出应用 |
+| 已经链接过的应用 | 不重复迁移 | 强制阻止 | 防止链接状态进一步损坏 |
 
 ## 🛠️ 安装与运行
 
@@ -94,7 +95,7 @@ xattr -rd com.apple.quarantine /Applications/AppPorts.app
 * macOS 14.0 (Sonoma) 或更高版本。
 
 ### 下载安装
-请前往 [Releases](https://github.com/wzh4869/AppPorts/releases) 页面下载最新版本的 `AppPorts.dmg`。
+请前往 [官方网站](https://appports.shimoko.com/) 或 [Releases](https://github.com/wzh4869/AppPorts/releases) 页面下载最新版本的 `AppPorts.dmg`。
 
 
 
