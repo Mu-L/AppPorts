@@ -1,0 +1,44 @@
+---
+outline: deep
+---
+
+# Einstellungen
+
+Die Einstellungsseite von AppPorts ist über das Zahnradsymbol in der oberen rechten Ecke des Hauptfensters erreichbar.
+
+## App Store & iOS Einstellungen
+
+| Einstellung | Beschreibung | Standard |
+|-------------|--------------|---------|
+| App Store-App-Migration | Ermöglicht die Migration von App Store-Apps. Muss auf macOS-Versionen unter 15.1 manuell aktiviert werden | Aus |
+| iOS-App-Migration | Ermöglicht die Migration von iOS/iPadOS-Apps (Mac-Version) | Aus |
+
+::: tip 💡 macOS 15.1+ Benutzer
+macOS 15.1 und neuer unterstützt die native App Store-App-Installation auf externe Laufwerke. Es wird empfohlen, „Große Apps auf ein externes Laufwerk herunterladen und installieren" in den App Store-Einstellungen zu aktivieren, anstatt den Migrations-Schalter von AppPorts zu verwenden.
+:::
+
+## Signierungs-Einstellungen
+
+| Einstellung | Beschreibung | Standard |
+|-------------|--------------|---------|
+| Automatisch neu signieren | Führt automatisch Ad-hoc-Neuzeichnung bei assoziierten Apps nach der Datenverzeichnismigration aus | Aus |
+
+Wenn aktiviert, sichert jede Datenverzeichnismigration automatisch die ursprüngliche Signatur und führt die Neuzeichnung aus, um „Beschädigt"-Meldungen nach der Migration zu vermeiden.
+
+## Protokollierungs-Einstellungen
+
+| Einstellung | Beschreibung | Standard |
+|-------------|--------------|---------|
+| Protokollierung aktivieren | Schreibt Laufzeitprotokolle in Datei | Ein |
+| Maximale Protokollgröße | Schneidet automatisch die ältere Hälfte ab, wenn die Protokolldatei diese Größe überschreitet | 2 MB |
+| Protokollort | Speicherpfad der Protokolldatei | `~/Library/Application Support/AppPorts/AppPorts_Log.txt` |
+
+### Protokolloperationen
+
+| Operation | Beschreibung |
+|-----------|--------------|
+| Im Finder anzeigen | Öffnet das Verzeichnis mit der Protokolldatei |
+| Diagnosepaket exportieren | Erzeugt eine ZIP-Datei mit Protokollen, Aufzeichnungen und Systeminformationen |
+| Protokoll löschen | Löscht den aktuellen Inhalt der Protokolldatei |
+
+Für detaillierte Protokollbeschreibungen siehe [Protokollierung & Diagnose](/de/logging).

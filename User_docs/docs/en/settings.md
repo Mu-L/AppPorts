@@ -1,0 +1,44 @@
+---
+outline: deep
+---
+
+# Settings
+
+AppPorts' settings page is accessible via the gear icon in the upper right corner of the main window.
+
+## App Store & iOS Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| App Store App Migration | Allows migration of App Store apps. Must be manually enabled on macOS versions below 15.1 | Off |
+| iOS App Migration | Allows migration of iOS/iPadOS apps (Mac version) | Off |
+
+::: tip 💡 macOS 15.1+ Users
+macOS 15.1 and later support native App Store app installation to external drives. It is recommended to enable "Download and install large apps to an external drive" in App Store settings instead of using AppPorts' migration toggle.
+:::
+
+## Signing Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Auto Re-sign | Automatically executes Ad-hoc re-signing on associated apps after data directory migration | Off |
+
+When enabled, each data directory migration automatically backs up the original signature and executes re-signing to avoid "Damaged" prompts after migration.
+
+## Logging Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Logging | Writes runtime logs to file | On |
+| Max Log Size | Automatically truncates older half when log file exceeds this size | 2 MB |
+| Log Location | Log file save path | `~/Library/Application Support/AppPorts/AppPorts_Log.txt` |
+
+### Log Operations
+
+| Operation | Description |
+|-----------|-------------|
+| View in Finder | Opens the directory containing the log file |
+| Export Diagnostic Package | Generates a ZIP file containing logs, operation records, and system info |
+| Clear Log | Clears current log file contents |
+
+For detailed log descriptions, see [Logging & Diagnostics](/en/logging).
