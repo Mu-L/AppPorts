@@ -702,8 +702,8 @@ actor DataDirScanner {
 
             // 普通本地子目录
             if inspection.status == "本地" {
-                // Data/Library 受沙盒保护，不可迁移。其子目录可迁移。
-                let isProtectedLibrary = relativeSuffix == "Data/Library"
+                // Data/Library 和 Data/Documents 受沙盒保护，不可迁移。其子目录可迁移。
+                let isProtectedDirectory = relativeSuffix == "Data/Library" || relativeSuffix == "Data/Documents"
 
                 var item = DataDirItem(
                     name: "容器子目录: \(relativeSuffix)",
@@ -711,16 +711,16 @@ actor DataDirScanner {
                     type: .containers,
                     priority: priority,
                     description: "容器内部数据目录".localized,
-                    isMigratable: !isProtectedLibrary,
-                    nonMigratableReason: isProtectedLibrary
-                        ? "Data/Library 受沙盒保护，迁移会致应用崩溃。请迁移其子目录。".localized : nil
+                    isMigratable: !isProtectedDirectory,
+                    nonMigratableReason: isProtectedDirectory
+                        ? "容器目录受沙盒保护，直接迁移会导致应用崩溃。请迁移其子目录。".localized : nil
                 )
                 item.associatedAppName = appName
                 applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
                 results.append(item)
 
-                // Data/Library 自身不可迁移，但扫描其子目录（如 Application Support）
-                if isProtectedLibrary {
+                // 受保护目录自身不可迁移，但扫描其子目录（如 xwechat_files、Application Support）
+                if isProtectedDirectory {
                     let libEntries = directoryEntries(at: childURL)
                     for libChild in libEntries {
                         let libInspection = inspectItem(at: libChild, type: .containers)
@@ -728,6 +728,8 @@ actor DataDirScanner {
 
                         let libResolved = resolveSymlinkDestination(at: libChild)
                         let libShouldSurface = libResolved.map { shouldSurfaceNestedContainerLink(from: libChild, to: $0, externalRootURL: externalRootURL) } ?? false
+
+                        let isProtectedAppSupport = libSuffix == "Data/Library/Application Support"
 
                         switch libInspection.status {
                         case "已链接", "待规范":
@@ -737,10 +739,14 @@ actor DataDirScanner {
                                 type: .containers,
                                 priority: priority,
                                 description: "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）".localized,
-                                isMigratable: true
+                                isMigratable: !isProtectedAppSupport,
+                                nonMigratableReason: isProtectedAppSupport
+                                    ? "容器目录受沙盒保护，直接迁移会导致应用崩溃。请迁移其子目录。".localized : nil
                             )
                             libItem.associatedAppName = appName
-                            libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            if !isProtectedAppSupport {
+                                libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            }
                             libItem.linkedDestination = libInspection.linkedDestination ?? libResolved
                             applyInspectionResult(
                                 to: &libItem,
@@ -755,14 +761,41 @@ actor DataDirScanner {
                                 type: .containers,
                                 priority: priority,
                                 description: "容器内部数据目录".localized,
-                                isMigratable: true
+                                isMigratable: !isProtectedAppSupport,
+                                nonMigratableReason: isProtectedAppSupport
+                                    ? "容器目录受沙盒保护，直接迁移会导致应用崩溃。请迁移其子目录。".localized : nil
                             )
                             libItem.associatedAppName = appName
-                            libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            if !isProtectedAppSupport {
+                                libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            }
                             applyInspectionResult(to: &libItem, inspection: libInspection, externalRootURL: externalRootURL)
                             results.append(libItem)
                         default:
                             break
+                        }
+
+                        // Application Support 自身不可迁移，但扫描其子目录
+                        if isProtectedAppSupport && libInspection.status == "本地" {
+                            let appSupportEntries = directoryEntries(at: libChild)
+                            for appSupportChild in appSupportEntries {
+                                let asInspection = inspectItem(at: appSupportChild, type: .containers)
+                                let asSuffix = appSupportChild.path.replacingOccurrences(of: containerURL.path + "/", with: "")
+                                guard asInspection.status == "本地" || asInspection.status == "已链接" || asInspection.status == "待规范" else { continue }
+
+                                var asItem = DataDirItem(
+                                    name: "容器子目录: \(asSuffix)",
+                                    path: appSupportChild,
+                                    type: .containers,
+                                    priority: priority,
+                                    description: "容器内部数据目录".localized,
+                                    isMigratable: true
+                                )
+                                asItem.associatedAppName = appName
+                                asItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                                applyInspectionResult(to: &asItem, inspection: asInspection, externalRootURL: externalRootURL)
+                                results.append(asItem)
+                            }
                         }
                     }
                 }

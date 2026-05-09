@@ -962,15 +962,22 @@ actor DataDirMover {
             return true
         }
 
-        // 仅阻止 Data/Library 目录本身：~/Library/Containers/<bundleId>/Data/Library
-        // macOS 沙盒不允许此目录是符号链接。子目录可安全迁移。
+        // 阻止 Data 下的受保护目录：Data/Library、Data/Documents、Data/Library/Application Support
+        // macOS 沙盒会对这些目录做完整性校验，不能是符号链接。子目录可安全迁移。
         let pathComponents = standardized.pathComponents
         guard let containersIndex = pathComponents.lastIndex(of: "Containers"),
-              containersIndex + 3 == pathComponents.count - 1 else {
+              containersIndex + 2 < pathComponents.count,
+              pathComponents[containersIndex + 2] == "Data" else {
             return false
         }
-        return pathComponents[containersIndex + 2] == "Data"
-            && pathComponents[containersIndex + 3] == "Library"
+        let subPath = pathComponents[(containersIndex + 3)...]
+        if subPath == ["Library"] || subPath == ["Documents"] {
+            return true
+        }
+        if subPath == ["Library", "Application Support"] {
+            return true
+        }
+        return false
     }
 
     private func isProtectedGroupContainerRootPath(_ url: URL) -> Bool {
