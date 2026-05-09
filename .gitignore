@@ -22,6 +22,9 @@ DerivedData/
 # Swift Package Manager
 .build/
 
+# Node.js
+User_docs/node_modules/
+
 # Other
 *.xcscmblueprint
 AppPorts/Localizable.xcstrings
@@ -29,3 +32,4 @@ AppPorts/Localizable.xcstrings
 .claude/settings.json
 .kilo/plans/1778193948175-mighty-knight.md
 .kilo/plans/1778208853339-sunny-engine.md
+docs/superpowers/specs/2026-05-10-logging-improvements-design.md
