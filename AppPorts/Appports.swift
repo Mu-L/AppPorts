@@ -23,15 +23,24 @@ import SwiftUI
 /// 3. 用户确认权限 -> 进入主界面
 ///
 /// - Note: 使用 `@main` 标记为 SwiftUI 应用的入口点
+/// App 生命周期代理
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+}
+
 @main
 struct AppMoverApp: App {
     /// 全局语言管理器
     @StateObject private var languageManager = LanguageManager.shared
-    
+
     /// 控制欢迎界面显示（首次启动为 true）
     @State private var showWelcome = true
     @State private var showAboutSheet = false
-    
+
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
         // 应用启动时记录系统诊断信息
         AppLogger.shared.logLaunchSession()

@@ -39,7 +39,7 @@ final class AppMigrationServiceTests: XCTestCase {
             progressHandler: nil
         )
 
-        try assertDeepPortal(localAppURL, pointsTo: externalAppURL)
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
 
         try service.deleteLink(app: AppItem(name: "Foo.app", path: localAppURL, status: "已链接"))
         XCTAssertFalse(fileManager.fileExists(atPath: localAppURL.path))
@@ -49,7 +49,7 @@ final class AppMigrationServiceTests: XCTestCase {
             destinationURL: localAppURL
         )
 
-        try assertDeepPortal(localAppURL, pointsTo: externalAppURL)
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
 
         try await service.moveBack(
             app: AppItem(name: "Foo.app", path: externalAppURL, status: "已链接"),
@@ -136,7 +136,7 @@ final class AppMigrationServiceTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: externalSuiteURL.path))
     }
 
-    func testIOSRelinkUsesWholeAppSymlink() throws {
+    func testIOSRelinkUsesStubPortal() throws {
         let workspace = try makeWorkspace()
         defer { cleanupWorkspace(workspace.rootURL) }
 
@@ -149,7 +149,7 @@ final class AppMigrationServiceTests: XCTestCase {
             destinationURL: localAppURL
         )
 
-        try assertWholeAppSymlink(localAppURL, pointsTo: externalAppURL)
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
     }
 
     func testDeleteLinkRejectsRealLocalAppBundle() throws {
@@ -243,6 +243,18 @@ final class AppMigrationServiceTests: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    private func assertStubPortal(_ localURL: URL, pointsTo externalURL: URL, file: StaticString = #filePath, line: UInt = #line) throws {
+        let localValues = try localURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        XCTAssertEqual(localValues.isDirectory, true, "stub portal should be a directory", file: file, line: line)
+        XCTAssertNotEqual(localValues.isSymbolicLink, true, "stub portal should not be a symlink", file: file, line: line)
+
+        let launcherURL = localURL.appendingPathComponent("Contents/MacOS/launcher")
+        XCTAssertTrue(fileManager.fileExists(atPath: launcherURL.path), "launcher script should exist", file: file, line: line)
+
+        let script = try String(contentsOf: launcherURL, encoding: .utf8)
+        XCTAssertTrue(script.contains(externalURL.path), "launcher should reference external app", file: file, line: line)
     }
 
     private func assertWholeAppSymlink(_ localURL: URL, pointsTo externalURL: URL, file: StaticString = #filePath, line: UInt = #line) throws {

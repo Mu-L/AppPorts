@@ -64,6 +64,70 @@ private struct AppDataSearchConfig {
 /// // 扫描应用关联目录
 /// let libItems = await scanner.scanLibraryDirs(for: someApp)
 /// ```
+
+// MARK: - 快速目录大小计算（非 actor 隔离，支持并发）
+
+/// 目录大小缓存，减少重复遍历
+private let directorySizeCache: NSCache<NSString, NSNumber> = {
+    let c = NSCache<NSString, NSNumber>()
+    c.countLimit = 200
+    return c
+}()
+
+/// 清除指定路径的大小缓存
+func invalidateSizeCache(for url: URL) {
+    directorySizeCache.removeObject(forKey: url.standardizedFileURL.path as NSString)
+}
+
+/// 清除全部大小缓存
+func clearSizeCache() {
+    directorySizeCache.removeAllObjects()
+}
+
+/// 非隔离的快速目录大小计算，支持 TaskGroup 并发调用。
+///
+/// 优先级：内存缓存 → FileManager.enumerator
+/// 注意：不对目录使用 Spotlight（kMDItemFSSize 对目录不可靠，PearCleaner 也跳过了）
+func fastDirectorySize(at url: URL, fileManager: FileManager = .default) -> Int64 {
+    let cacheKey = url.standardizedFileURL.path as NSString
+    if let cached = directorySizeCache.object(forKey: cacheKey) {
+        return cached.int64Value
+    }
+
+    let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey, .isDirectoryKey]
+    guard let values = try? url.resourceValues(forKeys: Set(resourceKeys)) else { return 0 }
+
+    // 单文件：直接返回大小
+    if values.isRegularFile == true {
+        let size = Int64(values.fileSize ?? 0)
+        directorySizeCache.setObject(NSNumber(value: size), forKey: cacheKey)
+        return size
+    }
+
+    guard values.isDirectory == true else { return 0 }
+
+    // 枚举器遍历（单次批量遍历，替代手动递归的 contentsOfDirectory）
+    guard let enumerator = fileManager.enumerator(
+        at: url,
+        includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey],
+        options: [],
+        errorHandler: nil
+    ) else { return 0 }
+
+    var total: Int64 = 0
+    for case let fileURL as URL in enumerator {
+        guard let attrs = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]),
+              attrs.isSymbolicLink != true,
+              attrs.isRegularFile == true,
+              let fileSize = attrs.fileSize else { continue }
+        total += Int64(fileSize)
+    }
+    directorySizeCache.setObject(NSNumber(value: total), forKey: cacheKey)
+    return total
+}
+
+// MARK: - 数据目录扫描器
+
 actor DataDirScanner {
 
     private let fileManager = FileManager.default
@@ -377,19 +441,10 @@ actor DataDirScanner {
             for candidateURL in localCandidates {
                 let inspection = inspectItem(at: candidateURL, type: config.type)
 
-                var item = makeAppDataItem(
-                    name: candidateURL.lastPathComponent,
-                    path: candidateURL,
-                    type: config.type,
-                    priority: config.priority,
-                    description: config.description,
-                    appName: appName
-                )
-                applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
-
-                resultsByPath[candidateURL.standardizedFileURL.path] = item
-
                 if config.type == .containers {
+                    // 跳过顶层容器目录（~/Library/Containers/xxx），
+                    // macOS 系统保护不允许在 ~/Library/Containers/ 创建新条目，
+                    // 迁移整个容器目录会导致数据丢失。只扫描容器内的嵌套子目录。
                     for nestedItem in scanNestedContainerDataLinks(
                         in: candidateURL,
                         priority: config.priority,
@@ -398,6 +453,34 @@ actor DataDirScanner {
                     ) {
                         resultsByPath[nestedItem.path.standardizedFileURL.path] = nestedItem
                     }
+                } else if config.type == .groupContainers {
+                    // 应用组容器根目录同样由 containermanagerd 管理。根目录变成软链后，
+                    // 系统可能无法读取/修复 .com.apple.containermanagerd.metadata.plist。
+                    // 普通本地根目录不作为可迁移项展示；已有软链保留展示，方便用户还原。
+                    if inspection.status == "已链接" || inspection.status == "现有软链" {
+                        var item = makeAppDataItem(
+                            name: candidateURL.lastPathComponent,
+                            path: candidateURL,
+                            type: config.type,
+                            priority: config.priority,
+                            description: config.description,
+                            appName: appName
+                        )
+                        applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                        markProtectedGroupContainerRoot(&item)
+                        resultsByPath[candidateURL.standardizedFileURL.path] = item
+                    }
+                } else {
+                    var item = makeAppDataItem(
+                        name: candidateURL.lastPathComponent,
+                        path: candidateURL,
+                        type: config.type,
+                        priority: config.priority,
+                        description: config.description,
+                        appName: appName
+                    )
+                    applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                    resultsByPath[candidateURL.standardizedFileURL.path] = item
                 }
             }
 
@@ -410,6 +493,9 @@ actor DataDirScanner {
                         from: externalBaseURL,
                         to: config.localBaseURL
                     ) else { continue }
+
+                    // 跳过顶层容器目录（与本地扫描一致）
+                    if config.type == .containers || config.type == .groupContainers { continue }
 
                     let localKey = localURL.standardizedFileURL.path
                     if resultsByPath[localKey] != nil { continue }
@@ -456,10 +542,13 @@ actor DataDirScanner {
 
     /// 异步计算单个目录大小
     ///
+    /// 遇到符号链接时：
+    /// - 标准沙盒链接（Desktop、Downloads 等指向 `~/` 的）→ 跳过，避免误计入用户个人文件
+    /// - 指向外部存储的链接 → 递归计算目标目录大小，确保已迁移数据被正确计量
+    ///
     /// - Parameter item: 要计算大小的目录项
     /// - Returns: 大小（字节）
     func calculateSize(for item: DataDirItem) -> Int64 {
-        // 如果是已链接状态，我们需要计算链接目标（外部存储）的大小
         var scanURL = item.linkedDestination ?? item.path
         let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey, .isDirectoryKey]
 
@@ -472,31 +561,9 @@ actor DataDirScanner {
 
         guard fileManager.fileExists(atPath: scanURL.path) else { return 0 }
 
-        if let values = try? scanURL.resourceValues(forKeys: Set(resourceKeys)),
-           values.isRegularFile == true {
-            return Int64(values.fileSize ?? 0)
-        }
-
-        guard let enumerator = fileManager.enumerator(
-            at: scanURL,
-            includingPropertiesForKeys: resourceKeys,
-            options: [],
-            errorHandler: nil
-        ) else { return 0 }
-
-        var size: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            if isManagedLinkMetadataFile(fileURL.lastPathComponent) {
-                continue
-            }
-
-            guard let values = try? fileURL.resourceValues(forKeys: Set(resourceKeys)) else { continue }
-            if values.isSymbolicLink == true { continue }
-            if values.isRegularFile == true, let fileSize = values.fileSize {
-                size += Int64(fileSize)
-            }
-        }
-        return size
+        let result = fastDirectorySize(at: scanURL, fileManager: fileManager)
+        AppLogger.shared.log("[SizeDebug] \(item.name) | path=\(item.path.path) | scan=\(scanURL.path) | linked=\(item.linkedDestination?.path ?? "nil") | size=\(result) (\(result / (1024*1024)) MB)", level: "DEBUG")
+        return result
     }
 
     // MARK: - 私有辅助方法
@@ -579,32 +646,127 @@ actor DataDirScanner {
 
         var results: [DataDirItem] = []
 
-        for childURL in directoryEntries(at: dataURL) {
-            guard let targetURL = resolveSymlinkDestination(at: childURL),
-                  shouldSurfaceNestedContainerLink(from: childURL, to: targetURL, externalRootURL: externalRootURL) else {
-                continue
-            }
+        let entries = directoryEntries(at: dataURL)
+        AppLogger.shared.log("[NestedDebug] Container=\(containerURL.lastPathComponent) | Data/ entries=\(entries.count) | \(entries.map(\.lastPathComponent).joined(separator: ", "))", level: "DEBUG")
 
+        for childURL in entries {
             let inspection = inspectItem(at: childURL, type: .containers)
             let relativeSuffix = childURL.path.replacingOccurrences(of: containerURL.path + "/", with: "")
 
-            var item = DataDirItem(
-                name: "容器子目录: \(relativeSuffix)",
-                path: childURL,
-                type: .containers,
-                priority: priority,
-                description: "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）".localized,
-                isMigratable: true
-            )
-            item.associatedAppName = appName
-            item.linkedDestination = inspection.linkedDestination ?? targetURL
-            applyInspectionResult(
-                to: &item,
-                inspection: (inspection.status, inspection.linkedDestination ?? targetURL),
-                externalRootURL: externalRootURL
-            )
+            // 已迁移的符号链接（指向外部）
+            let resolvedTarget = resolveSymlinkDestination(at: childURL)
+            let shouldSurface = resolvedTarget.map { shouldSurfaceNestedContainerLink(from: childURL, to: $0, externalRootURL: externalRootURL) } ?? false
+            AppLogger.shared.log("[NestedDebug] \(relativeSuffix) | status=\(inspection.status) | resolved=\(resolvedTarget?.path ?? "nil") | shouldSurface=\(shouldSurface) | extRoot=\(externalRootURL?.path ?? "nil")", level: "DEBUG")
 
-            results.append(item)
+            // AppPorts 受管链接始终显示（不受路径检查限制）
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = inspection.linkedDestination ?? resolvedTarget
+                applyInspectionResult(
+                    to: &item,
+                    inspection: (inspection.status, inspection.linkedDestination ?? resolvedTarget),
+                    externalRootURL: externalRootURL
+                )
+                results.append(item)
+                continue
+            }
+
+            // 其他符号链接 — 仅在目标为外部存储时展示
+            if let targetURL = resolvedTarget, shouldSurface {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = targetURL
+                applyInspectionResult(
+                    to: &item,
+                    inspection: (inspection.status, targetURL),
+                    externalRootURL: externalRootURL
+                )
+                results.append(item)
+                continue
+            }
+
+            // 普通本地子目录
+            if inspection.status == "本地" {
+                // Data/Library 受沙盒保护，不可迁移。其子目录可迁移。
+                let isProtectedLibrary = relativeSuffix == "Data/Library"
+
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "容器内部数据目录".localized,
+                    isMigratable: !isProtectedLibrary,
+                    nonMigratableReason: isProtectedLibrary
+                        ? "Data/Library 受沙盒保护，迁移会致应用崩溃。请迁移其子目录。".localized : nil
+                )
+                item.associatedAppName = appName
+                applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                results.append(item)
+
+                // Data/Library 自身不可迁移，但扫描其子目录（如 Application Support）
+                if isProtectedLibrary {
+                    let libEntries = directoryEntries(at: childURL)
+                    for libChild in libEntries {
+                        let libInspection = inspectItem(at: libChild, type: .containers)
+                        let libSuffix = libChild.path.replacingOccurrences(of: containerURL.path + "/", with: "")
+
+                        let libResolved = resolveSymlinkDestination(at: libChild)
+                        let libShouldSurface = libResolved.map { shouldSurfaceNestedContainerLink(from: libChild, to: $0, externalRootURL: externalRootURL) } ?? false
+
+                        switch libInspection.status {
+                        case "已链接", "待规范":
+                            var libItem = DataDirItem(
+                                name: "容器子目录: \(libSuffix)",
+                                path: libChild,
+                                type: .containers,
+                                priority: priority,
+                                description: "容器内部拆分迁移的数据目录（如聊天记录、下载文件或运行时数据）".localized,
+                                isMigratable: true
+                            )
+                            libItem.associatedAppName = appName
+                            libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            libItem.linkedDestination = libInspection.linkedDestination ?? libResolved
+                            applyInspectionResult(
+                                to: &libItem,
+                                inspection: (libInspection.status, libInspection.linkedDestination ?? libResolved),
+                                externalRootURL: externalRootURL
+                            )
+                            results.append(libItem)
+                        case "本地":
+                            var libItem = DataDirItem(
+                                name: "容器子目录: \(libSuffix)",
+                                path: libChild,
+                                type: .containers,
+                                priority: priority,
+                                description: "容器内部数据目录".localized,
+                                isMigratable: true
+                            )
+                            libItem.associatedAppName = appName
+                            libItem.migrationWarning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+                            applyInspectionResult(to: &libItem, inspection: libInspection, externalRootURL: externalRootURL)
+                            results.append(libItem)
+                        default:
+                            break
+                        }
+                    }
+                }
+            }
         }
 
         return deduplicate(items: results)
@@ -667,6 +829,11 @@ actor DataDirScanner {
         }
 
         item.status = "待规范"
+    }
+
+    private func markProtectedGroupContainerRoot(_ item: inout DataDirItem) {
+        item.isMigratable = false
+        item.nonMigratableReason = "应用组容器根目录由 macOS 管理，不能迁移根目录。请只迁移容器内更深层的数据目录。".localized
     }
 
     private func needsNormalization(for item: DataDirItem, currentTarget: URL, externalRootURL: URL?) -> Bool {
@@ -1025,23 +1192,38 @@ actor DataDirScanner {
 
     /// 在指定目录中查找与应用匹配的子目录。
     ///
-    /// 除了顶层目录外，还会额外检查一层子目录，用于覆盖：
-    /// - `Application Support/Adobe/Adobe Photoshop 2026`
-    /// - `Group Containers/FN2V63AD2J.com.tencent/qqex`
+    /// 使用 enumerator 仅遍历至多 2 层深度，单次批量遍历替代逐层 contentsOfDirectory。
+    /// 对非匹配的顶层目录自动下钻一层，匹配后跳过子树。
     private func findMatchingDirs(in baseURL: URL, matchProfile: AppMatchProfile) -> [URL] {
         guard fileManager.fileExists(atPath: baseURL.path) else { return [] }
 
         var matched: [URL] = []
-        let topLevelEntries = directoryEntries(at: baseURL)
+        guard let enumerator = fileManager.enumerator(
+            at: baseURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
 
-        for itemURL in topLevelEntries {
-            if matchesDirectoryName(itemURL.lastPathComponent, profile: matchProfile) {
-                matched.append(itemURL)
+        let baseDepth = baseURL.standardizedFileURL.pathComponents.count
+
+        for case let itemURL as URL in enumerator {
+            let depth = itemURL.standardizedFileURL.pathComponents.count - baseDepth
+            guard depth <= 2 else {
+                enumerator.skipDescendants()
                 continue
             }
 
-            for childURL in directoryEntries(at: itemURL) where matchesDirectoryName(childURL.lastPathComponent, profile: matchProfile) {
-                matched.append(childURL)
+            guard let values = try? itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                  (values.isDirectory == true || values.isSymbolicLink == true) else { continue }
+
+            if matchesDirectoryName(itemURL.lastPathComponent, profile: matchProfile) {
+                matched.append(itemURL)
+                if depth >= 2 {
+                    enumerator.skipDescendants()
+                }
+            } else if depth >= 2 {
+                // 非匹配的二级目录不再深入
+                enumerator.skipDescendants()
             }
         }
 

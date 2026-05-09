@@ -50,7 +50,9 @@ struct AppStoreSettingsView: View {
     
     /// 环境变量：用于关闭弹窗
     @Environment(\.dismiss) private var dismiss
-    
+
+    private var isMASExternalSupported: Bool { AppMigrationService.isMASExternalInstallSupported }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             // 标题栏
@@ -60,9 +62,9 @@ struct AppStoreSettingsView: View {
                     .foregroundColor(.blue)
                 Text("设置".localized)
                     .font(.title2.bold())
-                
+
                 Spacer()
-                
+
                 // 关闭按钮
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
@@ -73,84 +75,100 @@ struct AppStoreSettingsView: View {
                 .help("关闭".localized)
             }
             .padding(.bottom, 8)
-            
-            // 说明
-            Text("默认情况下，来自 App Store 的应用不允许迁移，因为迁移后将无法通过 App Store 更新。".localized)
-                .font(.callout)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            Divider()
-            
-            // Mac App Store 应用设置
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "applelogo")
-                                .foregroundColor(.blue)
-                            Text("允许迁移 Mac App Store 应用".localized)
-                                .font(.headline)
-                        }
-                        Text("启用后可以迁移来自 Mac App Store 的原生 Mac 应用".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+
+            if isMASExternalSupported {
+                // macOS 15.1+：自动启用，显示说明
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("macOS 15.1+ 已原生支持 App Store 应用外部安装".localized)
+                            .font(.headline)
                     }
-                    
-                    Spacer()
-                    
-                    Toggle("", isOn: $allowAppStoreMigration)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
+                    Text("App Store 应用和非原生应用可直接迁移，无需手动开启。App Store 会自动管理外部磁盘上的应用更新。".localized)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                if allowAppStoreMigration {
-                    WarningBanner(
-                        icon: "exclamationmark.triangle.fill",
-                        color: .orange,
-                        text: "迁移后的 App Store 应用将无法自动更新，需要手动还原后才能更新".localized
-                    )
+                .padding()
+                .background(Color.green.opacity(0.06))
+                .cornerRadius(12)
+                .onAppear {
+                    // 自动启用
+                    allowAppStoreMigration = true
+                    allowIOSAppMigration = true
                 }
-            }
-            .padding()
-            .frame(minHeight: 110)
-            .background(Color.primary.opacity(0.03))
-            .cornerRadius(12)
-            
-            // iOS/iPad 应用设置
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "iphone")
-                                .foregroundColor(.pink)
-                            Text("允许迁移非原生应用".localized)
-                                .font(.headline)
+            } else {
+                // macOS < 15.1：显示原有开关
+                Text("默认情况下，来自 App Store 的应用不允许迁移，因为迁移后将无法通过 App Store 更新。".localized)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Divider()
+
+                // Mac App Store 应用设置
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "applelogo")
+                                    .foregroundColor(.blue)
+                                Text("允许迁移 Mac App Store 应用".localized)
+                                    .font(.headline)
+                            }
+                            Text("启用后可以迁移来自 Mac App Store 的原生 Mac 应用".localized)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        Text("启用后可以迁移来自 iPhone/iPad 的非原生 Mac 应用（使用整体链接）".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Toggle("", isOn: $allowAppStoreMigration)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
                     }
-                    
-                    Spacer()
-                    
-                    Toggle("", isOn: $allowIOSAppMigration)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
+
+                    if allowAppStoreMigration {
+                        WarningBanner(
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange,
+                            text: "迁移后的 App Store 应用将无法自动更新，需要手动还原后才能更新".localized
+                        )
+                    }
                 }
-                
-                if allowIOSAppMigration {
-                    WarningBanner(
-                        icon: "info.circle.fill",
-                        color: .blue,
-                        text: "由于 iOS 应用结构限制，迁移后 Finder 图标会显示箭头（macOS 系统行为）".localized
-                    )
+                .padding()
+                .frame(minHeight: 110)
+                .background(Color.primary.opacity(0.03))
+                .cornerRadius(12)
+
+                // iOS/iPad 应用设置
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "iphone")
+                                    .foregroundColor(.pink)
+                                Text("允许迁移非原生应用".localized)
+                                    .font(.headline)
+                            }
+                            Text("启用后可以迁移来自 iPhone/iPad 的非原生 Mac 应用".localized)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Toggle("", isOn: $allowIOSAppMigration)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                    }
                 }
+                .padding()
+                .frame(minHeight: 110)
+                .background(Color.primary.opacity(0.03))
+                .cornerRadius(12)
             }
-            .padding()
-            .frame(minHeight: 110)
-            .background(Color.primary.opacity(0.03))
-            .cornerRadius(12)
             
             // 日志设置
             VStack(alignment: .leading, spacing: 12) {

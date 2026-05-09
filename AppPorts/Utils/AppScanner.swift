@@ -159,6 +159,10 @@ actor AppScanner {
                 
                 // 检测是否为 App Store 应用和 iOS 应用
                 let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: itemURL)
+                let isResigned = checkResignedStatus(bundleURL: itemURL)
+                let (isElectron, isSparkle) = detectElectronAndSparkle(at: itemURL)
+                let hasUpdater = isSparkle || (isElectron && hasElectronUpdater(at: itemURL)) || hasCustomUpdater(at: itemURL)
+                let needsLock = isSparkle || (isElectron && hasElectronUpdater(at: itemURL))
                 let app = AppItem(
                     name: appName,
                     path: itemURL,
@@ -168,6 +172,11 @@ actor AppScanner {
                     isRunning: isRunning,
                     isAppStoreApp: isAppStore,
                     isIOSApp: isIOS,
+                    isResigned: isResigned,
+                    isElectronApp: isElectron,
+                    isSparkleApp: isSparkle,
+                    hasSelfUpdater: hasUpdater,
+                    needsLock: needsLock,
                     containerKind: .standaloneApp
                 )
                 candidates.append(makeCandidate(for: app, bundleURL: itemURL, priority: 10))
@@ -188,6 +197,7 @@ actor AppScanner {
 
                     if appCount == 1, let bundleURL = appsInFolder.first {
                         let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: bundleURL)
+                        let isResigned = checkResignedStatus(bundleURL: bundleURL)
                         let app = AppItem(
                             name: folderName,
                             path: itemURL,
@@ -197,6 +207,7 @@ actor AppScanner {
                             isRunning: hasRunning,
                             isAppStoreApp: isAppStore,
                             isIOSApp: isIOS,
+                            isResigned: isResigned,
                             containerKind: .singleAppContainer,
                             appCount: 1
                         )
@@ -239,31 +250,69 @@ actor AppScanner {
     /// - AppPorts 创建的跨卷链接：显示为“已链接”
     /// - 安装器自带的同卷入口 symlink（如 `/Applications` -> `/opt/anaconda3/...`）：仍视为“本地”
     private func detectLocalAppStatus(at appURL: URL) -> String {
+        let fm = FileManager.default
+
+        // wholeAppSymlink：整个 .app 是符号链接
         if let linkDest = resolveSymlinkDestination(of: appURL) {
-            return isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) ? "已链接" : "本地"
+            if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
+                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            }
+            return "本地"
         }
 
         let contentsURL = appURL.appendingPathComponent("Contents")
+
+        // deepContentsWrapper：Contents/ 是符号链接
         if let linkDest = resolveSymlinkDestination(of: contentsURL) {
-            return isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) ? "已链接" : "本地"
+            if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
+                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            }
+            return "本地"
         }
 
+        // 旧版混合入口：MacOS/Resources/Frameworks 是符号链接
         let macOSURL = contentsURL.appendingPathComponent("MacOS")
         if let linkDest = resolveSymlinkDestination(of: macOSURL) {
-            return isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) ? "已链接" : "本地"
+            if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
+                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            }
+            return "本地"
         }
-
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
         if let linkDest = resolveSymlinkDestination(of: resourcesURL) {
-            return isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) ? "已链接" : "本地"
+            if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
+                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            }
+            return "本地"
+        }
+        let frameworksURL = contentsURL.appendingPathComponent("Frameworks")
+        if let linkDest = resolveSymlinkDestination(of: frameworksURL) {
+            if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
+                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            }
+            return "本地"
+        }
+
+        // Stub Portal：检查 launcher 脚本引用的外部 app 是否存在
+        let launcherPath = contentsURL.appendingPathComponent("MacOS/launcher")
+        if fm.fileExists(atPath: launcherPath.path),
+           let script = try? String(contentsOf: launcherPath, encoding: .utf8) {
+            // 提取 REAL_APP='...' 中的路径
+            if let range = script.range(of: "REAL_APP='") {
+                let afterQuote = script[range.upperBound...]
+                if let endQuote = afterQuote.range(of: "'") {
+                    let realAppPath = String(afterQuote[..<endQuote.lowerBound])
+                    return fm.fileExists(atPath: realAppPath) ? "已链接" : "孤立链接"
+                }
+            }
         }
 
         return "本地"
     }
 
     private func detectLocalFolderStatus(at folderURL: URL) -> String {
-        if resolveSymlinkDestination(of: folderURL) != nil {
-            return "已链接"
+        if let linkDest = resolveSymlinkDestination(of: folderURL) {
+            return FileManager.default.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
         }
 
         return "本地"
@@ -296,6 +345,11 @@ actor AppScanner {
             return enclosingAppBundleURL(for: resourcesTarget)
         }
 
+        let frameworksURL = contentsURL.appendingPathComponent("Frameworks")
+        if let frameworksTarget = resolveSymlinkDestination(of: frameworksURL) {
+            return enclosingAppBundleURL(for: frameworksTarget)
+        }
+
         return url
     }
 
@@ -321,6 +375,30 @@ actor AppScanner {
         let localContentsURL = localAppURL.appendingPathComponent("Contents")
         if let contentsDestination = resolveSymlinkDestination(of: localContentsURL),
            contentsDestination == standardizedExternalAppURL.appendingPathComponent("Contents").standardizedFileURL {
+            return true
+        }
+
+        // 旧版混合入口：MacOS/Resources/Frameworks 是符号链接
+        let localMacOS = localContentsURL.appendingPathComponent("MacOS")
+        if let macOSDestination = resolveSymlinkDestination(of: localMacOS),
+           macOSDestination == standardizedExternalAppURL.appendingPathComponent("Contents/MacOS").standardizedFileURL {
+            return true
+        }
+        let localResources = localContentsURL.appendingPathComponent("Resources")
+        if let resourcesDestination = resolveSymlinkDestination(of: localResources),
+           resourcesDestination == standardizedExternalAppURL.appendingPathComponent("Contents/Resources").standardizedFileURL {
+            return true
+        }
+        let localFrameworks = localContentsURL.appendingPathComponent("Frameworks")
+        if let frameworksDestination = resolveSymlinkDestination(of: localFrameworks),
+           frameworksDestination == standardizedExternalAppURL.appendingPathComponent("Contents/Frameworks").standardizedFileURL {
+            return true
+        }
+
+        // Stub Portal：launcher 脚本包含外部 app 路径
+        let launcherPath = localContentsURL.appendingPathComponent("MacOS/launcher")
+        if let script = try? String(contentsOf: launcherPath, encoding: .utf8),
+           script.contains(standardizedExternalAppURL.path) {
             return true
         }
 
@@ -371,6 +449,11 @@ actor AppScanner {
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
         if let resourcesDestination = resolveSymlinkDestination(of: resourcesURL) {
             return enclosingAppBundleURL(for: resourcesDestination)
+        }
+
+        let frameworksURL = contentsURL.appendingPathComponent("Frameworks")
+        if let frameworksDestination = resolveSymlinkDestination(of: frameworksURL) {
+            return enclosingAppBundleURL(for: frameworksDestination)
         }
 
         return nil
@@ -475,7 +558,102 @@ actor AppScanner {
         
         return (isAppStore, isIOSApp)
     }
-    
+
+    /// 检测是否为 Electron 或 Sparkle 自更新应用
+    private func detectElectronAndSparkle(at appURL: URL) -> (isElectron: Bool, isSparkle: Bool) {
+        let fm = FileManager.default
+        let frameworks = appURL.appendingPathComponent("Contents/Frameworks")
+
+        // Electron 检测
+        var isElectron = false
+        if fm.fileExists(atPath: frameworks.appendingPathComponent("Electron Framework.framework").path) {
+            isElectron = true
+        }
+        if !isElectron, let items = try? fm.contentsOfDirectory(at: frameworks, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+            isElectron = items.contains { $0.lastPathComponent.contains("Electron Helper") }
+        }
+        if !isElectron, let plist = NSDictionary(contentsOf: appURL.appendingPathComponent("Contents/Info.plist")) {
+            isElectron = plist["ElectronDefaultApp"] != nil || plist["electron"] != nil
+        }
+
+        // Sparkle 检测
+        var isSparkle = false
+        let sparkleFrameworks = ["Sparkle.framework", "Squirrel.framework"]
+        for name in sparkleFrameworks {
+            if fm.fileExists(atPath: frameworks.appendingPathComponent(name).path) {
+                isSparkle = true
+                break
+            }
+        }
+        // 二进制文件名检测（仅对非 Electron 应用，避免 electron-updater 的 "updater" 误判）
+        if !isSparkle && !isElectron {
+            let updaterNames = ["shipit", "autoupdate", "updater", "update"]
+            let searchRoots = [appURL.appendingPathComponent("Contents/MacOS"), frameworks]
+            for root in searchRoots {
+                let items = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
+                if items.contains(where: { item in
+                    let name = item.lastPathComponent.lowercased()
+                    return updaterNames.contains(where: { name.contains($0) })
+                }) {
+                    isSparkle = true
+                    break
+                }
+            }
+        }
+        if !isSparkle, let plist = NSDictionary(contentsOf: appURL.appendingPathComponent("Contents/Info.plist")) {
+            let sparkleKeys = ["SUFeedURL", "SUPublicDSAKeyFile", "SUPublicEDKey", "SUScheduledCheckInterval", "SUAllowsAutomaticUpdates"]
+            isSparkle = sparkleKeys.contains { plist[$0] != nil }
+        }
+
+        return (isElectron, isSparkle)
+    }
+
+    /// 检测 Electron 应用是否有 electron-updater
+    private func hasElectronUpdater(at appURL: URL) -> Bool {
+        FileManager.default.fileExists(atPath: appURL.appendingPathComponent("Contents/Resources/app-update.yml").path)
+    }
+
+    /// 检测是否有自定义更新机制（非 Sparkle、非 Electron）
+    private func hasCustomUpdater(at appURL: URL) -> Bool {
+        let fm = FileManager.default
+        let contents = appURL.appendingPathComponent("Contents")
+
+        // 1. LaunchServices 特权助手（Chrome、Edge、Thunderbird 等）
+        let launchServices = contents.appendingPathComponent("Library/LaunchServices")
+        if let items = try? fm.contentsOfDirectory(at: launchServices, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+            if items.contains(where: { $0.lastPathComponent.lowercased().contains("update") }) {
+                return true
+            }
+        }
+
+        // 2. MacOS/ 下的更新二进制（Parallels、Thunderbird 等）
+        let macOS = contents.appendingPathComponent("MacOS")
+        if let items = try? fm.contentsOfDirectory(at: macOS, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+            if items.contains(where: {
+                let name = $0.lastPathComponent.lowercased()
+                return (name.contains("update") || name.contains("upgrade")) && !name.contains("electron")
+            }) {
+                return true
+            }
+        }
+
+        // 3. SharedSupport/ 更新工具（wpsoffice 等）
+        let sharedSupport = contents.appendingPathComponent("SharedSupport")
+        if let items = try? fm.contentsOfDirectory(at: sharedSupport, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+            if items.contains(where: { $0.lastPathComponent.lowercased().contains("update") }) {
+                return true
+            }
+        }
+
+        // 4. Keystone plist 键（Google Chrome）
+        if let plist = NSDictionary(contentsOf: contents.appendingPathComponent("Info.plist")),
+           plist["KSProductID"] != nil {
+            return true
+        }
+
+        return false
+    }
+
     /// 扫描外部存储目录
     ///
     /// 扫描外部存储设备上的应用目录，并检测这些应用是否已链接回本地。
@@ -514,6 +692,10 @@ actor AppScanner {
                    isLocalApp(localAppURL, linkedTo: itemURL) {
                     status = "已链接"
                 }
+                let isResigned = checkResignedStatus(bundleURL: itemURL)
+                let (isElectron, isSparkle) = detectElectronAndSparkle(at: itemURL)
+                let hasUpdater = isSparkle || (isElectron && hasElectronUpdater(at: itemURL)) || hasCustomUpdater(at: itemURL)
+                let needsLock = isSparkle || (isElectron && hasElectronUpdater(at: itemURL))
                 let app = AppItem(
                     name: appName,
                     path: itemURL,
@@ -521,6 +703,11 @@ actor AppScanner {
                     status: status,
                     isSystemApp: false,
                     isRunning: false,
+                    isResigned: isResigned,
+                    isElectronApp: isElectron,
+                    isSparkleApp: isSparkle,
+                    hasSelfUpdater: hasUpdater,
+                    needsLock: needsLock,
                     containerKind: .standaloneApp
                 )
                 candidates.append(makeCandidate(for: app, bundleURL: itemURL, priority: 10))
@@ -548,6 +735,7 @@ actor AppScanner {
                         }
 
                         let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: bundleURL)
+                        let isResigned = checkResignedStatus(bundleURL: bundleURL)
                         let app = AppItem(
                             name: folderName,
                             path: itemURL,
@@ -557,6 +745,7 @@ actor AppScanner {
                             isRunning: false,
                             isAppStoreApp: isAppStore,
                             isIOSApp: isIOS,
+                            isResigned: isResigned,
                             containerKind: .singleAppContainer,
                             appCount: 1
                         )
@@ -606,6 +795,7 @@ actor AppScanner {
                 }
 
                 let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: externalTargetURL)
+                let isResigned = checkResignedStatus(bundleURL: externalTargetURL)
                 let app = AppItem(
                     name: externalTargetURL.lastPathComponent,
                     path: externalTargetURL,
@@ -615,6 +805,7 @@ actor AppScanner {
                     isRunning: false,
                     isAppStoreApp: isAppStore,
                     isIOSApp: isIOS,
+                    isResigned: isResigned,
                     containerKind: .standaloneApp
                 )
                 candidates.append(makeCandidate(for: app, bundleURL: externalTargetURL, priority: 40))
@@ -633,6 +824,7 @@ actor AppScanner {
 
             if appsInFolder.count == 1, let bundleURL = appsInFolder.first {
                 let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: bundleURL)
+                let isResigned = checkResignedStatus(bundleURL: bundleURL)
                 let app = AppItem(
                     name: externalTargetURL.lastPathComponent,
                     path: externalTargetURL,
@@ -642,6 +834,7 @@ actor AppScanner {
                     isRunning: false,
                     isAppStoreApp: isAppStore,
                     isIOSApp: isIOS,
+                    isResigned: isResigned,
                     containerKind: .singleAppContainer,
                     appCount: 1
                 )
@@ -660,6 +853,38 @@ actor AppScanner {
                 candidates.append(makeCandidate(for: app, bundleURL: externalTargetURL, priority: 40))
             }
         }
+
+        // macOS >= 15.1: 扫描外部磁盘根目录的 Applications 文件夹
+        if AppMigrationService.isMASExternalInstallSupported {
+            let masDir = AppMigrationService.masApplicationsURL(for: dir)
+            let masItems = (try? fileManager.contentsOfDirectory(at: masDir, includingPropertiesForKeys: keys, options: .skipsHiddenFiles)) ?? []
+            for itemURL in masItems where itemURL.pathExtension == "app" {
+                let appName = itemURL.lastPathComponent
+                var status = "未链接"
+                let localAppURL = localAppsDir.appendingPathComponent(appName)
+                if fileManager.fileExists(atPath: localAppURL.path),
+                   isLocalApp(localAppURL, linkedTo: itemURL) {
+                    status = "已链接"
+                }
+                let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: itemURL)
+                let isResigned = checkResignedStatus(bundleURL: itemURL)
+                let app = AppItem(
+                    name: appName,
+                    path: itemURL,
+                    bundleURL: itemURL,
+                    status: status,
+                    isSystemApp: false,
+                    isRunning: false,
+                    isAppStoreApp: isAppStore,
+                    isMASExternal: true,
+                    isIOSApp: isIOS,
+                    isResigned: isResigned,
+                    containerKind: .standaloneApp
+                )
+                candidates.append(makeCandidate(for: app, bundleURL: itemURL, priority: 15))
+            }
+        }
+
         let sortedApps = sortApps(deduplicate(candidates))
         AppLogger.shared.logContext(
             "AppScanner 完成外部应用扫描",
@@ -764,5 +989,41 @@ actor AppScanner {
         }
 
         return plist["CFBundleIdentifier"] as? String
+    }
+
+    private func readBundleVersion(from appURL: URL) -> String? {
+        let infoPlistURL = appURL.appendingPathComponent("Contents/Info.plist")
+        guard let plist = NSDictionary(contentsOf: infoPlistURL) as? [String: Any] else { return nil }
+        return plist["CFBundleShortVersionString"] as? String
+    }
+
+    private static var backupDirectoryURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("AppPorts/signature-backups")
+    }
+
+    private func checkResignedStatus(bundleURL: URL?) -> Bool {
+        guard let bundleURL else { return false }
+        guard let bundleID = readBundleIdentifier(from: bundleURL) else { return false }
+        let backupPlist = Self.backupDirectoryURL.appendingPathComponent("\(bundleID).plist")
+        guard FileManager.default.fileExists(atPath: backupPlist.path) else { return false }
+        // 备份文件存在时，还需验证 app 当前签名确实是 ad-hoc（用户可能已重新安装原版）
+        return isAdHocSigned(at: bundleURL)
+    }
+
+    /// 检查 app 是否为 ad-hoc 签名（非 Developer ID）
+    private func isAdHocSigned(at appURL: URL) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = ["-dvv", appURL.path]
+        let pipe = Pipe()
+        process.standardError = pipe
+        process.standardOutput = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        // ad-hoc 签名的特征：Signature=adhoc
+        return output.contains("Signature=adhoc")
     }
 }

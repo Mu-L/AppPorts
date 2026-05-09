@@ -7,6 +7,19 @@
 
 import SwiftUI
 
+// MARK: - 数据目录分组
+
+/// 按数据类型分组的目录集合
+struct DataDirGroup {
+    let type: DataDirType
+    let items: [DataDirItem]
+    /// 分组总大小——只统计根级项，避免父目录大小与子目录大小重复计入。
+    /// 子目录项的 sizeBytes 已包含在父目录的 calculateDirectorySize 中。
+    var totalSizeBytes: Int64 {
+        items.reduce(0) { $0 + $1.sizeBytes }
+    }
+}
+
 // MARK: - 数据目录主视图
 
 /// 数据目录管理视图（主界面 Tab 三）
@@ -24,6 +37,12 @@ struct DataDirsView: View {
     let localApps: [AppItem]
     /// 选择外部存储路径的回调
     let onSelectExternalDrive: () -> Void
+    /// 数据迁移完成后对关联应用执行重签名的回调（Bool = 是否静默，true 则不弹错误框）
+    let onResignApp: ((AppItem, Bool) -> Void)?
+    /// 恢复应用原始签名的回调
+    let onRestoreSignature: ((AppItem) -> Void)?
+    /// 迁移前备份原始签名的回调
+    let onBackupSignature: ((AppItem) -> Void)?
 
     // MARK: - 内部状态
     @State private var dotFolderItems: [DataDirItem] = []
@@ -36,6 +55,7 @@ struct DataDirsView: View {
     @State private var selectedStatusFilters: Set<String> = []
     @State private var selectedTypeFilters: Set<DataDirType> = []
     @State private var selectedAppDataSortMode: AppDataSortMode = .defaultOrder
+    @State private var selectedAppSortMode: AppSortMode = .size
 
     @State private var isScanning = false
 
@@ -59,13 +79,25 @@ struct DataDirsView: View {
     @State private var managedLinkNormalizationMessage = ""
     @State private var managedLinkNormalizationItem: DataDirItem? = nil
     @State private var managedLinkNormalizationCurrentTarget: URL? = nil
+    @State private var showMigrationRiskAlert = false
+    @State private var migrationRiskMessage = ""
 
     // 错误弹窗
     @State private var showError = false
     @State private var errorMessage = ""
 
+    // 权限弹窗
+    @State private var showPermissionAlert = false
+    @AppStorage("skipPermissionCheck") private var skipPermissionCheck = false
+
     // 选中项（用于高亮）
-    @State private var selectedItemID: UUID? = nil
+    @State private var selectedItemID: String? = nil
+
+    // 搜索
+    @State private var appSearchText = ""
+
+    // 重签名开关
+    @AppStorage("autoResignEnabled") private var autoResignEnabled = false
 
     enum DataTab: String, CaseIterable {
         case toolDirs  = "工具目录"
@@ -74,6 +106,11 @@ struct DataDirsView: View {
 
     enum AppDataSortMode: String, CaseIterable {
         case defaultOrder = "默认"
+        case size = "按大小"
+        case alphabetical = "按首字母"
+    }
+
+    enum AppSortMode: String, CaseIterable {
         case size = "按大小"
         case alphabetical = "按首字母"
     }
@@ -95,6 +132,53 @@ struct DataDirsView: View {
                 .frame(width: 200)
 
                 Spacer()
+
+                // 数据迁移后自动重签名开关
+                HStack(spacing: 6) {
+                    Image(systemName: autoResignEnabled ? "seal.fill" : "seal")
+                        .font(.system(size: 12))
+                        .foregroundColor(autoResignEnabled ? .teal : .secondary)
+
+                    Text("迁移后重签名".localized)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    Toggle("", isOn: $autoResignEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+
+                    HelpButton(content: """
+                    **什么是重签名？**
+
+                    数据目录迁移到外部存储后，macOS 可能认为应用已被修改，在 Finder 中提示「已损坏」或「无法打开」。
+
+                    开启此选项后，AppPorts 会在数据迁移完成后自动对关联应用执行 **Ad-hoc 自签名**，绕过此限制。
+
+                    **可能的影响：**
+                    • 应用原有的 Developer ID 签名将被替换
+                    • 部分依赖签名验证的功能（如 Keychain 访问）可能受限
+                    • 应用更新后可能需要重新迁移数据
+
+                    如需恢复原始签名，可在应用列表中右键选择「恢复原始签名」。
+                    """.localized)
+                }
+                .help("数据迁移完成后，自动对关联应用执行 Ad-hoc 重签名，避免 Finder 提示「已损坏」".localized)
+
+                // 恢复原始签名按钮（仅应用数据 Tab 且选中已重签名应用时可见）
+                if selectedTab == .appDirs, let app = selectedApp, app.isResigned {
+                    Button(action: { onRestoreSignature?(app) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 11))
+                            Text("恢复原始签名".localized)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.teal)
+                    .help("恢复选中应用的原始代码签名".localized)
+                }
 
                 // 刷新按钮
                 Button(action: reloadCurrentTab) {
@@ -162,11 +246,33 @@ struct DataDirsView: View {
         } message: {
             Text(managedLinkNormalizationMessage)
         }
+        .alert("迁移风险提示".localized, isPresented: $showMigrationRiskAlert) {
+            Button("继续".localized, role: .none) {
+                if let item = pendingMigrationItem, let destPath = pendingMigrationDestinationPath {
+                    presentMigrationConfirmation(for: item, destinationPath: destPath)
+                }
+            }
+            Button("取消".localized, role: .cancel) {
+                clearPendingMigrationConfirmation()
+            }
+        } message: {
+            Text(migrationRiskMessage)
+        }
         // 错误弹窗
         .alert("操作失败".localized, isPresented: $showError) {
             Button("好的".localized, role: .cancel) {}
         } message: {
             Text(errorMessage)
+        }
+        .alert("需要 App 管理权限".localized, isPresented: $showPermissionAlert) {
+            Button("打开系统设置".localized) {
+                openAppManagementSettings()
+            }
+            Button("稍后".localized, role: .cancel) {
+                skipPermissionCheck = true
+            }
+        } message: {
+            Text("AppPorts 需要「App 管理」权限才能迁移应用数据。请在系统设置中勾选 AppPorts，然后重启应用。".localized)
         }
         // 进度覆盖层
         .overlay {
@@ -237,12 +343,20 @@ struct DataDirsView: View {
             // 左侧：应用选择列表
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Image(systemName: "app.badge")
-                        .font(.system(size: 14))
-                        .foregroundColor(.accentColor)
-                    Text("选择应用".localized)
-                        .font(.system(size: 13, weight: .semibold))
-                    Spacer()
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    TextField("搜索应用...".localized, text: $appSearchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                    if !appSearchText.isEmpty {
+                        Button(action: { appSearchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if !localApps.isEmpty {
                         let count = localApps.filter { !$0.isFolder }.count
                         Text("\(count)")
@@ -254,18 +368,64 @@ struct DataDirsView: View {
                             .clipShape(Capsule())
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(.regularMaterial)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
                 Divider()
 
                 if localApps.isEmpty {
                     ContentView.EmptyStateView(icon: "app.dashed", text: "无本地应用".localized)
                 } else {
-                    let filteredApps = localApps.filter { !$0.isFolder }
+                    let filteredApps = localApps.filter { app in
+                        !app.isFolder && (appSearchText.isEmpty || app.displayName.localizedCaseInsensitiveContains(appSearchText) || app.name.localizedCaseInsensitiveContains(appSearchText))
+                    }
+                    let sortedApps: [AppItem] = {
+                        switch selectedAppSortMode {
+                        case .size:
+                            return filteredApps.sorted { lhs, rhs in
+                                if lhs.sizeBytes != rhs.sizeBytes { return lhs.sizeBytes > rhs.sizeBytes }
+                                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+                            }
+                        case .alphabetical:
+                            return filteredApps.sorted {
+                                $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+                            }
+                        }
+                    }()
+
+                    // 排序切换按钮
+                    HStack(spacing: 6) {
+                        Menu {
+                            ForEach(AppSortMode.allCases, id: \.self) { mode in
+                                Button(action: { selectedAppSortMode = mode }) {
+                                    HStack {
+                                        Text(mode.rawValue.localized)
+                                        Spacer()
+                                        if selectedAppSortMode == mode {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .font(.system(size: 10))
+                                Text(selectedAppSortMode.rawValue.localized)
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+
                     ScrollView {
                         LazyVStack(spacing: 2) {
-                            ForEach(filteredApps, id: \.id) { app in
+                            ForEach(sortedApps, id: \.id) { app in
                                 AppListRow(app: app, isSelected: selectedApp?.id == app.id)
                                     .onTapGesture { selectedApp = app }
                             }
@@ -279,6 +439,14 @@ struct DataDirsView: View {
             .onChange(of: selectedApp) { newApp in
                 if let app = newApp { scanLibraryDirs(for: app) }
                 else { libraryItems = [] }
+            }
+            .onChange(of: localApps) { newApps in
+                // 重签名/迁移后刷新 selectedApp，避免持有旧的 isResigned 等字段
+                // 用 path 匹配而非 id（id 每次扫描都是新 UUID）
+                if let selected = selectedApp,
+                   let refreshed = newApps.first(where: { $0.path == selected.path }) {
+                    selectedApp = refreshed
+                }
             }
 
             // 右侧：关联数据目录
@@ -302,8 +470,8 @@ struct DataDirsView: View {
                     }
                 }
                 .font(.headline)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
                 .background(.ultraThinMaterial)
                 Divider()
 
@@ -328,22 +496,22 @@ struct DataDirsView: View {
                         ContentView.EmptyStateView(icon: "line.3.horizontal.decrease.circle", text: "没有匹配当前筛选条件的数据目录".localized)
                     } else {
                         ScrollView {
-                            LazyVStack(spacing: 4) {
-                                ForEach(sortedFilteredLibraryItems) { item in
-                                    DataDirRowView(
-                                        item: item,
-                                        isSelected: selectedItemID == item.id,
-                                        onMigrate: { askMigrate($0) },
-                                        onRestore: { askRestore($0) },
-                                        onManageExistingLink: { askManageExistingLink($0) },
-                                        onNormalizeManagedLink: { askNormalizeManagedLink($0) },
-                                        onRelinkExternalData: { askRelinkExternalData($0) }
+                            LazyVStack(spacing: 10) {
+                                ForEach(groupedLibraryItems, id: \.type) { group in
+                                    DataDirGroupCard(
+                                        group: group,
+                                        selectedItemID: selectedItemID,
+                                        onSelect: { selectedItemID = $0 },
+                                        onMigrate: askMigrate,
+                                        onRestore: askRestore,
+                                        onManageExistingLink: askManageExistingLink,
+                                        onNormalizeManagedLink: askNormalizeManagedLink,
+                                        onRelinkExternalData: askRelinkExternalData
                                     )
-                                    .onTapGesture { selectedItemID = item.id }
-                                    .padding(.horizontal, 10)
                                 }
                             }
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
                         }
                     }
                 }
@@ -505,7 +673,13 @@ struct DataDirsView: View {
     }
 
     private func statsBar(items: [DataDirItem]) -> some View {
-        let total = items.filter { $0.status == "本地" }.reduce(0) { $0 + $1.sizeBytes }
+        // 只统计根级项大小，避免父目录大小与子目录大小重复计入
+        let standardizedPaths = items.map { $0.path.standardizedFileURL.path }
+        let rootItems = items.filter { item in
+            let path = item.path.standardizedFileURL.path
+            return !standardizedPaths.contains { $0 != path && path.hasPrefix($0 + "/") }
+        }
+        let total = rootItems.filter { $0.status == "本地" }.reduce(0) { $0 + $1.sizeBytes }
         let linked = items.filter { $0.status == "已链接" }.count
         let needsNormalization = items.filter { $0.status == "待规范" }.count
         let existingSymlinks = items.filter { $0.status == "现有软链" }.count
@@ -545,14 +719,43 @@ struct DataDirsView: View {
         .overlay(Rectangle().frame(height: 1).foregroundColor(Color.primary.opacity(0.05)), alignment: .bottom)
     }
 
+    /// 递归渲染树形数据目录项
+    private func treeItemView(item: DataDirItem, level: Int) -> TreeItemView {
+        TreeItemView(
+            item: item,
+            level: level,
+            isSelected: selectedItemID == item.id,
+            onSelect: { selectedItemID = $0 },
+            onMigrate: askMigrate,
+            onRestore: askRestore,
+            onManageExistingLink: askManageExistingLink,
+            onNormalizeManagedLink: askNormalizeManagedLink,
+            onRelinkExternalData: askRelinkExternalData
+        )
+    }
+
     private var filteredLibraryItems: [DataDirItem] {
         libraryItems.filter(matchesAppDataFilters)
+    }
+
+    /// 链接状态优先级：已链接、待规范、现有软链优先展示
+    private let statusPriority: [String] = ["已链接", "待规范", "现有软链", "待接回", "本地", "未找到"]
+
+    private func statusSortKey(_ status: String) -> Int {
+        statusPriority.firstIndex(of: status) ?? statusPriority.count
     }
 
     private var sortedFilteredLibraryItems: [DataDirItem] {
         switch selectedAppDataSortMode {
         case .defaultOrder:
-            return filteredLibraryItems
+            // 已迁移路径在前，然后按大小降序
+            return filteredLibraryItems.sorted { lhs, rhs in
+                let lhsKey = statusSortKey(lhs.status)
+                let rhsKey = statusSortKey(rhs.status)
+                if lhsKey != rhsKey { return lhsKey < rhsKey }
+                if lhs.sizeBytes != rhs.sizeBytes { return lhs.sizeBytes > rhs.sizeBytes }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
         case .size:
             return filteredLibraryItems.sorted { lhs, rhs in
                 if lhs.sizeBytes != rhs.sizeBytes {
@@ -565,6 +768,55 @@ struct DataDirsView: View {
                 lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
         }
+    }
+
+    private var groupedLibraryItems: [DataDirGroup] {
+        let sorted = sortedFilteredLibraryItems
+        var groups: [DataDirType: [DataDirItem]] = [:]
+        for item in sorted {
+            groups[item.type, default: []].append(item)
+        }
+        let typeOrder = DataDirType.allCases
+        return typeOrder.compactMap { type in
+            guard let items = groups[type], !items.isEmpty else { return nil }
+            return DataDirGroup(type: type, items: buildTree(from: items))
+        }
+    }
+
+    /// 将扁平列表构建成树形结构。
+    ///
+    /// 路径被另一个项路径包含的条目会被嵌套为子节点。
+    private func buildTree(from items: [DataDirItem]) -> [DataDirItem] {
+        // 按路径深度排序：确保父节点（短路径）在子节点（长路径）之前处理，
+        // 否则子节点会同时作为顶层节点和父节点的子节点出现，造成重复条目。
+        let sorted = items.sorted { lhs, rhs in
+            lhs.path.standardizedFileURL.pathComponents.count < rhs.path.standardizedFileURL.pathComponents.count
+        }
+        var result: [DataDirItem] = []
+        var nestedIDs: Set<String> = []
+
+        for var parent in sorted {
+            guard !nestedIDs.contains(parent.id) else { continue }
+
+            let parentPath = parent.path.standardizedFileURL.path
+            var directChildren: [DataDirItem] = []
+
+            for child in items where child.id != parent.id && !nestedIDs.contains(child.id) {
+                let childPath = child.path.standardizedFileURL.path
+                if childPath.hasPrefix(parentPath + "/") {
+                    directChildren.append(child)
+                    nestedIDs.insert(child.id)
+                }
+            }
+
+            if !directChildren.isEmpty {
+                parent.children = buildTree(from: directChildren)
+            }
+
+            result.append(parent)
+        }
+
+        return result
     }
 
     private var hasActiveAppDataFilters: Bool {
@@ -671,7 +923,7 @@ struct DataDirsView: View {
         AppLogger.shared.logContext("开始扫描工具目录", details: [("scan_id", scanID)])
         Task.detached(priority: .userInitiated) {
             let scanner = DataDirScanner()
-            var items = await scanner.scanKnownDotFolders()
+            let items = await scanner.scanKnownDotFolders()
             let initialItems = items
 
             await MainActor.run {
@@ -687,20 +939,28 @@ struct DataDirsView: View {
                 ]
             )
 
-            // 后台逐个计算大小
-            for i in items.indices {
-                let sizeBytes = await scanner.calculateSize(for: items[i])
-                let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
-                let itemID = items[i].id
-                await MainActor.run {
-                    if let idx = self.dotFolderItems.firstIndex(where: { $0.id == itemID }) {
-                        withAnimation {
-                            self.dotFolderItems[idx].size = sizeStr
-                            self.dotFolderItems[idx].sizeBytes = sizeBytes
-                        }
+            // 并行计算所有目录大小（TaskGroup，非 actor 隔离的 fastDirectorySize）
+            let sizedItems = await withTaskGroup(of: (Int, Int64).self) { group in
+                for i in items.indices {
+                    let scanURL = items[i].linkedDestination ?? items[i].path
+                    group.addTask {
+                        (i, fastDirectorySize(at: scanURL))
                     }
                 }
-                items[i].sizeBytes = sizeBytes
+                var results: [(Int, Int64)] = []
+                for await result in group { results.append(result) }
+                return results
+            }
+
+            await MainActor.run {
+                for (i, sizeBytes) in sizedItems {
+                    guard i < self.dotFolderItems.count else { continue }
+                    let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
+                    withAnimation {
+                        self.dotFolderItems[i].size = sizeStr
+                        self.dotFolderItems[i].sizeBytes = sizeBytes
+                    }
+                }
             }
         }
     }
@@ -722,11 +982,10 @@ struct DataDirsView: View {
         )
         Task.detached(priority: .userInitiated) {
             let scanner = DataDirScanner()
-            var items = await scanner.scanLibraryDirs(for: app, externalRootURL: selectedExternalRoot)
-            let initialItems = items
+            let items = await scanner.scanLibraryDirs(for: app, externalRootURL: selectedExternalRoot)
 
             await MainActor.run {
-                self.libraryItems = initialItems
+                self.libraryItems = items
                 self.isScanning = false
             }
             AppLogger.shared.logContext(
@@ -739,20 +998,28 @@ struct DataDirsView: View {
                 ]
             )
 
-            // 后台逐个计算大小
-            for i in items.indices {
-                let sizeBytes = await scanner.calculateSize(for: items[i])
-                let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
-                let itemID = items[i].id
-                await MainActor.run {
-                    if let idx = self.libraryItems.firstIndex(where: { $0.id == itemID }) {
-                        withAnimation {
-                            self.libraryItems[idx].size = sizeStr
-                            self.libraryItems[idx].sizeBytes = sizeBytes
-                        }
+            // 并行计算所有目录大小
+            let sizedItems = await withTaskGroup(of: (Int, Int64).self) { group in
+                for i in items.indices {
+                    let scanURL = items[i].linkedDestination ?? items[i].path
+                    group.addTask {
+                        (i, fastDirectorySize(at: scanURL))
                     }
                 }
-                items[i].sizeBytes = sizeBytes
+                var results: [(Int, Int64)] = []
+                for await result in group { results.append(result) }
+                return results
+            }
+
+            await MainActor.run {
+                for (i, sizeBytes) in sizedItems {
+                    guard i < self.libraryItems.count else { continue }
+                    let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
+                    withAnimation {
+                        self.libraryItems[i].size = sizeStr
+                        self.libraryItems[i].sizeBytes = sizeBytes
+                    }
+                }
             }
         }
     }
@@ -771,7 +1038,35 @@ struct DataDirsView: View {
             return
         }
 
+        // 检查关联应用是否正在运行
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再迁移其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+
+        // 检查 App 管理权限
+        if !skipPermissionCheck && !hasAppManagementPermission() {
+            AppLogger.shared.logContext(
+                "缺少 App 管理权限，提示用户授权",
+                details: [("item_name", item.name)],
+                level: "WARN"
+            )
+            showPermissionAlert = true
+            return
+        }
+
         let destPath = suggestedDestinationPath(for: item, under: dest)
+
+        // 沙盒容器子目录迁移风险警告
+        if let warning = item.migrationWarning {
+            pendingMigrationItem = item
+            pendingMigrationDestinationPath = destPath
+            migrationRiskMessage = warning
+            showMigrationRiskAlert = true
+            return
+        }
+
         if selectedTab == .appDirs {
             pendingMigrationItem = item
             pendingMigrationDestinationPath = destPath
@@ -783,18 +1078,19 @@ struct DataDirsView: View {
     }
 
     private func askRestore(_ item: DataDirItem) {
-        let linkedDest = item.linkedDestination?.path ?? "（未知）"
+        // 检查关联应用是否正在运行
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再还原其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+
+        let linkedDest = item.linkedDestination?.path ?? "（未知）".localized
 
         confirmTitle = "还原数据目录".localized
         confirmActionTitle = "继续".localized
-        confirmMessage = """
-        将「\(item.name)」从外部存储还原到本地。
-
-        外部路径：\(linkedDest)
-        还原到：\(item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-
-        还原完成后，外部存储中的副本将被删除。
-        """
+        confirmMessage = String(format: "将「%@」从外部存储还原到本地。\n\n外部路径：%@\n还原到：%@\n\n还原完成后，外部存储中的副本将被删除。".localized,
+            item.name, linkedDest, item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
         confirmAction = { performRestore(item) }
         showConfirm = true
     }
@@ -813,19 +1109,20 @@ struct DataDirsView: View {
 
         confirmTitle = "现有软链".localized
         confirmActionTitle = "规范化管理".localized
-        confirmMessage = """
-        检测到「\(item.name)」已经是一个现有软链。
-
-        软链路径：\(item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-        目标路径：\(linkedDest.path)
-
-        选择「规范化管理」后，AppPorts 会将这条软链接纳入受管状态，后续可直接还原。
-        """
+        confirmMessage = String(format: "检测到「%@」已经是一个现有软链。\n\n软链路径：%@\n目标路径：%@\n\n选择「规范化管理」后，AppPorts 会将这条软链接纳入受管状态，后续可直接还原。".localized,
+            item.name, item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), linkedDest.path)
         confirmAction = { queueManagedLinkNormalization(item, currentTarget: linkedDest) }
         showConfirm = true
     }
 
     private func askNormalizeManagedLink(_ item: DataDirItem) {
+        // 检查关联应用是否正在运行
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再整理其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+
         guard let linkedDest = item.linkedDestination else {
             AppLogger.shared.logError(
                 "请求规范化受管软链失败：无法读取目标路径",
@@ -841,14 +1138,8 @@ struct DataDirsView: View {
 
         confirmTitle = "整理已链接目录".localized
         confirmActionTitle = "继续".localized
-        confirmMessage = """
-        检测到「\(item.name)」已经由 AppPorts 接管，但外部目标仍位于旧路径。
-
-        当前外部路径：\(linkedDest.path)
-        规范后路径：\(normalizedTarget.path)
-
-        继续后将进入二次确认，并执行真实迁移。
-        """
+        confirmMessage = String(format: "检测到「%@」已经由 AppPorts 接管，但外部目标仍位于旧路径。\n\n当前外部路径：%@\n规范后路径：%@\n\n继续后将进入二次确认，并执行真实迁移。".localized,
+            item.name, linkedDest.path, normalizedTarget.path)
         confirmAction = { queueManagedLinkNormalization(item, currentTarget: linkedDest) }
         showConfirm = true
     }
@@ -863,14 +1154,8 @@ struct DataDirsView: View {
 
         managedLinkNormalizationItem = item
         managedLinkNormalizationCurrentTarget = currentTarget
-        managedLinkNormalizationMessage = """
-        请确认是否继续规范化管理「\(item.name)」。
-
-        现在的路径：\(currentPath)
-        规范后路径：\(normalizedPath)
-
-        \(note)
-        """
+        managedLinkNormalizationMessage = String(format: "请确认是否继续规范化管理「%@」。\n\n现在的路径：%@\n规范后路径：%@\n\n%@".localized,
+            item.name, currentPath, normalizedPath, note)
         showConfirm = false
         DispatchQueue.main.async {
             self.showManagedLinkNormalizationConfirm = true
@@ -878,6 +1163,13 @@ struct DataDirsView: View {
     }
 
     private func askRelinkExternalData(_ item: DataDirItem) {
+        // 检查关联应用是否正在运行
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再接回其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+
         guard let linkedDest = item.linkedDestination else {
             AppLogger.shared.logError(
                 "请求接回外部数据失败：无法读取目标路径",
@@ -891,14 +1183,8 @@ struct DataDirsView: View {
 
         confirmTitle = "接回外部数据".localized
         confirmActionTitle = "接回".localized
-        confirmMessage = """
-        检测到「\(item.name)」的数据目录已存在于外部存储，但本地原路径尚未建立链接。
-
-        本地原路径：\(item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-        外部目录：\(linkedDest.path)
-
-        选择「接回」后，AppPorts 会在原路径补建符号链接，并将其纳入受管状态。
-        """
+        confirmMessage = String(format: "检测到「%@」的数据目录已存在于外部存储，但本地原路径尚未建立链接。\n\n本地原路径：%@\n外部目录：%@\n\n选择「接回」后，AppPorts 会在原路径补建符号链接，并将其纳入受管状态。".localized,
+            item.name, item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), linkedDest.path)
         confirmAction = { performRelinkExternalData(item, target: linkedDest) }
         showConfirm = true
     }
@@ -921,6 +1207,11 @@ struct DataDirsView: View {
         )
 
         Task {
+            // 如果开启了迁移后重签名，先备份原始签名（在迁移前）
+            if self.autoResignEnabled, let app = self.selectedApp {
+                self.onBackupSignature?(app)
+            }
+
             let mover = DataDirMover()
             do {
                 try await mover.migrate(item: item, to: dest) { progress in
@@ -937,6 +1228,11 @@ struct DataDirsView: View {
                 await MainActor.run {
                     self.showProgress = false
                     self.reloadCurrentTab()
+
+                    // 数据迁移完成后自动重签名关联应用
+                    if self.autoResignEnabled, let app = self.selectedApp {
+                        self.onResignApp?(app, true)  // 静默重签名，失败不弹窗
+                    }
                 }
             } catch {
                 AppLogger.shared.logError(
@@ -947,6 +1243,7 @@ struct DataDirsView: View {
                 )
                 await MainActor.run {
                     self.showProgress = false
+                    self.refreshSelectedApp()
                     self.errorMessage = error.localizedDescription
                     self.showError = true
                 }
@@ -959,14 +1256,8 @@ struct DataDirsView: View {
 
         confirmTitle = "迁移数据目录".localized
         confirmActionTitle = "继续".localized
-        confirmMessage = """
-        将「\(item.name)」迁移到外部存储\(sizeInfo)。
-
-        源路径：\(item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-        目标路径：\(destinationPath.path)
-
-        迁移完成后，原路径将自动变成符号链接，相关工具无需任何修改即可继续使用。
-        """
+        confirmMessage = String(format: "将「%@」迁移到外部存储%@。\n\n源路径：%@\n目标路径：%@\n\n迁移完成后，原路径将自动变成符号链接，相关工具无需任何修改即可继续使用。".localized,
+            item.name, sizeInfo, item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), destinationPath.path)
         confirmAction = { performMigrate(item, to: destinationPath.deletingLastPathComponent()) }
         showConfirm = true
     }
@@ -1155,6 +1446,80 @@ struct DataDirsView: View {
         managedLinkNormalizationCurrentTarget = nil
         managedLinkNormalizationMessage = ""
     }
+
+    // MARK: - 权限与运行检查
+
+    /// 从 localApps 中刷新 selectedApp，确保 isResigned 等字段为最新
+    private func refreshSelectedApp() {
+        if let selected = selectedApp,
+           let refreshed = localApps.first(where: { $0.path == selected.path }) {
+            selectedApp = refreshed
+        }
+    }
+
+    /// 检查数据目录关联的应用是否正在运行
+    ///
+    /// - 应用数据 Tab：检查 `selectedApp` 是否正在运行
+    /// - 工具目录 Tab：尝试从目录路径中匹配正在运行的进程（基于 bundle ID 或路径名）
+    ///
+    /// - Returns: 正在运行的应用显示名称，未运行则返回 nil
+    private func runningAssociatedAppName(for item: DataDirItem) -> String? {
+        let runningApps = NSWorkspace.shared.runningApplications
+
+        // 应用数据 Tab：精确匹配当前选中的应用
+        if selectedTab == .appDirs, let app = selectedApp {
+            let appPath = app.path
+            let isRunning = runningApps.contains { runningApp in
+                return runningApp.bundleURL?.standardizedFileURL == appPath.standardizedFileURL
+                    || runningApp.bundleIdentifier == bundleIdentifier(for: app)
+            }
+            if isRunning {
+                AppLogger.shared.logContext(
+                    "拒绝操作：关联应用正在运行",
+                    details: [("app_name", app.displayName), ("app_path", appPath.path), ("item_name", item.name)],
+                    level: "WARN"
+                )
+                return app.displayName
+            }
+            return nil
+        }
+
+        // 工具目录 Tab：尝试从目录路径或名称推断关联进程
+        // 例如 ~/.npm → 检查 node/npm 进程（但通常工具目录不需要强制检查）
+        // 当前不做强制阻断，因为工具目录通常不与单个 .app 绑定
+        return nil
+    }
+
+    /// 读取应用的 Bundle Identifier
+    private func bundleIdentifier(for app: AppItem) -> String? {
+        let plistURL = app.path.appendingPathComponent("Contents/Info.plist")
+        guard let dict = NSDictionary(contentsOf: plistURL) as? [String: Any] else { return nil }
+        return dict["CFBundleIdentifier"] as? String
+    }
+
+    /// 检测当前进程是否有 App 管理权限
+    ///
+    /// 通过尝试在 /Applications/ 创建测试文件来判断。
+    /// App 管理权限（kTCCServiceSystemPolicyAppBundles）控制对 /Applications 的写入。
+    private func hasAppManagementPermission() -> Bool {
+        let testFile = URL(fileURLWithPath: "/Applications/.appports-permission-test")
+        do {
+            try Data().write(to: testFile, options: .atomic)
+            try FileManager.default.removeItem(at: testFile)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 打开系统设置的 App 管理面板
+    private func openAppManagementSettings() {
+        let venturaURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement")
+        let legacyURL = URL(string: "x-apple.systempreferences:com.apple.preference.security")
+
+        if let url = venturaURL, NSWorkspace.shared.open(url) { return }
+        if let url = legacyURL { NSWorkspace.shared.open(url) }
+    }
 }
 
 // MARK: - 应用选择列表行
@@ -1181,6 +1546,27 @@ private struct AppListRow: View {
                 .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                 .foregroundColor(isSelected ? .primary : .primary.opacity(0.85))
                 .lineLimit(1)
+
+            // 已重签名标记
+            if app.isResigned {
+                Image(systemName: "seal.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(.teal)
+                    .help("此应用已被 Ad-hoc 重签名".localized)
+            }
+
+            // Sparkle/Electron 标记
+            if app.isSparkleApp {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 9))
+                    .foregroundColor(.teal.opacity(0.7))
+                    .help("Sparkle 自更新应用".localized)
+            } else if app.isElectronApp {
+                Image(systemName: "atom")
+                    .font(.system(size: 9))
+                    .foregroundColor(.indigo.opacity(0.7))
+                    .help("Electron 应用".localized)
+            }
 
             Spacer()
 
@@ -1257,5 +1643,140 @@ struct DataDirProgressOverlay: View {
 
     private func formatBytes(_ bytes: Int64) -> String {
         LocalizedByteCountFormatter.string(fromByteCount: bytes)
+    }
+}
+
+// MARK: - 树形目录项递归视图
+
+/// 递归渲染带子节点的数据目录项。
+/// 独立 struct 避免 `@ViewBuilder func -> some View` 的递归类型推断限制。
+struct TreeItemView: View {
+    let item: DataDirItem
+    let level: Int
+    let isSelected: Bool
+    let onSelect: (String) -> Void
+    let onMigrate: (DataDirItem) -> Void
+    let onRestore: (DataDirItem) -> Void
+    let onManageExistingLink: (DataDirItem) -> Void
+    let onNormalizeManagedLink: (DataDirItem) -> Void
+    let onRelinkExternalData: (DataDirItem) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            DataDirRowView(
+                item: item,
+                isSelected: isSelected,
+                level: level,
+                onMigrate: onMigrate,
+                onRestore: onRestore,
+                onManageExistingLink: onManageExistingLink,
+                onNormalizeManagedLink: onNormalizeManagedLink,
+                onRelinkExternalData: onRelinkExternalData
+            )
+            .onTapGesture { onSelect(item.id) }
+
+            ForEach(item.children) { child in
+                TreeItemView(
+                    item: child,
+                    level: level + 1,
+                    isSelected: isSelected,
+                    onSelect: onSelect,
+                    onMigrate: onMigrate,
+                    onRestore: onRestore,
+                    onManageExistingLink: onManageExistingLink,
+                    onNormalizeManagedLink: onNormalizeManagedLink,
+                    onRelinkExternalData: onRelinkExternalData
+                )
+            }
+        }
+    }
+}
+
+// MARK: - 分组卡片视图
+
+/// 按数据类型分组的卡片视图，内部使用扁平列表展示
+struct DataDirGroupCard: View {
+    let group: DataDirGroup
+    let selectedItemID: String?
+    let onSelect: (String) -> Void
+    let onMigrate: (DataDirItem) -> Void
+    let onRestore: (DataDirItem) -> Void
+    let onManageExistingLink: (DataDirItem) -> Void
+    let onNormalizeManagedLink: (DataDirItem) -> Void
+    let onRelinkExternalData: (DataDirItem) -> Void
+
+    @State private var isCollapsed = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 卡片头部
+            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.toggle() } }) {
+                HStack(spacing: 10) {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: 12)
+
+                    Image(systemName: group.type.icon)
+                        .font(.system(size: 13))
+                        .foregroundColor(.accentColor)
+                        .frame(width: 18)
+
+                    Text(group.type.rawValue.localized)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+
+                    Text("\(group.items.count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(Capsule())
+
+                    if group.totalSizeBytes > 0 {
+                        Text(LocalizedByteCountFormatter.string(fromByteCount: group.totalSizeBytes))
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // 卡片内容
+            if !isCollapsed {
+                Divider()
+                    .padding(.horizontal, 14)
+
+                VStack(spacing: 1) {
+                    ForEach(group.items) { item in
+                        TreeItemView(
+                            item: item,
+                            level: 0,
+                            isSelected: selectedItemID == item.id,
+                            onSelect: onSelect,
+                            onMigrate: onMigrate,
+                            onRestore: onRestore,
+                            onManageExistingLink: onManageExistingLink,
+                            onNormalizeManagedLink: onNormalizeManagedLink,
+                            onRelinkExternalData: onRelinkExternalData
+                        )
+                    }
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 6)
+            }
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }

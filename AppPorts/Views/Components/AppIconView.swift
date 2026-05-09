@@ -8,36 +8,12 @@
 import SwiftUI
 import AppKit
 
-// MARK: - 应用图标视图
-
 /// 应用图标异步加载视图
-///
-/// 使用 Swift 并发模型异步加载应用图标，避免阻塞主线程。
-/// 提供流畅的列表滚动体验，即使加载大量应用图标。
-///
-/// ## 性能优化
-/// - ✅ 异步加载：使用 `Task.detached` 在后台线程加载图标
-/// - ✅ 延迟加载：只在视图出现时才开始加载（`.task` 修饰符）
-/// - ✅ 缓存友好：NSWorkspace 内部缓存图标，重复访问速度快
-///
-/// ## 使用示例
-/// ```swift
-/// List(apps) { app in
-///     HStack {
-///         AppIconView(url: app.path)  // 自动异步加载图标
-///         Text(app.name)
-///     }
-/// }
-/// ```
-///
-/// - Note: 图标大小固定为 40x40 点，使用阴影增强视觉效果
 struct AppIconView: View {
-    /// 应用包的 URL
     let url: URL
-    
-    /// 加载的图标（初始为 nil，异步加载后更新）
+
     @State private var icon: NSImage? = nil
-    
+
     var body: some View {
         Group {
             if let icon = icon {
@@ -45,21 +21,95 @@ struct AppIconView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                // Placeholder while loading
                 Color.clear
             }
         }
         .frame(width: 40, height: 40)
         .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
         .accessibilityHidden(true)
-        .task {
-            // Async icon loading
-            if icon == nil {
-                let loadedIcon = await Task.detached(priority: .userInitiated) {
-                    return NSWorkspace.shared.icon(forFile: url.path)
-                }.value
-                await MainActor.run { self.icon = loadedIcon }
+        .task(id: url) {
+            let loaded = Self.loadIcon(from: url)
+            icon = loaded
+            if loaded == nil {
+                AppLogger.shared.logContext(
+                    "AppIconView 图标加载失败",
+                    details: [
+                        ("url", url.path),
+                        ("exists", FileManager.default.fileExists(atPath: url.path) ? "YES" : "NO"),
+                        ("resolved", url.resolvingSymlinksInPath().path)
+                    ],
+                    level: "WARN"
+                )
             }
         }
+    }
+
+    private static func loadIcon(from appURL: URL) -> NSImage? {
+        let fm = FileManager.default
+        let path = appURL.path
+
+        // 方式 1: NSWorkspace
+        if fm.fileExists(atPath: path) {
+            let icon = NSWorkspace.shared.icon(forFile: path)
+            // 检查是否为 iOS app（有 Wrapper/WrappedBundle），尝试提取真实图标
+            if let iosIcon = loadIOSAppIcon(from: appURL) {
+                return iosIcon
+            }
+            return icon
+        }
+
+        // 方式 2: 解析符号链接后重试
+        let resolved = appURL.resolvingSymlinksInPath()
+        if resolved.path != path, fm.fileExists(atPath: resolved.path) {
+            return NSWorkspace.shared.icon(forFile: resolved.path)
+        }
+
+        // 方式 3: 从 bundle .icns 直接读取
+        for tryPath in [path, resolved.path] {
+            guard fm.fileExists(atPath: tryPath) else { continue }
+            guard let plist = NSDictionary(contentsOfFile: tryPath + "/Contents/Info.plist"),
+                  let iconFile = plist["CFBundleIconFile"] as? String else { continue }
+            let icnsName = iconFile.hasSuffix(".icns") ? iconFile : iconFile + ".icns"
+            let icnsPath = tryPath + "/Contents/Resources/" + icnsName
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: icnsPath)),
+               let img = NSImage(data: data) {
+                return img
+            }
+        }
+
+        // 最终回退
+        return NSWorkspace.shared.icon(forFile: path)
+    }
+
+    /// 从 iOS app 的 Wrapper/ 目录提取 AppIcon PNG
+    private static func loadIOSAppIcon(from appURL: URL) -> NSImage? {
+        let fm = FileManager.default
+        let wrapperDir: URL
+        if fm.fileExists(atPath: appURL.appendingPathComponent("Wrapper").path) {
+            wrapperDir = appURL.appendingPathComponent("Wrapper")
+        } else if fm.fileExists(atPath: appURL.appendingPathComponent("WrappedBundle").path) {
+            wrapperDir = appURL.appendingPathComponent("WrappedBundle")
+        } else {
+            return nil
+        }
+
+        // 查找内部 .app
+        guard let innerApps = try? fm.contentsOfDirectory(at: wrapperDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
+              let innerApp = innerApps.first(where: { $0.pathExtension == "app" }) else {
+            return nil
+        }
+
+        // 查找最大的 AppIcon PNG
+        guard let iconFiles = try? fm.contentsOfDirectory(at: innerApp, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
+              let largestIcon = iconFiles
+                .filter({ $0.lastPathComponent.hasPrefix("AppIcon") && $0.pathExtension == "png" })
+                .max(by: { a, b in
+                    (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) ?? 0 <
+                    (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) ?? 0
+                }) else {
+            return nil
+        }
+
+        return NSImage(contentsOf: largestIcon)
     }
 }

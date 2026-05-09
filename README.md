@@ -21,19 +21,17 @@ Easily migrate large applications to external storage while maintaining seamless
          alt="Featured｜HelloGitHub"
          width="250" height="54">
   </a>
-</div> 
-
-
+</div>
 
 </div>
 
----      
+---
 
 ## ✨ Introduction
 
-Mac's built-in storage space is extremely precious. **AppPorts** allows you to move applications from your `/Applications` directory to an external drive (SSD, SD Card, or NAS) with a single click, while keeping a valid **App Portal** in the original location.
+Mac's built-in storage space is extremely precious. **AppPorts** allows you to move applications from your `/Applications` directory to an external drive (SSD, SD Card, or NAS) with a single click, while keeping a tiny **launcher stub** in the original location.
 
-To macOS, the app still "exists" locally, allowing you to launch it as usual, but the storage occupied is on inexpensive external media.
+To macOS, the app still "exists" locally, allowing you to launch it as usual, but the actual storage is on the external drive. The local stub is so small it's negligible — and Finder shows **no shortcut arrow**.
 
 ### ⚠️ "AppPorts" is damaged and can't be opened
 If you encounter this error (and macOS suggests moving it to the Trash) when opening the app, it is because the application is not signed with an Apple Developer ID.
@@ -55,41 +53,44 @@ xattr -rd com.apple.quarantine /Applications/AppPorts.app
 
 ## 🚀 Key Features
 
-* **📦 App Slimming**: One-click migration of multi-gigabyte applications such as Logic Pro, Xcode, and games to external storage.
-* **🔗 Contents Linking**: Keeps the `.app` bundle structure locally and links only the internal `Contents` directory to the external drive. Local disk usage is usually negligible, Finder shows no shortcut arrow, and the result works with the **"App Menu"** in macOS 26.
-* **🛡️ Safety First**: Automatically identifies and locks **System Apps**, and checks the **Running Status** before migration to avoid damaging active applications.
-* **↩️ Restore Anytime**: Click **Restore** to move the application back to the local disk and remove the symbolic link automatically.
-* **🎨 Modern UI**: Built natively with SwiftUI, fully supports **Dark Mode**, and supports **Bi-lingual** (English/Chinese) switching via system or in-app menu.
-* **♿️ Accessibility Plus**: Includes **VoiceOver**-friendly row announcements, clearer semantic UI, and a **Braille** language option that displays interface text directly in Braille dots.
-* **🌍 Global Ready**: Supports 20+ languages including 🇺🇸 English, 🇨🇳 Simplified Chinese, 🇭🇰 Traditional Chinese, 🇯🇵 Japanese, 🇰🇷 Korean, 🇩🇪 German, 🇫🇷 French, 🇪🇸 Spanish, 🇮🇹 Italian, 🇵🇹 Portuguese, 🇷🇺 Russian, 🇸🇦 Arabic, 🇮🇳 Hindi, 🇻🇳 Vietnamese, 🇹🇭 Thai, 🇹🇷 Turkish, 🇳🇱 Dutch, 🇵🇱 Polish, 🇮🇩 Indonesian, 🏁 Esperanto, and ⠃⠗ Braille. File sizes also respect localized formatting rules.
-* **🔍 Quick Search**: Built-in search bar for quickly locating local or external applications.
+* **📦 Arrow-Free Migration**: One-click migration of multi-gigabyte applications to external storage. A tiny launcher stub stays locally — Finder shows no shortcut arrow, Launchpad and macOS App Menu work perfectly.
+* **🛡️ Auto-Update Protection**: Automatically detects self-updating apps (Sparkle, Electron, Chrome, etc.) and offers a **locked migration** option. Locked apps on the external drive are protected from being deleted or overwritten by auto-updaters.
+* **✍️ Code Signature Management**: Re-sign migrated apps that show "damaged" warnings, or restore their original signatures. Supports automatic re-signing after data directory migration.
+* **🔴 Orphaned Link Detection**: If the external drive is disconnected or an app is deleted, the app list shows a red "Orphaned Link" badge so you can clean up the broken link.
+* **🍎 macOS 15.1+ App Store Support**: On macOS 15.1+, App Store apps can be installed directly to the external drive, and App Store can update them in-place without migrating back.
+* **↩️ Restore Anytime**: One-click restore moves the app back to local storage and removes the link automatically. Interrupted migrations are automatically recovered.
+* **📊 Data Directory Management**: Migrate app data folders (`~/Library/` subfolders, dot-folders like `~/.npm`) to external storage. Tree view with grouped cards, search, and sorting.
+* **🎨 Modern UI**: Native SwiftUI, full Dark Mode support, 20+ languages.
+* **♿️ Accessibility**: VoiceOver-friendly with clear semantic labels and a Braille language option.
+* **🌍 Global Ready**: 20+ languages including English, Chinese, Japanese, Korean, German, French, Spanish, Italian, Portuguese, Russian, Arabic, Hindi, Vietnamese, Thai, Turkish, Dutch, Polish, Indonesian, Esperanto, Braille, and 👽 Martian.
 
 ## 🏆 Why AppPorts?
 
-Compared to other solutions, AppPorts uses the unique **Contents Linking** technology, balancing aesthetics, compatibility, and system cleanliness.
+AppPorts uses a unique **Stub Portal** technology — a tiny launcher shell that opens the real app on the external drive. This gives you the best of both worlds: the app looks and behaves as if it's still installed locally, but the storage is on the external drive.
 
-| Strategy | AppPorts | Traditional Symlink |
+| Feature | AppPorts (Stub Portal) | Traditional Symlink |
 | :--- | :--- | :--- |
-| **Finder Icon** | ✅ **Native (No Arrow)** | ❌ Arrow Overlay |
-| **Launchpad** | ✅ **Perfect** | ⚠️ Unreliable |
-| **App Menu (macOS 26)**| ✅ **Perfect** | ❌ Unsupported |
-| **FS Cleanliness** | ✅ **Clean (1 Link)** | ✅ Clean (1 Link) |
-| **Maintenance** | ✅ **Instant** | ✅ Instant |
+| **Finder Icon** | ✅ Native (No Arrow) | ❌ Arrow Overlay |
+| **Launchpad** | ✅ Perfect | ⚠️ Unreliable |
+| **App Menu (macOS 26)** | ✅ Perfect | ❌ Unsupported |
+| **Auto-Update Protection** | ✅ Lock Mode | ❌ None |
+| **Signature Management** | ✅ Built-in | ❌ None |
+| **Orphaned Link Detection** | ✅ Automatic | ❌ None |
 
 ## 🧭 Migration Strategy
 
-AppPorts does not migrate every app in the same way. It picks a local portal strategy based on the app's structure and update behavior.
+AppPorts picks the best migration strategy based on the app's type and behavior:
 
-| App Type | Default Strategy | Default Availability | Notes |
+| App Type | Strategy | Default | Notes |
 | :--- | :--- | :--- | :--- |
-| Native macOS apps | Keep a local `.app` wrapper and link `Contents` | Enabled | The default strategy for most regular apps |
-| Self-updating apps | Symlink the whole app bundle | Enabled | Better suited for apps that ship updater components such as Sparkle or Squirrel |
-| iPhone/iPad apps on Mac | Symlink the whole app bundle | Disabled by default | Can be enabled manually in settings |
-| Mac App Store apps | Migrate only after opt-in, then follow the detected bundle strategy | Disabled by default | More sensitive to system protections and update flow |
-| App suites or folders containing multiple apps | Move and symlink the whole folder | Enabled | Better suited for suite-style distributions |
-| System apps | Not migrated | Blocked | Protected to avoid damaging the system |
-| Running apps | Not migrated | Blocked | Quit the app before migrating |
-| Already linked apps | Not migrated again | Blocked | Prevents double-linking and broken states |
+| **Native Mac apps** | Stub Portal | ✅ Enabled | Tiny launcher shell locally, no arrow icon |
+| **Self-updating apps** (Sparkle, Electron, etc.) | Stub Portal + Lock | ✅ Enabled | External app is locked (uchg) to prevent auto-updater damage |
+| **iPhone/iPad apps** | iOS Stub Portal | ✅ Enabled | Icon extracted from iOS app bundle |
+| **Mac App Store apps** | Native on macOS 15.1+ | ✅ Auto on 15.1+ | App Store can update directly on external drive |
+| **App suites** (Office, Adobe, etc.) | Folder symlink | ✅ Enabled | Entire folder migrated as a unit |
+| **System apps** | Blocked | ❌ | Protected from migration |
+| **Running apps** | Blocked | ❌ | Quit the app first |
+| **Already linked apps** | Blocked | ❌ | Prevents double-linking |
 
 ## 🛠️ Installation
 
@@ -99,53 +100,48 @@ AppPorts does not migrate every app in the same way. It picks a local portal str
 ### Download and Installation
 Please visit the [official website](https://appports.shimoko.com/) or the [Releases](https://github.com/wzh4869/AppPorts/releases) page to download the latest `AppPorts.dmg`.
 
-
 ### ⚠️ Permissions
-Upon first run, AppPorts requires **Full Disk Access** to read and modify the `/Applications` directory.
+AppPorts requires **Full Disk Access** to read and modify `/Applications`.
 
 1. Open **System Settings** → **Privacy & Security**.
 2. Select **Full Disk Access**.
 3. Click the `+` button, add **AppPorts**, and turn on the toggle.
 4. Relaunch AppPorts.
 
-
-*(The application includes an in-app guide for direct navigation to settings)*
-
+*(The app includes an in-app guide that can open Settings directly)*
 
 ## 🧑‍💻 Development
 
-If you are a developer and wish to build the project yourself:
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/wzh4869/AppPorts.git
-    ```
-2.  Open the project with **Xcode**.
-3.  Compile and Run.
+```bash
+git clone https://github.com/wzh4869/AppPorts.git
+```
+Open the project with **Xcode** and build.
 
 ## 🤝 Contributing
 
-We welcome Issues and Pull Requests\!
+We welcome Issues and Pull Requests!
 If you find translation errors or have suggestions for new features, please let us know.
-## AppPorts Heroes💗  
+
+## AppPorts Heroes 💗
 <a href="https://github.com/wzh4869/AppPorts/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=wzh4869/AppPorts" />
 </a>
 
-##  Advanced Storage Management
+## Advanced Storage Management
 
 * [LazyMount-Mac](https://github.com/yuanweize/LazyMount-Mac): Easily expand Mac storage space — Automatically mount SMB shares and cloud storage at startup, no manual operation required.
-    
+
   > The perfect companion for AppPorts. LazyMount connects the storage, AppPorts handles the applications.
-    *   🎮 Game Libraries — Store Steam/Epic games on a NAS, play them like local installs
-    *   💾 Time Machine Backups — Back up to a remote server automatically
-    *   🎬 Media Libraries — Access your movie/music collection stored on a home server
-    *   📁 Project Archives — Keep large files on cheaper storage, access them on-demand
-    *   ☁️ Cloud Storage — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
+  > * 🎮 Game Libraries — Store Steam/Epic games on a NAS, play them like local installs
+  > * 💾 Time Machine Backups — Back up to a remote server automatically
+  > * 🎬 Media Libraries — Access your movie/music collection stored on a home server
+  > * 📁 Project Archives — Keep large files on cheaper storage, access them on-demand
+  > * ☁️ Cloud Storage — Mount Google Drive, Dropbox, or any rclone-supported service as a local folder
 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/image?repos=wzh4869/AppPorts&type=date&legend=top-left)](https://www.star-history.com/?repos=wzh4869%2FAppPorts&type=date&legend=top-left)
+
 ## 📄 License
 
 This project is open-source under the [Apache License 2.0](LICENSE).

@@ -7,6 +7,7 @@
 
 import Foundation
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - 应用日志管理器
 
@@ -55,18 +56,18 @@ final class AppLogger: @unchecked Sendable {
     }
 
     /// 单例实例
-    nonisolated(unsafe) static let shared = AppLogger()
+    static let shared = AppLogger()
     
     // MARK: - 私有属性
     
     /// 日期格式化器（格式：yyyy-MM-dd HH:mm:ss）
-    nonisolated(unsafe) private let dateFormatter: DateFormatter
+    private let dateFormatter: DateFormatter
     
     /// 文件管理器
     nonisolated(unsafe) private let fileManager = FileManager.default
 
     /// 串行日志队列，避免多线程写文件交错
-    nonisolated(unsafe) private let writeQueue = DispatchQueue(label: "com.shimoko.AppPorts.logger")
+    private let writeQueue = DispatchQueue(label: "com.shimoko.AppPorts.logger")
 
     /// 当前启动会话 ID，便于用户粘贴日志后快速关联一次运行
     nonisolated private let sessionID: String
@@ -220,7 +221,7 @@ final class AppLogger: @unchecked Sendable {
         savePanel.title = "导出诊断包".localized
         savePanel.prompt = "导出".localized
         savePanel.nameFieldStringValue = defaultDiagnosticArchiveName()
-        savePanel.allowedFileTypes = ["zip"]
+        savePanel.allowedContentTypes = [UTType.zip]
         savePanel.canCreateDirectories = true
 
         guard savePanel.runModal() == .OK, let destinationURL = savePanel.url else {

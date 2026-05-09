@@ -35,17 +35,17 @@ enum AppContainerKind: String, Sendable {
 /// ```
 struct AppItem: Identifiable, Equatable, Sendable {
     // MARK: - 基本属性
-    
-    /// 唯一标识符，用于 SwiftUI 列表渲染
-    let id = UUID()
-    
+
     /// 应用名称（包含 .app 扩展名）
-    /// - Example: "Safari.app", "Xcode.app"
+    /// - Example: “Safari.app”, “Xcode.app”
     var name: String
-    
+
     /// 应用的完整文件路径
-    /// - Note: 这是实际操作路径；对“单应用容器”场景会指向外层文件夹
+    /// - Note: 这是实际操作路径；对”单应用容器”场景会指向外层文件夹
     var path: URL
+
+    /// 基于路径的稳定 ID，避免每次扫描重建列表
+    nonisolated var id: String { path.standardizedFileURL.path }
 
     /// 实际用于展示图标和读取 bundle 信息的 app 路径
     ///
@@ -75,11 +75,33 @@ struct AppItem: Identifiable, Equatable, Sendable {
     /// 是否为 App Store 应用
     /// - Note: App Store 应用包含 _MASReceipt 目录，受系统保护
     var isAppStoreApp: Bool = false
+
+    /// 是否位于外部磁盘的 Applications 目录（macOS 15.1+ MAS 外部安装）
+    var isMASExternal: Bool = false
     
     /// 是否为 iOS 应用（iPhone/iPad 应用，运行在 Apple Silicon Mac 上）
     /// - Note: iOS 应用通常包含 WrappedBundle 或特定的 Info.plist 标识
     var isIOSApp: Bool = false
-    
+
+    /// 是否已被 AppPorts 重签名
+    /// - Note: 通过检测签名备份 plist 是否存在来判断
+    var isResigned: Bool = false
+
+    /// 是否为 Electron 应用（含 Electron Framework）
+    var isElectronApp: Bool = false
+
+    /// 是否为 Sparkle/Squirrel 自更新应用
+    var isSparkleApp: Bool = false
+
+    /// 是否有自更新能力（Sparkle、electron-updater、自定义更新器）
+    var hasSelfUpdater: Bool = false
+
+    /// 是否需要 uchg 锁定（仅 Sparkle/Electron 有更新器的应用）
+    var needsLock: Bool = false
+
+    /// 应用版本号（CFBundleShortVersionString）
+    var version: String? = nil
+
     // MARK: - 大小信息
     
     /// 应用大小的可读字符串（如 "1.2 GB", "450 MB"）
@@ -139,9 +161,19 @@ struct AppItem: Identifiable, Equatable, Sendable {
         lhs.size == rhs.size &&
         lhs.sizeBytes == rhs.sizeBytes &&
         lhs.isAppStoreApp == rhs.isAppStoreApp &&
+        lhs.isMASExternal == rhs.isMASExternal &&
         lhs.isIOSApp == rhs.isIOSApp &&
+        lhs.isResigned == rhs.isResigned &&
+        lhs.isElectronApp == rhs.isElectronApp &&
+        lhs.isSparkleApp == rhs.isSparkleApp &&
+        lhs.hasSelfUpdater == rhs.hasSelfUpdater &&
+        lhs.needsLock == rhs.needsLock &&
         lhs.bundleURL == rhs.bundleURL &&
-        lhs.containerKind == rhs.containerKind
+        lhs.containerKind == rhs.containerKind &&
+        lhs.isSystemApp == rhs.isSystemApp &&
+        lhs.isFolder == rhs.isFolder &&
+        lhs.appCount == rhs.appCount &&
+        lhs.version == rhs.version
     }
 }
 

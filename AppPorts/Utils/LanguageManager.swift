@@ -98,16 +98,24 @@ extension String {
     var localized: String {
         let selectedLang = LanguageManager.shared.language
         if selectedLang == "system" {
-            // 使用系统默认本地化
             return NSLocalizedString(self, comment: "")
-        } else {
-            // 从指定语言的 .lproj 文件中加载
-            guard let path = Bundle.main.path(forResource: selectedLang, ofType: "lproj"),
-                  let bundle = Bundle(path: path) else {
-                // 如果找不到对应语言包，使用默认本地化
-                return NSLocalizedString(self, comment: "")
-            }
-            return NSLocalizedString(self, tableName: nil, bundle: bundle, value: "", comment: "")
         }
+        // 1. 精确匹配 .lproj
+        if let path = Bundle.main.path(forResource: selectedLang, ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            let result = NSLocalizedString(self, tableName: nil, bundle: bundle, value: "", comment: "")
+            if result != self { return result }
+        }
+        // 2. 模糊匹配（通过 preferredLocalizations）
+        let preferred = Bundle.preferredLocalizations(from: Bundle.main.localizations, forPreferences: [selectedLang])
+        if let best = preferred.first,
+           best != selectedLang,
+           let path = Bundle.main.path(forResource: best, ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            let result = NSLocalizedString(self, tableName: nil, bundle: bundle, value: "", comment: "")
+            if result != self { return result }
+        }
+        // 3. 系统默认回退
+        return NSLocalizedString(self, comment: "")
     }
 }

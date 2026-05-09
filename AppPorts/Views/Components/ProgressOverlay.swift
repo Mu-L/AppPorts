@@ -45,12 +45,12 @@ struct ProgressOverlay: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            Text("正在迁移应用...")
+            Text("正在迁移应用...".localized)
                 .font(.headline)
             
             // 批量迁移时显示应用进度
             if total > 1 {
-                Text("应用 \(current) / \(total)")
+                Text(String(format: "应用 %lld / %lld".localized, Int64(current), Int64(total)))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -160,6 +160,58 @@ final class DataDirScannerTests: XCTestCase {
         XCTAssertEqual(item.linkedDestination?.standardizedFileURL, externalDataURL.standardizedFileURL)
     }
 
+    func testLocalGroupContainerRootIsNotOfferedAsMigratableData() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let localGroupContainerURL = workspace.homeURL
+            .appendingPathComponent("Library/Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+
+        try createDirectoryWithPayload(at: localGroupContainerURL)
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        XCTAssertNil(items.first(where: { $0.path.standardizedFileURL == localGroupContainerURL.standardizedFileURL }))
+    }
+
+    func testManagedGroupContainerRootLinkIsReportedButNotMigratable() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let localGroupContainerURL = workspace.homeURL
+            .appendingPathComponent("Library/Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+        let externalGroupContainerURL = workspace.externalRootURL
+            .appendingPathComponent("Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+
+        try createDirectoryWithPayload(at: externalGroupContainerURL)
+        try writeManagedLinkMetadata(
+            sourcePath: localGroupContainerURL,
+            destinationPath: externalGroupContainerURL,
+            dataDirType: DataDirType.groupContainers.rawValue
+        )
+        try fileManager.createDirectory(
+            at: localGroupContainerURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try fileManager.createSymbolicLink(at: localGroupContainerURL, withDestinationURL: externalGroupContainerURL)
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        let item = try XCTUnwrap(items.first(where: { $0.path.standardizedFileURL == localGroupContainerURL.standardizedFileURL }))
+        XCTAssertEqual(item.status, "已链接")
+        XCTAssertEqual(item.linkedDestination?.standardizedFileURL, externalGroupContainerURL.standardizedFileURL)
+        XCTAssertFalse(item.isMigratable)
+        XCTAssertNotNil(item.nonMigratableReason)
+    }
+
     private func makeWorkspace() throws -> (rootURL: URL, homeURL: URL, appsURL: URL, externalRootURL: URL) {
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent("DataDirScannerTests-\(UUID().uuidString)")
         let homeURL = rootURL.appendingPathComponent("Home")
@@ -203,6 +255,25 @@ final class DataDirScannerTests: XCTestCase {
             to: directoryURL.appendingPathComponent("payload.txt"),
             atomically: true,
             encoding: .utf8
+        )
+    }
+
+    private func writeManagedLinkMetadata(
+        sourcePath: URL,
+        destinationPath: URL,
+        dataDirType: String
+    ) throws {
+        let metadata: [String: Any] = [
+            "schemaVersion": 1,
+            "managedBy": "com.shimoko.AppPorts",
+            "sourcePath": sourcePath.standardizedFileURL.path,
+            "destinationPath": destinationPath.standardizedFileURL.path,
+            "dataDirType": dataDirType
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: metadata, format: .binary, options: 0)
+        try data.write(
+            to: destinationPath.appendingPathComponent(".appports-link-metadata.plist"),
+            options: .atomic
         )
     }
 }

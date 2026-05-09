@@ -98,7 +98,7 @@ class UpdateChecker {
         
         // 验证 HTTP 响应
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "UpdateChecker", code: 1, userInfo: [NSLocalizedDescriptionKey: "GitHub API 响应无效"])
+            throw NSError(domain: "UpdateChecker", code: 1, userInfo: [NSLocalizedDescriptionKey: "GitHub API 响应无效".localized])
         }
         
         // 解析 JSON

@@ -31,8 +31,8 @@ struct ContentView: View {
     @State private var externalDriveURL: URL?
 
     // 多选支持
-    @State private var selectedLocalApps: Set<UUID> = []
-    @State private var selectedExternalApps: Set<UUID> = []
+    @State private var selectedLocalApps: Set<String> = []
+    @State private var selectedExternalApps: Set<String> = []
     
     @State private var showAlert = false
     @State private var alertTitle = ""
@@ -44,6 +44,14 @@ struct ContentView: View {
     // App Store 应用迁移确认
     @State private var showAppStoreConfirm = false
     @State private var pendingAppStoreApps: [AppItem] = []
+
+    // 自更新应用迁移确认（Sparkle/Electron，锁定模式保护）
+    @State private var showSelfUpdaterConfirm = false
+    @State private var pendingSelfUpdaterApps: [AppItem] = []
+    @State private var pendingRemainingAppsForSelfUpdater: [AppItem] = []
+    @State private var selfUpdaterIsLinkIn = false // true = 链接回本地, false = 迁移到外部
+
+    @State private var pendingRemainingApps: [AppItem] = []
     
     // 进度弹窗状态
     @State private var showProgress = false
@@ -52,6 +60,9 @@ struct ContentView: View {
     @State private var progressAppName = ""
     @State private var isMigrating = false
     
+    // App Store 外部安装引导
+    @State private var showMASGuidance = false
+
     // 设置页面
     @State private var showAppStoreSettings = false
     
@@ -64,7 +75,10 @@ struct ContentView: View {
     // Monitors
     @State private var localMonitor: FolderMonitor?
     @State private var externalMonitor: FolderMonitor?
-    
+
+    // Monitor 防抖：合并两个 monitor 的扫描请求
+    private static let monitorRescanDebouncer = RescanDebouncer()
+
     // Track previous external drive URL for logging
     @State private var previousExternalDriveURL: URL?
 
@@ -113,16 +127,26 @@ struct ContentView: View {
 
                     // Sort Button
                     Menu {
-                        Picker("排序方式".localized, selection: $sortOption) {
-                            Text("按名称".localized).tag(SortOption.name)
-                            Text("按大小".localized).tag(SortOption.size)
+                        Button(action: { sortOption = .name }) {
+                            HStack {
+                                Text("按名称".localized)
+                                Spacer()
+                                if sortOption == .name { Image(systemName: "checkmark") }
+                            }
+                        }
+                        Button(action: { sortOption = .size }) {
+                            HStack {
+                                Text("按大小".localized)
+                                Spacer()
+                                if sortOption == .size { Image(systemName: "checkmark") }
+                            }
                         }
                     } label: {
                         Label("排序".localized, systemImage: "line.3.horizontal.decrease.circle")
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                    .help("排序方式")
+                    .help("排序方式".localized)
                 }
 
                 Spacer()
@@ -145,7 +169,10 @@ struct ContentView: View {
                 DataDirsView(
                     externalDriveURL: externalDriveURL,
                     localApps: localApps,
-                    onSelectExternalDrive: openPanelForExternalDrive
+                    onSelectExternalDrive: openPanelForExternalDrive,
+                    onResignApp: performSingleResign,
+                    onRestoreSignature: performRestoreSignature,
+                    onBackupSignature: performBackupSignature
                 )
             } else {
 
@@ -174,7 +201,10 @@ struct ContentView: View {
                                     showDeleteLinkButton: true,
                                     showMoveBackButton: false,
                                     onDeleteLink: performDeleteLink,
-                                    onMoveBack: performMoveBack
+                                    onMoveBack: performMoveBack,
+                                    onResign: { performSingleResign(app: $0) },
+                                    onRestoreSignature: performRestoreSignature,
+                                    onMoveOutWholeSymlink: performMoveOutWholeSymlink
                                 )
                                 .tag(app.id)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)) // Add spacing around rows
@@ -235,7 +265,9 @@ struct ContentView: View {
                                 showDeleteLinkButton: false,
                                 showMoveBackButton: false,
                                 onDeleteLink: performDeleteLink,
-                                onMoveBack: performMoveBack
+                                onMoveBack: performMoveBack,
+                                onResign: { performSingleResign(app: $0) },
+                                onRestoreSignature: performRestoreSignature
                             )
                             .tag(app.id)
                             .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
@@ -245,36 +277,45 @@ struct ContentView: View {
                 }
                 
                 // 双按钮底部栏
-                HStack(spacing: 8) {
-                    // 链接回本地按钮
-                    Button(action: performLinkIn) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "link")
-                            Text(getLinkButtonTitle())
+                VStack(spacing: 0) {
+                    Divider()
+                        .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
+
+                    HStack(spacing: 8) {
+                        Button(action: performLinkIn) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "link")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text(getLinkButtonTitle())
+                                    .fontWeight(.medium)
+                                    .font(.system(size: 13))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 28)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                    .disabled(!canLinkIn)
-                    
-                    // 迁移回本地按钮
-                    Button(action: performBatchMoveBack) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.turn.up.left")
-                            Text(getMoveBackButtonTitle())
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                        .disabled(!canLinkIn)
+
+                        Button(action: performBatchMoveBack) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.turn.up.left")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text(getMoveBackButtonTitle())
+                                    .fontWeight(.medium)
+                                    .font(.system(size: 13))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 28)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange.opacity(0.85))
+                        .disabled(selectedExternalApps.isEmpty)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(selectedExternalApps.isEmpty)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(.bar)
             }
             .frame(minWidth: 320, maxWidth: .infinity)
             } // end HSplitView for mainTab == .apps
@@ -349,6 +390,14 @@ struct ContentView: View {
                 stopMonitoringExternal()
             }
             scanExternalApps()
+
+            // macOS >= 15.1: 检查外部磁盘的 Applications 目录
+            if let url = newValue, AppMigrationService.isMASExternalInstallSupported {
+                let masDir = AppMigrationService.masApplicationsURL(for: url)
+                if !fileManager.fileExists(atPath: masDir.path) {
+                    showMASGuidance = true
+                }
+            }
         }
         
         .alert(LocalizedStringKey(alertTitle.localized), isPresented: $showAlert) {
@@ -383,6 +432,61 @@ struct ContentView: View {
             } else {
                 Text(String(format: "选中的 %lld 个应用包含 %lld 个 App Store 应用，迁移时会使用 Finder 删除，您会听到垃圾桶的声音。\n\n这是正常的，应用会被安全地移动到外部存储。".localized, totalCount, count))
             }
+        }
+        // 自更新应用迁移确认弹窗
+        .alert("自更新应用迁移".localized, isPresented: $showSelfUpdaterConfirm) {
+            Button("锁定迁移".localized) {
+                let allApps = pendingSelfUpdaterApps + pendingRemainingAppsForSelfUpdater
+                if selfUpdaterIsLinkIn {
+                    executeBatchLinkIn(apps: allApps, lockExternal: true)
+                } else if let dest = externalDriveURL {
+                    executeBatchMove(apps: allApps, destination: dest, lockExternal: true)
+                }
+                pendingSelfUpdaterApps = []
+                pendingRemainingAppsForSelfUpdater = []
+            }
+            Button("非锁定迁移".localized) {
+                let allApps = pendingSelfUpdaterApps + pendingRemainingAppsForSelfUpdater
+                if selfUpdaterIsLinkIn {
+                    executeBatchLinkIn(apps: allApps, lockExternal: false)
+                } else if let dest = externalDriveURL {
+                    executeBatchMove(apps: allApps, destination: dest, lockExternal: false)
+                }
+                pendingSelfUpdaterApps = []
+                pendingRemainingAppsForSelfUpdater = []
+            }
+            Button("取消".localized, role: .cancel) {
+                pendingSelfUpdaterApps = []
+                pendingRemainingAppsForSelfUpdater = []
+            }
+        } message: {
+            let names = pendingSelfUpdaterApps.map { $0.displayName }.joined(separator: "、")
+            Text(String(format: "以下应用支持自动更新，迁移后应用内更新可能导致外部应用丢失：\n\n%@\n\n• 锁定迁移：外部应用被锁定，阻止更新破坏，需通过 AppPorts 迁回后更新\n• 非锁定迁移：不锁定外部应用，应用内更新可能删除外部应用\n\n建议选择锁定迁移以保护数据安全。".localized, names))
+        }
+        // App Store 外部安装引导弹窗
+        .alert("App Store 应用外部安装".localized, isPresented: $showMASGuidance) {
+            Button("打开 App Store 设置".localized) {
+                if let url = URL(string: "macappstores://settings") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button("我已设置".localized) {
+                // 检查 Applications 目录是否存在，不存在则创建
+                if let url = externalDriveURL {
+                    let masDir = AppMigrationService.masApplicationsURL(for: url)
+                    if !fileManager.fileExists(atPath: masDir.path) {
+                        try? fileManager.createDirectory(at: masDir, withIntermediateDirectories: true)
+                        AppLogger.shared.logContext(
+                            "已创建外部磁盘 Applications 目录",
+                            details: [("path", masDir.path)]
+                        )
+                    }
+                }
+                scanExternalApps()
+            }
+            Button("稍后".localized, role: .cancel) {}
+        } message: {
+            Text("macOS 15.1+ 支持将 App Store 应用安装到外部磁盘。\n\n请在 App Store → 设置中勾选「将大型 App 下载并安装到独立磁盘」，并选择当前外部驱动器。\n\n设置完成后点击「我已设置」，AppPorts 会自动创建 Applications 目录并检测管理这些应用。".localized)
         }
         // App Store 设置页面
         .sheet(isPresented: $showAppStoreSettings) {
@@ -506,31 +610,29 @@ struct ContentView: View {
         let icon: String
         let isEnabled: Bool
         let action: () -> Void
-        
+
         var body: some View {
             VStack(spacing: 0) {
                 Divider()
                     .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-                
-                HStack {
-                    Spacer()
-                    Button(action: action) {
-                        HStack(spacing: 8) {
-                            Text(title.localized)
-                                .fontWeight(.semibold)
-                            Image(systemName: icon)
-                        }
-                        .frame(maxWidth: .infinity) // Fill width
-                        .frame(height: 32)
+
+                Button(action: action) {
+                    HStack(spacing: 6) {
+                        Text(title.localized)
+                            .fontWeight(.medium)
+                            .font(.system(size: 13))
+                        Image(systemName: icon)
+                            .font(.system(size: 12, weight: .medium))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!isEnabled)
-                    .controlSize(.large)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 28)
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(!isEnabled)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .background(.bar) // Standard bar material
+            .background(.bar)
         }
     }
     
@@ -582,20 +684,20 @@ struct ContentView: View {
         }.filter { !$0.isSystemApp && !$0.isRunning && $0.status != "已链接" }
         
         if selectedLocalApps.isEmpty {
-            return ("迁移到外部", false)
+            return ("迁移到外部".localized, false)
         }
-        
+
         if validApps.isEmpty {
             // 检查是否全是不可迁移的
             let selectedAppsData = selectedLocalApps.compactMap { id in localApps.first { $0.id == id } }
-            if selectedAppsData.contains(where: { $0.isSystemApp }) { return ("含系统应用", true) }
-            if selectedAppsData.contains(where: { $0.isRunning }) { return ("含运行中应用", true) }
-            if selectedAppsData.contains(where: { $0.status == "已链接" }) { return ("已链接", false) }
-            return ("迁移到外部", false)
+            if selectedAppsData.contains(where: { $0.isSystemApp }) { return ("含系统应用".localized, true) }
+            if selectedAppsData.contains(where: { $0.isRunning }) { return ("含运行中应用".localized, true) }
+            if selectedAppsData.contains(where: { $0.status == "已链接" }) { return ("已链接".localized, false) }
+            return ("迁移到外部".localized, false)
         }
-        
+
         if validApps.count == 1 {
-            return ("迁移到外部", false)
+            return ("迁移到外部".localized, false)
         }
         
         return (String(format: "迁移 %lld 个应用".localized, Int64(validApps.count)), false)
@@ -679,7 +781,7 @@ struct ContentView: View {
         return nil
     }
     
-    func scanLocalApps() {
+    func scanLocalApps(calculateSizes: Bool = true) {
         let scanID = AppLogger.shared.makeOperationID(prefix: "scan-local-apps")
         AppLogger.shared.logContext(
             "开始扫描本地应用",
@@ -695,7 +797,6 @@ struct ContentView: View {
             let scanner = AppScanner()
             let newApps = await scanner.scanLocalApps(at: scanDir, runningAppURLs: runningAppURLs)
             
-            // Update UI
             await MainActor.run {
                 self.localApps = newApps
             }
@@ -708,12 +809,18 @@ struct ContentView: View {
                 ]
             )
             
-            // Calculate sizes progressively using the same scanner actor
-            await self.calculateSizesProgressive(for: newApps, isLocal: true, scanner: scanner)
+            if calculateSizes {
+                await self.calculateSizesProgressive(for: newApps, isLocal: true, scanner: scanner)
+            }
         }
     }
-    
-    func scanExternalApps() {
+
+    private func readVersion(from appURL: URL) -> String {
+        let plist = NSDictionary(contentsOf: appURL.appendingPathComponent("Contents/Info.plist"))
+        return (plist?["CFBundleShortVersionString"] as? String) ?? ""
+    }
+
+    func scanExternalApps(calculateSizes: Bool = true) {
         guard let dir = externalDriveURL else {
             AppLogger.shared.log("未选择外部路径，清空外部应用列表", level: "TRACE")
             self.externalApps = []
@@ -748,38 +855,81 @@ struct ContentView: View {
                     ("status_summary", self.summarizeStatuses(for: newApps))
                 ]
             )
-             
-            // Calculate sizes progressively
-            await self.calculateSizesProgressive(for: newApps, isLocal: false, scanner: scanner)
+            if calculateSizes {
+                await self.calculateSizesProgressive(for: newApps, isLocal: false, scanner: scanner)
+            }
         }
     }
     
     func calculateSizesProgressive(for apps: [AppItem], isLocal: Bool, scanner: AppScanner) async {
-        for app in apps {
-             let sizeBytes = await scanner.calculateDisplayedSize(for: app, isLocalEntry: isLocal)
-             
-             await MainActor.run {
-                 let sizeString = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
-                 
-                 if isLocal {
-                     if let index = self.localApps.firstIndex(where: { $0.id == app.id }) {
-                         withAnimation { 
-                            self.localApps[index].size = sizeString 
+        // 并行计算所有大小，再一次性批量更新 UI，避免列表反复重排
+        let results = await withTaskGroup(of: (String, Int64).self) { group in
+            for app in apps {
+                group.addTask {
+                    let size = await scanner.calculateDisplayedSize(for: app, isLocalEntry: isLocal)
+                    return (app.id, size)
+                }
+            }
+            var dict: [String: Int64] = [:]
+            for await (id, size) in group { dict[id] = size }
+            return dict
+        }
+
+        await MainActor.run {
+            for (id, sizeBytes) in results {
+                let sizeString = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
+                if isLocal {
+                    if let index = self.localApps.firstIndex(where: { $0.id == id }) {
+                        withAnimation {
+                            self.localApps[index].size = sizeString
                             self.localApps[index].sizeBytes = sizeBytes
-                         }
-                     }
-                 } else {
-                     if let index = self.externalApps.firstIndex(where: { $0.id == app.id }) {
-                         withAnimation { 
-                            self.externalApps[index].size = sizeString 
+                        }
+                    }
+                } else {
+                    if let index = self.externalApps.firstIndex(where: { $0.id == id }) {
+                        withAnimation {
+                            self.externalApps[index].size = sizeString
                             self.externalApps[index].sizeBytes = sizeBytes
-                         }
-                     }
-                 }
-             }
+                        }
+                    }
+                }
+            }
         }
     }
-    
+
+    /// 只重算指定 app 的大小（迁移/迁回后调用，避免全量重算）
+    func recalculateAppSize(appName: String) {
+        Task.detached(priority: .userInitiated) {
+            let scanner = AppScanner()
+
+            // 在本地列表中查找
+            let localApp = await MainActor.run { self.localApps.first(where: { $0.name == appName }) }
+            if let localApp {
+                let size = await scanner.calculateDisplayedSize(for: localApp, isLocalEntry: true)
+                let sizeString = LocalizedByteCountFormatter.string(fromByteCount: size)
+                await MainActor.run {
+                    if let index = self.localApps.firstIndex(where: { $0.name == appName }) {
+                        self.localApps[index].size = sizeString
+                        self.localApps[index].sizeBytes = size
+                    }
+                }
+            }
+
+            // 在外部列表中查找
+            let externalApp = await MainActor.run { self.externalApps.first(where: { $0.name == appName }) }
+            if let externalApp {
+                let size = await scanner.calculateDisplayedSize(for: externalApp, isLocalEntry: false)
+                let sizeString = LocalizedByteCountFormatter.string(fromByteCount: size)
+                await MainActor.run {
+                    if let index = self.externalApps.firstIndex(where: { $0.name == appName }) {
+                        self.externalApps[index].size = sizeString
+                        self.externalApps[index].sizeBytes = size
+                    }
+                }
+            }
+        }
+    }
+
     func openPanelForExternalDrive() {
         let openPanel = NSOpenPanel()
         openPanel.prompt = "选择文件夹".localized
@@ -859,15 +1009,65 @@ struct ContentView: View {
         return false
     }
 
-    func moveAndLink(appToMove: AppItem, destinationURL: URL, progressHandler: FileCopier.ProgressHandler?) async throws {
+    func moveAndLink(appToMove: AppItem, destinationURL: URL, lockExternal: Bool = true, progressHandler: FileCopier.ProgressHandler?) async throws {
         let service = AppMigrationService()
         try await service.moveAndLink(
             appToMove: appToMove,
             destinationURL: destinationURL,
             isRunning: isAppRunning(url: appToMove.displayURL),
+            lockExternal: lockExternal,
             deleteSourceFallback: AppMigrationService.removeItemViaFinder(at:),
             progressHandler: progressHandler
         )
+    }
+
+    func performMoveOutWholeSymlink(_ app: AppItem) {
+        guard let dest = externalDriveURL else { return }
+        let destURL = dest.appendingPathComponent(app.name)
+        AppLogger.shared.logContext(
+            "用户请求传统链接迁移",
+            details: [("app_name", app.displayName), ("destination", destURL.path)]
+        )
+        isMigrating = true
+        progressTotal = 1
+        progressCurrent = 1
+        progressAppName = app.name
+        progressBytes = 0
+        progressTotalBytes = 0
+        showProgress = true
+
+        Task {
+            do {
+                let service = AppMigrationService(portalCreationOverride: { appItem, externalURL in
+                    try FileManager.default.createSymbolicLink(at: appItem.path, withDestinationURL: externalURL)
+                })
+                try await service.moveAndLink(
+                    appToMove: app,
+                    destinationURL: destURL,
+                    isRunning: isAppRunning(url: app.displayURL),
+                    deleteSourceFallback: AppMigrationService.removeItemViaFinder(at:),
+                    progressHandler: { progress in
+                        await MainActor.run {
+                            self.progressBytes = progress.copiedBytes
+                            self.progressTotalBytes = progress.totalBytes
+                        }
+                    }
+                )
+                AppLogger.shared.logContext("传统链接迁移成功", details: [("app_name", app.displayName)])
+            } catch {
+                AppLogger.shared.logError("传统链接迁移失败", error: error, context: [("app_name", app.displayName)])
+                await MainActor.run {
+                    showError(title: "迁移失败".localized, message: error.localizedDescription)
+                }
+            }
+            await MainActor.run {
+                showProgress = false
+                isMigrating = false
+                scanLocalApps(calculateSizes: false)
+                scanExternalApps(calculateSizes: false)
+                recalculateAppSize(appName: app.name)
+            }
+        }
     }
 
     func linkApp(appToLink: AppItem, destinationURL: URL) throws {
@@ -889,9 +1089,10 @@ struct ContentView: View {
     func performMoveOut() {
         guard let dest = externalDriveURL else { return }
         
-        // 读取用户设置
-        let allowAppStoreMigration = UserDefaults.standard.bool(forKey: "allowAppStoreMigration")
-        let allowIOSAppMigration = UserDefaults.standard.bool(forKey: "allowIOSAppMigration")
+        // 读取用户设置（macOS 15.1+ 自动启用）
+        let masSupported = AppMigrationService.isMASExternalInstallSupported
+        let allowAppStoreMigration = masSupported || UserDefaults.standard.bool(forKey: "allowAppStoreMigration")
+        let allowIOSAppMigration = masSupported || UserDefaults.standard.bool(forKey: "allowIOSAppMigration")
         
         // 获取所有选中且可迁移的应用
         let validApps = selectedLocalApps.compactMap { id in
@@ -964,25 +1165,35 @@ struct ContentView: View {
             let hasAppStoreApps = skippedApps.contains { $0.isAppStoreApp && !$0.isIOSApp }
             
             if hasIOSApps && hasAppStoreApps {
-                message = "选中的应用包含 App Store 应用和非原生应用。\n\n如需迁移，请在设置中启用相应选项。"
+                message = "选中的应用包含 App Store 应用和非原生应用。\n\n如需迁移，请在设置中启用相应选项。".localized
             } else if hasIOSApps {
-                message = "非原生 (iPhone/iPad) 应用不支持迁移。\n\n如需迁移，请在设置中启用「允许迁移非原生应用」选项。"
+                message = "非原生 (iPhone/iPad) 应用不支持迁移。\n\n如需迁移，请在设置中启用「允许迁移非原生应用」选项。".localized
             } else {
-                message = "App Store 应用不支持迁移，因为迁移后将无法通过 App Store 更新。\n\n如需强制迁移，请在设置中启用相应选项。"
+                message = "App Store 应用不支持迁移，因为迁移后将无法通过 App Store 更新。\n\n如需强制迁移，请在设置中启用相应选项。".localized
             }
             
-            showError(title: "无法迁移", message: message)
+            showError(title: "无法迁移".localized, message: message)
             return
         }
         
         guard !validApps.isEmpty else { return }
-        
+
+        // 检查是否包含自更新应用（Sparkle/Electron）
+        let selfUpdaterApps = validApps.filter { $0.hasSelfUpdater }
+        if !selfUpdaterApps.isEmpty {
+            pendingSelfUpdaterApps = selfUpdaterApps
+            pendingRemainingAppsForSelfUpdater = validApps.filter { !($0.hasSelfUpdater) }
+            selfUpdaterIsLinkIn = false
+            showSelfUpdaterConfirm = true
+            return
+        }
+
         // 直接迁移符合条件的应用
         executeBatchMove(apps: validApps, destination: dest)
     }
     
     /// 批量迁移应用
-    func executeBatchMove(apps: [AppItem], destination: URL) {
+    func executeBatchMove(apps: [AppItem], destination: URL, lockExternal: Bool = true) {
         guard !apps.isEmpty else { return }
         let batchID = AppLogger.shared.makeOperationID(prefix: "batch-move-out")
         AppLogger.shared.logContext(
@@ -1011,7 +1222,15 @@ struct ContentView: View {
                     progressTotalBytes = 0
                 }
                 
-                let destURL = destination.appendingPathComponent(app.name)
+                // App Store 应用 + macOS >= 15.1 → 迁移到外部磁盘的 Applications 目录
+                let destURL: URL
+                if app.isAppStoreApp && AppMigrationService.isMASExternalInstallSupported {
+                    let masDir = AppMigrationService.masApplicationsURL(for: destination)
+                    try? fileManager.createDirectory(at: masDir, withIntermediateDirectories: true)
+                    destURL = masDir.appendingPathComponent(app.name)
+                } else {
+                    destURL = destination.appendingPathComponent(app.name)
+                }
                 AppLogger.shared.logContext(
                     "批量迁移单项开始",
                     details: [("batch_id", batchID), ("app_name", app.displayName), ("destination", destURL.path)],
@@ -1019,7 +1238,7 @@ struct ContentView: View {
                 )
                 
                 do {
-                    try await moveAndLink(appToMove: app, destinationURL: destURL) { progress in
+                    try await moveAndLink(appToMove: app, destinationURL: destURL, lockExternal: lockExternal) { progress in
                         await MainActor.run {
                             self.progressBytes = progress.copiedBytes
                             self.progressTotalBytes = progress.totalBytes
@@ -1044,11 +1263,13 @@ struct ContentView: View {
                 showProgress = false
                 isMigrating = false
                 selectedLocalApps.removeAll()
-                scanLocalApps()
-                scanExternalApps()
-                
+                scanLocalApps(calculateSizes: false)
+                scanExternalApps(calculateSizes: false)
+                // 只重算被迁移的 app 的大小
+                for app in apps { recalculateAppSize(appName: app.name) }
+
                 if !errors.isEmpty {
-                    showError(title: "部分迁移失败", message: errors.joined(separator: "\n"))
+                    showError(title: "部分迁移失败".localized, message: errors.joined(separator: "\n"))
                 }
             }
             AppLogger.shared.logContext(
@@ -1067,22 +1288,38 @@ struct ContentView: View {
         let validApps = selectedExternalApps.compactMap { id in
             externalApps.first { $0.id == id }
         }.filter { $0.status == "未链接" || $0.status == "外部" || $0.status == "部分链接" }
-        
+
         guard !validApps.isEmpty else { return }
-        
+
+        // 检查是否包含自更新应用
+        let selfUpdaterApps = validApps.filter { $0.hasSelfUpdater }
+        if !selfUpdaterApps.isEmpty {
+            pendingSelfUpdaterApps = selfUpdaterApps
+            pendingRemainingAppsForSelfUpdater = validApps.filter { !($0.hasSelfUpdater) }
+            selfUpdaterIsLinkIn = true
+            showSelfUpdaterConfirm = true
+            return
+        }
+
+        executeBatchLinkIn(apps: validApps, lockExternal: true)
+    }
+
+    private func executeBatchLinkIn(apps: [AppItem], lockExternal: Bool) {
+        guard !apps.isEmpty else { return }
+
         isMigrating = true
         showProgress = true
         
         var errors: [String] = []
         
-        let appsToLink = validApps.map { (app: $0, sourcePath: $0.path) }
+        let appsToLink = apps.map { (app: $0, sourcePath: $0.path) }
         let batchID = AppLogger.shared.makeOperationID(prefix: "batch-link-in")
         AppLogger.shared.logContext(
             "开始批量链接应用",
             details: [
                 ("batch_id", batchID),
-                ("selected_count", String(validApps.count)),
-                ("selected_items", joinedAppNames(validApps)),
+                ("selected_count", String(apps.count)),
+                ("selected_items", joinedAppNames(apps)),
                 ("expanded_app_count", String(appsToLink.count)),
                 ("expanded_sources", appsToLink.map { $0.sourcePath.lastPathComponent }.joined(separator: ", "))
             ]
@@ -1117,6 +1354,10 @@ struct ContentView: View {
                 
                 do {
                     try linkApp(appToLink: tempAppItem, destinationURL: destination)
+                    // 锁定外部 app（仅 Sparkle/Electron 有更新器的应用）
+                    if lockExternal && item.app.needsLock {
+                        AppMigrationService().lockExternalApp(at: item.sourcePath)
+                    }
                     AppLogger.shared.logContext(
                         "批量链接单项成功",
                         details: [("batch_id", batchID), ("app_name", appName)]
@@ -1138,11 +1379,12 @@ struct ContentView: View {
                 showProgress = false
                 isMigrating = false
                 selectedExternalApps.removeAll()
-                scanLocalApps()
-                scanExternalApps()
-                
+                scanLocalApps(calculateSizes: false)
+                scanExternalApps(calculateSizes: false)
+                for item in appsToLink { recalculateAppSize(appName: item.sourcePath.lastPathComponent) }
+
                 if !errors.isEmpty {
-                    showError(title: "部分链接失败", message: errors.joined(separator: "\n"))
+                    showError(title: "部分链接失败".localized, message: errors.joined(separator: "\n"))
                 }
             }
             AppLogger.shared.logContext(
@@ -1163,7 +1405,8 @@ struct ContentView: View {
         )
         do {
             try deleteLink(app: app)
-            scanLocalApps(); scanExternalApps()
+            scanLocalApps(calculateSizes: false); scanExternalApps(calculateSizes: false)
+            recalculateAppSize(appName: app.name)
         } catch {
             AppLogger.shared.logError(
                 "删除本地入口失败",
@@ -1171,7 +1414,7 @@ struct ContentView: View {
                 context: [("app_name", app.displayName)],
                 relatedURLs: [("path", app.path)]
             )
-            showError(title: "错误", message: error.localizedDescription)
+            showError(title: "错误".localized, message: error.localizedDescription)
         }
     }
     
@@ -1216,19 +1459,20 @@ struct ContentView: View {
                     relatedURLs: [("source", app.path), ("destination", destination)]
                 )
                 await MainActor.run {
-                    showError(title: "错误", message: error.localizedDescription)
+                    showError(title: "错误".localized, message: error.localizedDescription)
                 }
             }
             
             await MainActor.run {
                 showProgress = false
                 isMigrating = false
-                scanLocalApps()
-                scanExternalApps()
+                scanLocalApps(calculateSizes: false)
+                scanExternalApps(calculateSizes: false)
+                recalculateAppSize(appName: app.name)
             }
         }
     }
-    
+
     /// 批量迁移回本地
     func performBatchMoveBack() {
         // 获取所有选中的外部应用
@@ -1296,11 +1540,12 @@ struct ContentView: View {
                 showProgress = false
                 isMigrating = false
                 selectedExternalApps.removeAll()
-                scanLocalApps()
-                scanExternalApps()
-                
+                scanLocalApps(calculateSizes: false)
+                scanExternalApps(calculateSizes: false)
+                for app in validApps { recalculateAppSize(appName: app.name) }
+
                 if !errors.isEmpty {
-                    showError(title: "部分迁移失败", message: errors.joined(separator: "\n"))
+                    showError(title: "部分迁移失败".localized, message: errors.joined(separator: "\n"))
                 }
             }
             AppLogger.shared.logContext(
@@ -1326,42 +1571,203 @@ struct ContentView: View {
         return String(format: "迁移 %lld 个应用".localized, Int64(selectedExternalApps.count))
     }
     
+    // MARK: - 签名备份/恢复逻辑
+
+    /// 迁移前备份原始签名身份（不执行签名），确保迁移后恢复按钮立即可用
+    func performBackupSignature(app: AppItem) {
+        guard let bundleID = getBundleIdentifier(for: app) else { return }
+        Task {
+            let signer = CodeSigner()
+            do {
+                try await signer.backupOriginalSignature(appURL: app.displayURL, bundleIdentifier: bundleID)
+                AppLogger.shared.logContext(
+                    "迁移前备份签名身份",
+                    details: [("app_name", app.displayName), ("bundle_id", bundleID)]
+                )
+            } catch {
+                AppLogger.shared.logError(
+                    "迁移前备份签名身份失败",
+                    error: error,
+                    context: [("app_name", app.displayName)]
+                )
+            }
+        }
+    }
+
+    func performSingleResign(app: AppItem, silent: Bool = false) {
+        AppLogger.shared.logContext(
+            "用户请求重签名单个应用",
+            details: [("app_name", app.displayName), ("path", app.path.path), ("silent", silent ? "true" : "false")]
+        )
+
+        Task {
+            let signer = CodeSigner()
+            do {
+                try await signer.sign(appURL: app.displayURL, bundleIdentifier: getBundleIdentifier(for: app))
+                await MainActor.run {
+                    scanLocalApps(calculateSizes: false)
+                    scanExternalApps(calculateSizes: false)
+                }
+            } catch {
+                AppLogger.shared.logError(
+                    "重签名失败",
+                    error: error,
+                    context: [("app_name", app.displayName), ("silent", silent ? "true" : "false")]
+                )
+                if !silent {
+                    await MainActor.run {
+                        showError(title: "签名失败".localized, message: error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    func performRestoreSignature(app: AppItem) {
+        guard let bundleID = getBundleIdentifier(for: app) else {
+            showError(title: "恢复签名失败".localized, message: "无法读取应用 Bundle Identifier".localized)
+            return
+        }
+
+        AppLogger.shared.logContext(
+            "用户请求恢复原始签名",
+            details: [("app_name", app.displayName), ("bundle_id", bundleID)]
+        )
+
+        Task {
+            let signer = CodeSigner()
+            do {
+                try await signer.restoreSignature(appURL: app.displayURL, bundleIdentifier: bundleID)
+                await MainActor.run {
+                    scanLocalApps(calculateSizes: false)
+                    scanExternalApps(calculateSizes: false)
+                }
+            } catch {
+                await MainActor.run {
+                    showError(title: "恢复签名失败".localized, message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    nonisolated func getBundleIdentifier(for app: AppItem) -> String? {
+        let infoPlistURL = app.displayURL.appendingPathComponent("Contents/Info.plist")
+        guard let plistData = try? Data(contentsOf: infoPlistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any] else {
+            return nil
+        }
+        return plist["CFBundleIdentifier"] as? String
+    }
+
     // MARK: - Monitoring Helpers
     
     func startMonitoringLocal() {
-        // Stop existing if any (though usually one)
         localMonitor?.stopMonitoring()
         AppLogger.shared.logContext("启动本地目录监控", details: [("path", localAppsURL.path)])
-        
+
         let monitor = FolderMonitor(url: localAppsURL)
-        monitor.startMonitoring {
-            // Debounce or just trigger?
-            // Re-scan
-            AppLogger.shared.logContext("检测到本地目录变化", details: [("path", self.localAppsURL.path)], level: "TRACE")
-            Task { @MainActor in
-                self.scanLocalApps()
-            }
+        monitor.startMonitoring { [self] in
+            scheduleMonitorRescan(local: true)
         }
         self.localMonitor = monitor
     }
-    
+
     func startMonitoringExternal(url: URL) {
         externalMonitor?.stopMonitoring()
         AppLogger.shared.logContext("启动外部目录监控", details: [("path", url.path)])
-        
+
         let monitor = FolderMonitor(url: url)
-        monitor.startMonitoring {
-            AppLogger.shared.logContext("检测到外部目录变化", details: [("path", url.path)], level: "TRACE")
-            Task { @MainActor in
-                self.scanExternalApps()
-            }
+        monitor.startMonitoring { [self] in
+            scheduleMonitorRescan(local: false)
         }
         self.externalMonitor = monitor
+    }
+
+    /// 统一防抖：合并两个 monitor 的扫描请求，避免列表连续跳两下
+    private func scheduleMonitorRescan(local: Bool) {
+        Self.monitorRescanDebouncer.schedule { [self] in
+            AppLogger.shared.logContext("Monitor 防抖触发扫描", details: [("trigger", local ? "local" : "external")], level: "TRACE")
+            self.scanBothAppsAtomic()
+        }
+    }
+
+    /// 原子扫描：并行扫描本地和外部应用，一次性更新 UI，避免列表跳两下
+    private func scanBothAppsAtomic() {
+        let externalDir = externalDriveURL
+        Task.detached(priority: .userInitiated) {
+            let scanner = AppScanner()
+            let runningAppURLs = await MainActor.run { self.getRunningAppURLs() }
+            let localDir = self.localAppsURL
+            let externalLocalDir = URL(fileURLWithPath: "/Applications")
+
+            // 保留旧的大小信息
+            let oldLocalSizes = await MainActor.run {
+                Dictionary(uniqueKeysWithValues: self.localApps.compactMap { app -> (String, (String?, Int64))? in
+                    guard app.size != nil else { return nil }
+                    return (app.id, (app.size, app.sizeBytes))
+                })
+            }
+            let oldExternalSizes = await MainActor.run {
+                Dictionary(uniqueKeysWithValues: self.externalApps.compactMap { app -> (String, (String?, Int64))? in
+                    guard app.size != nil else { return nil }
+                    return (app.id, (app.size, app.sizeBytes))
+                })
+            }
+
+            // 并行扫描
+            async let localResult = scanner.scanLocalApps(at: localDir, runningAppURLs: runningAppURLs)
+            let externalResult: [AppItem]
+            if let externalDir {
+                externalResult = await scanner.scanExternalApps(at: externalDir, localAppsDir: externalLocalDir)
+            } else {
+                externalResult = []
+            }
+            var newLocalApps = await localResult
+
+            // 恢复旧的大小信息，只对变化的 app 标记需要重算
+            for i in newLocalApps.indices {
+                if let (size, sizeBytes) = oldLocalSizes[newLocalApps[i].id] {
+                    newLocalApps[i].size = size
+                    newLocalApps[i].sizeBytes = sizeBytes
+                }
+            }
+            var newExternalApps = externalResult
+            for i in newExternalApps.indices {
+                if let (size, sizeBytes) = oldExternalSizes[newExternalApps[i].id] {
+                    newExternalApps[i].size = size
+                    newExternalApps[i].sizeBytes = sizeBytes
+                }
+            }
+
+            await MainActor.run {
+                self.localApps = newLocalApps
+                self.externalApps = newExternalApps
+            }
+
+            // 只重算没有大小信息的 app（新增的或状态变化的）
+            let appsToRecalculate = newLocalApps.filter { $0.size == nil } + newExternalApps.filter { $0.size == nil }
+            for app in appsToRecalculate {
+                await self.recalculateAppSize(appName: app.name)
+            }
+        }
     }
     
     func stopMonitoringExternal() {
         AppLogger.shared.log("停止外部目录监控", level: "TRACE")
         externalMonitor?.stopMonitoring()
         externalMonitor = nil
+    }
+}
+
+/// 统一防抖器：合并 FolderMonitor 的扫描请求，避免列表连续跳动
+private class RescanDebouncer {
+    private var work: DispatchWorkItem?
+    private let queue = DispatchQueue(label: "com.shimoko.AppPorts.rescanDebounce")
+
+    func schedule(action: @escaping () -> Void) {
+        work?.cancel()
+        let item = DispatchWorkItem { action() }
+        work = item
+        queue.asyncAfter(deadline: .now() + 1.0, execute: item)
     }
 }

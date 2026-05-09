@@ -101,13 +101,15 @@ enum DataDirPriority: String, CaseIterable, Sendable, Comparable {
 /// ```
 struct DataDirItem: Identifiable, Equatable, Sendable {
     // MARK: - 基本属性
-    let id = UUID()
 
     /// 显示名称（如 "npm 缓存", "Application Support"）
     var name: String
 
     /// 目录实际路径
     var path: URL
+
+    /// 基于路径的稳定 ID，避免每次扫描重建列表
+    nonisolated var id: String { path.standardizedFileURL.path }
 
     /// 目录类型
     var type: DataDirType
@@ -148,16 +150,30 @@ struct DataDirItem: Identifiable, Equatable, Sendable {
     /// 不可迁移时的原因说明
     var nonMigratableReason: String? = nil
 
+    /// 迁移警告（可迁移但有风险时显示，用户确认后仍可继续）
+    var migrationWarning: String? = nil
+
     // MARK: - 符号链接信息
 
     /// 如果已链接，链接指向的外部路径
     var linkedDestination: URL? = nil
+
+    // MARK: - 树形结构
+
+    /// 子目录项（用于 UI 递归渲染）
+    var children: [DataDirItem] = []
+
+    /// 是否为叶子节点（无子目录）
+    var isLeaf: Bool { children.isEmpty }
 
     // MARK: - Equatable
     static func == (lhs: DataDirItem, rhs: DataDirItem) -> Bool {
         lhs.id == rhs.id &&
         lhs.status == rhs.status &&
         lhs.size == rhs.size &&
-        lhs.sizeBytes == rhs.sizeBytes
+        lhs.sizeBytes == rhs.sizeBytes &&
+        lhs.linkedDestination == rhs.linkedDestination &&
+        lhs.isMigratable == rhs.isMigratable &&
+        lhs.migrationWarning == rhs.migrationWarning
     }
 }

@@ -16,6 +16,9 @@ struct AppRowView: View {
     let showMoveBackButton: Bool
     let onDeleteLink: (AppItem) -> Void
     let onMoveBack: (AppItem) -> Void
+    let onResign: ((AppItem) -> Void)?
+    let onRestoreSignature: ((AppItem) -> Void)?
+    var onMoveOutWholeSymlink: ((AppItem) -> Void)? = nil
     
     @State private var isHovered = false
     
@@ -49,7 +52,7 @@ struct AppRowView: View {
             
             Spacer()
             
-            if showDeleteLinkButton && app.status == "已链接" {
+            if showDeleteLinkButton && (app.status == "已链接" || app.status == "孤立链接") {
                 Button(action: { onDeleteLink(app) }) {
                     Image(systemName: "link.badge.plus")
                         .foregroundColor(.red)
@@ -95,6 +98,37 @@ struct AppRowView: View {
         .contextMenu {
             Button("在 Finder 中显示".localized) {
                 NSWorkspace.shared.activateFileViewerSelecting([app.path])
+            }
+
+            if app.status == "本地" && !app.isSystemApp, let onMoveOutWholeSymlink {
+                Divider()
+                Button("使用传统链接迁移".localized) {
+                    onMoveOutWholeSymlink(app)
+                }
+            }
+
+            if app.status == "孤立链接" {
+                Divider()
+                Button("删除孤立链接".localized) {
+                    onDeleteLink(app)
+                }
+            }
+
+            if app.status == "已链接" {
+                Divider()
+
+                if let onResign {
+                    Button("重签名此应用".localized) {
+                        onResign(app)
+                    }
+                }
+            }
+
+            if let onRestoreSignature, app.isResigned {
+                Divider()
+                Button("恢复原始签名".localized) {
+                    onRestoreSignature(app)
+                }
             }
         }
     }

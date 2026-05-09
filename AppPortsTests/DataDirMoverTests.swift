@@ -184,6 +184,68 @@ final class DataDirMoverTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: normalizedExternalURL).path))
     }
 
+    func testMigrateRejectsGroupContainerRootDirectory() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localGroupContainerURL = workspace.homeURL
+            .appendingPathComponent("Library/Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("Group Containers")
+        let externalGroupContainerURL = externalBaseURL.appendingPathComponent(localGroupContainerURL.lastPathComponent)
+
+        try createDirectoryWithPayload(at: localGroupContainerURL, payload: "group-state")
+
+        let item = DataDirItem(
+            name: "GroupContainer",
+            path: localGroupContainerURL,
+            type: .groupContainers,
+            priority: .recommended,
+            description: "Protected group container root",
+            isMigratable: true
+        )
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("Expected group container root migration to be rejected")
+        } catch let error as DataDirError {
+            guard case .protectedPath = error else {
+                return XCTFail("Expected protectedPath, got \(error)")
+            }
+        }
+
+        try assertRealDirectory(localGroupContainerURL)
+        XCTAssertEqual(try String(contentsOf: localGroupContainerURL.appendingPathComponent("payload.txt")), "group-state")
+        XCTAssertFalse(fileManager.fileExists(atPath: externalGroupContainerURL.path))
+    }
+
+    func testCreateLinkRejectsGroupContainerRootDirectory() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localGroupContainerURL = workspace.homeURL
+            .appendingPathComponent("Library/Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+        let externalGroupContainerURL = workspace.externalRootURL
+            .appendingPathComponent("Group Containers/5A4RE8SF68.com.tencent.xinWeChat")
+
+        try createDirectoryWithPayload(at: externalGroupContainerURL, payload: "group-state")
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL).createLink(
+                localPath: localGroupContainerURL,
+                externalPath: externalGroupContainerURL
+            )
+            XCTFail("Expected group container root link creation to be rejected")
+        } catch let error as DataDirError {
+            guard case .protectedPath = error else {
+                return XCTFail("Expected protectedPath, got \(error)")
+            }
+        }
+
+        XCTAssertFalse(fileManager.fileExists(atPath: localGroupContainerURL.path))
+        XCTAssertEqual(try String(contentsOf: externalGroupContainerURL.appendingPathComponent("payload.txt")), "group-state")
+    }
+
     private func makeWorkspace() throws -> (rootURL: URL, homeURL: URL, externalRootURL: URL) {
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent("DataDirMoverTests-\(UUID().uuidString)")
         let homeURL = rootURL.appendingPathComponent("Home")

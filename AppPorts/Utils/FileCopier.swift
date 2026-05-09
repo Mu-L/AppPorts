@@ -144,8 +144,8 @@ actor FileCopier {
             return
         }
 
-        // 1. 计算源目录总大小（用于进度百分比计算）
-        let totalBytes = calculateDirectorySize(at: source)
+        // 1. 计算源目录总大小（Spotlight 加速或跳过）
+        let totalBytes = progressHandler != nil ? fastDirectorySize(at: source, fileManager: fileManager) : 0
         
         // 报告初始进度（0%）
         if let handler = progressHandler {
@@ -211,42 +211,6 @@ actor FileCopier {
     /// - Returns: 目录总大小（字节）
     ///
     /// - Note: 使用 FileManager.DirectoryEnumerator 进行深度优先遍历
-    private func calculateDirectorySize(at url: URL) -> Int64 {
-        var size: Int64 = 0
-        
-        // 需要获取的资源键
-        let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]
-        
-        // 创建目录枚举器
-        guard let enumerator = fileManager.enumerator(
-            at: url,
-            includingPropertiesForKeys: resourceKeys,
-            options: [],
-            errorHandler: nil
-        ) else { return 0 }
-        
-        // 遍历所有文件
-        for case let fileURL as URL in enumerator {
-            if isManagedLinkMetadataFile(fileURL.lastPathComponent) {
-                continue
-            }
-
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys)) else { continue }
-            
-            // 跳过符号链接（避免重复计算）
-            if resourceValues.isSymbolicLink == true {
-                continue
-            }
-            
-            // 累加常规文件的大小
-            if resourceValues.isRegularFile == true, let fileSize = resourceValues.fileSize {
-                size += Int64(fileSize)
-            }
-        }
-        
-        return size
-    }
-    
     /// 复制扩展属性（xattr）
     ///
     /// 扩展属性包含重要的元数据，如：
@@ -392,9 +356,39 @@ actor FileCopier {
                 continue
             }
             
+            // 跳过 socket 文件（无法复制，如 VS Code 的 .sock IPC 文件）
+            var statBuf = stat()
+            if stat(itemURL.path, &statBuf) == 0 && (statBuf.st_mode & 0o170000) == 0o140000 {
+                AppLogger.shared.logContext(
+                    "跳过 socket 文件",
+                    details: [("path", itemURL.path)],
+                    level: "TRACE"
+                )
+                continue
+            }
+
             // 处理常规文件
             do {
-                try fileManager.copyItem(at: itemURL, to: destItemURL)
+                // 如果目标已存在（如 macOS 自动重建的容器元数据文件），先删除再复制
+                if fileManager.fileExists(atPath: destItemURL.path) {
+                    do {
+                        try fileManager.removeItem(at: destItemURL)
+                    } catch {
+                        // 受保护文件无法删除（如 .com.apple.containermanagerd.metadata.plist），跳过
+                        AppLogger.shared.logContext(
+                            "目标文件已存在且无法删除，跳过复制",
+                            details: [("source", itemURL.path), ("destination", destItemURL.path)],
+                            level: "WARN"
+                        )
+                        continue
+                    }
+                }
+                // 外部存储卷可能返回 EINTR（被中断的系统调用），加重试
+                try await copyWithRetry(at: itemURL, to: destItemURL)
+                // 复制后恢复 posix 权限（跨卷复制可能丢失）
+                if let srcPerms = (try? fileManager.attributesOfItem(atPath: itemURL.path))?[.posixPermissions] {
+                    try? fileManager.setAttributes([.posixPermissions: srcPerms], ofItemAtPath: destItemURL.path)
+                }
             } catch {
                 AppLogger.shared.logError(
                     "FileCopier 复制文件失败",
@@ -426,6 +420,38 @@ actor FileCopier {
                 }
             }
         }
+    }
+
+    /// 带重试的文件复制（外部存储卷可能返回 EINTR）
+    private func copyWithRetry(at source: URL, to destination: URL, maxAttempts: Int = 3) async throws {
+        var lastError: Error?
+        for attempt in 1...maxAttempts {
+            do {
+                try fileManager.copyItem(at: source, to: destination)
+                return
+            } catch {
+                lastError = error
+                let nsError = error as NSError
+                // 检查顶层或底层错误是否为 EINTR（NSPOSIXErrorDomain code 4）
+                // NSFileManager 可能将 EINTR 包装为 NSCocoaErrorDomain code 512
+                let isEINTR = (nsError.domain == NSPOSIXErrorDomain && nsError.code == 4)
+                    || nsError.underlyingErrors.contains { ($0 as NSError).domain == NSPOSIXErrorDomain && ($0 as NSError).code == 4 }
+                if attempt < maxAttempts && isEINTR {
+                    AppLogger.shared.logContext(
+                        "文件复制被中断，重试",
+                        details: [
+                            ("attempt", "\(attempt)/\(maxAttempts)"),
+                            ("source", source.path)
+                        ],
+                        level: "WARN"
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(attempt) * 500_000_000)
+                } else {
+                    throw error
+                }
+            }
+        }
+        throw lastError!
     }
 
     private func isManagedLinkMetadataFile(_ fileName: String) -> Bool {

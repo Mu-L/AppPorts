@@ -19,8 +19,65 @@
 2.  **派生 (Fork) & 克隆**：将项目派生到你的账号下，并克隆到本地。
 3.  **创建分支**：基于 `develop` 分支创建功能分支 (`git checkout -b feat/your-feature`) 或修复分支 (`git checkout -b fix/your-fix`)。
 4.  **编写代码**：遵循 Swift 代码规范和项目既有风格。
-5.  **本地测试**：在 Xcode 中运行并确保所有功能正常工作。
+5.  **本地测试**：在 Xcode 中运行并确保所有功能正常工作（详见下方测试要求）。
 6.  **提交 PR**：将你的分支推送到你的仓库，并向 **AppPorts** 的 `develop` 分支提交 Pull Request。
+
+### 🤖 关于 Vibe Coding
+
+AppPorts 接受使用 AI 辅助工具（如 Cursor、GitHub Copilot、Claude 等）进行 Vibe Coding 开发。**但提交代码的质量和正确性由贡献者本人负责。**
+
+- **AI 助手必须遵循项目根目录的 `CLAUDE.md`**，该文件定义了编码准则、架构规范、构建命令和开发流程。如 AI 助手未自动读取该文件，请在提示词中明确要求模型先阅读 `CLAUDE.md`
+- 建议通过多个 AI 模型交叉验证生成代码的质量与安全性，避免单一模型的盲区
+- AI 生成的代码可能不符合项目既有风格，提交前请进行人工审查
+- AI 无法替代对 macOS 系统行为的理解，涉及文件系统操作、代码签名、权限管理等逻辑时请务必手动验证
+- **核心功能**（如迁移策略、数据目录迁移、代码签名等）的变更必须先提交 Issue 讨论，获得确认后再执行开发
+
+### 🧪 测试要求
+
+> **所有 PR 必须通过编译烟雾检查，这是合并的硬性门槛。**
+
+#### 必须通过：编译烟雾检查
+
+```bash
+xcodebuild clean build \
+  -scheme "AppPorts" \
+  -configuration Release \
+  -destination 'platform=macOS' \
+  -derivedDataPath build \
+  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+#### 按需运行：专项测试
+
+当 PR 涉及对应模块时，建议主动补跑专项测试。CI 会以 Advisory 模式运行，结果不阻塞合并但会提供反馈。
+
+| 测试套件 | 涉及模块 | 运行时机 |
+|----------|----------|----------|
+| `DataDirMoverTests` | 数据目录迁移 | 涉及 `DataDirMover` 时 |
+| `DataDirScannerTests` | 数据目录扫描 | 涉及 `DataDirScanner` 时 |
+| `AppMigrationServiceTests` | 应用迁移 | 涉及 `AppMigrationService` 时 |
+| `AppScannerTests` | 应用扫描 | 涉及 `AppScanner` 时 |
+| `AppLoggerTests` | 日志与诊断 | 涉及 `AppLogger` 时 |
+| `LocalizationAuditTests` | 本地化 | 涉及用户可见文案时 |
+
+运行示例（数据目录测试）：
+
+```bash
+xcodebuild test \
+  -scheme "AppPorts" \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath build \
+  -only-testing:"AppPortsTests/DataDirMoverTests" \
+  -only-testing:"AppPortsTests/DataDirScannerTests" \
+  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
+  CODE_SIGNING_ALLOWED=NO
+```
 
 ### 🌐 本地化要求
 
@@ -45,6 +102,7 @@
   - `fix: ...` (修复 Bug)
   - `docs: ...` (文档更新)
   - `refactor: ...` (重构)
+  - `test: ...` (测试相关)
 
 ### ❤️ 欢迎所有形式的贡献
 
@@ -65,8 +123,65 @@ Thank you for your interest in **AppPorts**! We welcome community contributions,
 2.  **Fork & Clone**: Fork the project to your account and clone it locally.
 3.  **Create a Branch**: Create a feature branch (`feat/your-feature`) or a fix branch (`fix/your-fix`) based on the `develop` branch.
 4.  **Write Code**: Follow Swift coding conventions and the project's existing style.
-5.  **Local Testing**: Run in Xcode and ensure all functions work correctly.
+5.  **Local Testing**: Run in Xcode and ensure all functions work correctly (see testing requirements below).
 6.  **Submit a PR**: Push your branch to your repository and submit a Pull Request to the `develop` branch of **AppPorts**.
+
+### 🤖 About Vibe Coding
+
+AppPorts accepts Vibe Coding with AI-assisted tools (e.g., Cursor, GitHub Copilot, Claude). **However, the quality and correctness of submitted code is the contributor's responsibility.**
+
+- **AI assistants must follow the `CLAUDE.md` file in the project root.** It defines coding guidelines, architecture conventions, build commands, and development workflows. If the AI assistant does not read it automatically, explicitly instruct the model to read `CLAUDE.md` in your prompt.
+- Cross-validate AI-generated code quality and security with multiple models to avoid blind spots from a single model
+- AI-generated code may not match the project's existing style — review it manually before committing
+- AI cannot replace understanding of macOS system behavior — manually verify logic involving file system operations, code signing, and permission management
+- **Core features** (e.g., migration strategy, data directory migration, code signing) must be discussed in an Issue first and confirmed before development begins
+
+### 🧪 Testing Requirements
+
+> **All PRs must pass the smoke build check — this is a hard requirement for merging.**
+
+#### Required: Smoke Build
+
+```bash
+xcodebuild clean build \
+  -scheme "AppPorts" \
+  -configuration Release \
+  -destination 'platform=macOS' \
+  -derivedDataPath build \
+  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+#### Recommended: Focused Tests
+
+When a PR touches the relevant module, it is recommended to run focused tests. CI also runs these in Advisory mode — results do not block merging but provide feedback.
+
+| Test Suite | Module | When to Run |
+|------------|--------|-------------|
+| `DataDirMoverTests` | Data directory migration | When touching `DataDirMover` |
+| `DataDirScannerTests` | Data directory scanning | When touching `DataDirScanner` |
+| `AppMigrationServiceTests` | App migration | When touching `AppMigrationService` |
+| `AppScannerTests` | App scanning | When touching `AppScanner` |
+| `AppLoggerTests` | Logging & diagnostics | When touching `AppLogger` |
+| `LocalizationAuditTests` | Localization | When touching user-facing copy |
+
+Example (data directory tests):
+
+```bash
+xcodebuild test \
+  -scheme "AppPorts" \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath build \
+  -only-testing:"AppPortsTests/DataDirMoverTests" \
+  -only-testing:"AppPortsTests/DataDirScannerTests" \
+  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_ENTITLEMENTS="" \
+  CODE_SIGNING_ALLOWED=NO
+```
 
 ### 🌐 Localization Requirements
 
@@ -90,6 +205,7 @@ See [LOCALIZATION.md](LOCALIZATION.md) for the full workflow.
   - `fix: ...` (Bug fix)
   - `docs: ...` (Documentation update)
   - `refactor: ...` (Refactoring)
+  - `test: ...` (Testing)
 
 ### ❤️ All Contributions are Welcome
 

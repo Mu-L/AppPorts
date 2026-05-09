@@ -31,21 +31,24 @@ import Foundation
 /// - Note: 底层使用 `kqueue` 机制，性能优异且资源占用少
 class FolderMonitor {
     // MARK: - 属性
-    
+
     /// 被监控的目录 URL
     private let url: URL
-    
+
     /// 目录的文件描述符
     private var fileDescriptor: CInt = -1
-    
+
     /// GCD 文件系统监控源
     private var dispatchSource: DispatchSourceFileSystemObject?
-    
+
     /// 监控事件的调度队列（并发队列）
     private let queue = DispatchQueue(label: "com.shimoko.AppPorts.folderMonitor", attributes: .concurrent)
-    
+
     /// 文件夹变化时的回调闭包
     private var onChange: (() -> Void)?
+
+    /// 防抖计时器
+    private var debounceTimer: DispatchWorkItem?
     
     // MARK: - 初始化
     
@@ -93,11 +96,17 @@ class FolderMonitor {
         // 创建文件系统监控源（监听写操作事件）
         dispatchSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fileDescriptor, eventMask: .write, queue: queue)
         
-        // 设置事件处理器
+        // 设置事件处理器（1 秒防抖，避免迁移期间扫描风暴）
         dispatchSource?.setEventHandler { [weak self] in
             guard let self else { return }
-            AppLogger.shared.logContext("FolderMonitor 检测到目录变化", details: [("path", self.url.path)], level: "TRACE")
-            self.onChange?()
+            self.debounceTimer?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                AppLogger.shared.logContext("FolderMonitor 检测到目录变化", details: [("path", self.url.path)], level: "TRACE")
+                self.onChange?()
+            }
+            self.debounceTimer = work
+            self.queue.asyncAfter(deadline: .now() + 1.0, execute: work)
         }
         
         // 设置取消处理器（清理资源）
@@ -117,6 +126,8 @@ class FolderMonitor {
     ///
     /// - Note: 会触发取消处理器，自动关闭文件描述符
     func stopMonitoring() {
+        debounceTimer?.cancel()
+        debounceTimer = nil
         if dispatchSource != nil {
             AppLogger.shared.logContext("FolderMonitor 停止监控", details: [("path", url.path)], level: "TRACE")
         }
