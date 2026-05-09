@@ -24,6 +24,7 @@ DerivedData/
 
 # Node.js
 User_docs/node_modules/
+User_docs/docs/.vitepress/dist/
 
 # Other
 *.xcscmblueprint
