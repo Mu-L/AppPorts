@@ -977,6 +977,13 @@ actor DataDirMover {
         if subPath == ["Library", "Application Support"] {
             return true
         }
+
+        // 微信专属：Data/Documents/xwechat_files 自身不可迁移（仅其子目录可迁移）
+        let isWeChatContainer = pathComponents[containersIndex + 1] == "com.tencent.xinWeChat"
+        if isWeChatContainer && subPath == ["Documents", "xwechat_files"] {
+            return true
+        }
+
         return false
     }
 

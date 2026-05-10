@@ -644,6 +644,18 @@ actor DataDirScanner {
         let dataURL = containerURL.appendingPathComponent("Data")
         guard fileManager.fileExists(atPath: dataURL.path) else { return [] }
 
+        // 微信专属策略：仅允许 xwechat_files 子目录和 Application Support/com.tencent.xinWeChat 迁移
+        let isWeChat = containerURL.lastPathComponent == "com.tencent.xinWeChat"
+        if isWeChat {
+            AppLogger.shared.log("[NestedDebug] Container=\(containerURL.lastPathComponent) | WeChat 专属策略激活", level: "DEBUG")
+            return scanWeChatContainerDataLinks(
+                in: containerURL,
+                priority: priority,
+                appName: appName,
+                externalRootURL: externalRootURL
+            )
+        }
+
         var results: [DataDirItem] = []
 
         let entries = directoryEntries(at: dataURL)
@@ -803,6 +815,378 @@ actor DataDirScanner {
         }
 
         return deduplicate(items: results)
+    }
+
+    // MARK: - 微信专属沙盒容器扫描策略
+
+    /// 微信容器 Data/ 第一层：仅展示 Documents 和 Library 作为不可迁移父节点
+    private func scanWeChatContainerDataLinks(
+        in containerURL: URL,
+        priority: DataDirPriority,
+        appName: String,
+        externalRootURL: URL?
+    ) -> [DataDirItem] {
+        let dataURL = containerURL.appendingPathComponent("Data")
+        var results: [DataDirItem] = []
+
+        let entries = directoryEntries(at: dataURL)
+        AppLogger.shared.log("[NestedDebug] WeChat Container=\(containerURL.lastPathComponent) | Data/ entries=\(entries.count) | \(entries.map(\.lastPathComponent).joined(separator: ", "))", level: "DEBUG")
+
+        for childURL in entries {
+            let relativeSuffix = childURL.standardizedFileURL.path.replacingOccurrences(of: containerURL.standardizedFileURL.path + "/", with: "")
+            let isDocuments = relativeSuffix == "Data/Documents"
+            let isLibrary = relativeSuffix == "Data/Library"
+            guard isDocuments || isLibrary else { continue }
+
+            let inspection = inspectItem(at: childURL, type: .containers)
+            let resolvedTarget = resolveSymlinkDestination(at: childURL)
+
+            // 处理已链接 / 待规范 / 外部软链的情况
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                var item = makeWeChatParentItem(
+                    relativeSuffix: relativeSuffix,
+                    path: childURL,
+                    priority: priority,
+                    appName: appName
+                )
+                item.linkedDestination = inspection.linkedDestination ?? resolvedTarget
+                applyInspectionResult(
+                    to: &item,
+                    inspection: (inspection.status, inspection.linkedDestination ?? resolvedTarget),
+                    externalRootURL: externalRootURL
+                )
+                results.append(item)
+            } else if let targetURL = resolvedTarget,
+                      shouldSurfaceNestedContainerLink(from: childURL, to: targetURL, externalRootURL: externalRootURL) {
+                var item = makeWeChatParentItem(
+                    relativeSuffix: relativeSuffix,
+                    path: childURL,
+                    priority: priority,
+                    appName: appName
+                )
+                item.linkedDestination = targetURL
+                applyInspectionResult(to: &item, inspection: (inspection.status, targetURL), externalRootURL: externalRootURL)
+                results.append(item)
+            } else if inspection.status == "本地" {
+                var item = makeWeChatParentItem(
+                    relativeSuffix: relativeSuffix,
+                    path: childURL,
+                    priority: priority,
+                    appName: appName
+                )
+                applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                results.append(item)
+            } else {
+                continue
+            }
+
+            // 扫描子目录
+            if isDocuments {
+                results.append(contentsOf: scanWeChatDocumentsChildren(
+                    in: containerURL,
+                    parentURL: childURL,
+                    priority: priority,
+                    appName: appName,
+                    externalRootURL: externalRootURL
+                ))
+            } else if isLibrary {
+                results.append(contentsOf: scanWeChatLibraryChildren(
+                    in: containerURL,
+                    parentURL: childURL,
+                    priority: priority,
+                    appName: appName,
+                    externalRootURL: externalRootURL
+                ))
+            }
+        }
+
+        return deduplicate(items: results)
+    }
+
+    /// 创建微信不可迁移父节点
+    private func makeWeChatParentItem(
+        relativeSuffix: String,
+        path: URL,
+        priority: DataDirPriority,
+        appName: String
+    ) -> DataDirItem {
+        var item = DataDirItem(
+            name: "容器子目录: \(relativeSuffix)",
+            path: path,
+            type: .containers,
+            priority: priority,
+            description: "容器内部数据目录".localized,
+            isMigratable: false,
+            nonMigratableReason: "容器目录受沙盒保护，直接迁移会导致应用崩溃。请迁移其子目录。".localized
+        )
+        item.associatedAppName = appName
+        return item
+    }
+
+    /// 微信 Data/Documents/ 第二层：仅展示 xwechat_files（不可迁移），其子目录各自可迁移
+    private func scanWeChatDocumentsChildren(
+        in containerURL: URL,
+        parentURL: URL,
+        priority: DataDirPriority,
+        appName: String,
+        externalRootURL: URL?
+    ) -> [DataDirItem] {
+        var results: [DataDirItem] = []
+        let entries = directoryEntries(at: parentURL)
+
+        for childURL in entries {
+            let relativeSuffix = childURL.standardizedFileURL.path.replacingOccurrences(of: containerURL.standardizedFileURL.path + "/", with: "")
+            guard relativeSuffix == "Data/Documents/xwechat_files" else { continue }
+
+            let inspection = inspectItem(at: childURL, type: .containers)
+            let nonMigratableReason = "请选择 xwechat_files 内的子目录进行迁移".localized
+
+            var xItem: DataDirItem
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                xItem = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信聊天文件存储目录。请选择内部子目录迁移。".localized,
+                    isMigratable: false,
+                    nonMigratableReason: nonMigratableReason
+                )
+                xItem.associatedAppName = appName
+                xItem.linkedDestination = inspection.linkedDestination ?? resolveSymlinkDestination(at: childURL)
+                applyInspectionResult(
+                    to: &xItem,
+                    inspection: (inspection.status, xItem.linkedDestination),
+                    externalRootURL: externalRootURL
+                )
+            } else if inspection.status == "本地" {
+                xItem = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信聊天文件存储目录。请选择内部子目录迁移。".localized,
+                    isMigratable: false,
+                    nonMigratableReason: nonMigratableReason
+                )
+                xItem.associatedAppName = appName
+                applyInspectionResult(to: &xItem, inspection: inspection, externalRootURL: externalRootURL)
+            } else {
+                continue
+            }
+            results.append(xItem)
+
+            // 扫描 xwechat_files 内部子目录（第三层）
+            results.append(contentsOf: scanWeChatXwechatFilesChildren(
+                in: containerURL,
+                parentURL: childURL,
+                priority: priority,
+                appName: appName,
+                externalRootURL: externalRootURL
+            ))
+        }
+
+        return results
+    }
+
+    /// 微信 xwechat_files/ 第三层：每个子目录独立可迁移
+    private func scanWeChatXwechatFilesChildren(
+        in containerURL: URL,
+        parentURL: URL,
+        priority: DataDirPriority,
+        appName: String,
+        externalRootURL: URL?
+    ) -> [DataDirItem] {
+        var results: [DataDirItem] = []
+        let entries = directoryEntries(at: parentURL)
+
+        for childURL in entries {
+            let relativeSuffix = childURL.standardizedFileURL.path.replacingOccurrences(of: containerURL.standardizedFileURL.path + "/", with: "")
+            let inspection = inspectItem(at: childURL, type: .containers)
+            let warning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信聊天文件子目录".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = inspection.linkedDestination ?? resolveSymlinkDestination(at: childURL)
+                applyInspectionResult(
+                    to: &item,
+                    inspection: (inspection.status, item.linkedDestination),
+                    externalRootURL: externalRootURL
+                )
+                results.append(item)
+            } else if let resolvedTarget = resolveSymlinkDestination(at: childURL),
+                      shouldSurfaceNestedContainerLink(from: childURL, to: resolvedTarget, externalRootURL: externalRootURL) {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信聊天文件子目录".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = resolvedTarget
+                applyInspectionResult(to: &item, inspection: (inspection.status, resolvedTarget), externalRootURL: externalRootURL)
+                results.append(item)
+            } else if inspection.status == "本地" {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信聊天文件子目录".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.migrationWarning = warning
+                applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                results.append(item)
+            }
+        }
+
+        return results
+    }
+
+    /// 微信 Data/Library/ 第二层：仅展示 Application Support（不可迁移），其下 com.tencent.xinWeChat 可迁移
+    private func scanWeChatLibraryChildren(
+        in containerURL: URL,
+        parentURL: URL,
+        priority: DataDirPriority,
+        appName: String,
+        externalRootURL: URL?
+    ) -> [DataDirItem] {
+        var results: [DataDirItem] = []
+        let entries = directoryEntries(at: parentURL)
+
+        for childURL in entries {
+            let relativeSuffix = childURL.standardizedFileURL.path.replacingOccurrences(of: containerURL.standardizedFileURL.path + "/", with: "")
+            guard relativeSuffix == "Data/Library/Application Support" else { continue }
+
+            let inspection = inspectItem(at: childURL, type: .containers)
+            let nonMigratableReason = "容器目录受沙盒保护，直接迁移会导致应用崩溃。请迁移其子目录。".localized
+
+            var asItem: DataDirItem
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                asItem = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "容器内部数据目录".localized,
+                    isMigratable: false,
+                    nonMigratableReason: nonMigratableReason
+                )
+                asItem.associatedAppName = appName
+                asItem.linkedDestination = inspection.linkedDestination ?? resolveSymlinkDestination(at: childURL)
+                applyInspectionResult(
+                    to: &asItem,
+                    inspection: (inspection.status, asItem.linkedDestination),
+                    externalRootURL: externalRootURL
+                )
+            } else if inspection.status == "本地" {
+                asItem = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "容器内部数据目录".localized,
+                    isMigratable: false,
+                    nonMigratableReason: nonMigratableReason
+                )
+                asItem.associatedAppName = appName
+                applyInspectionResult(to: &asItem, inspection: inspection, externalRootURL: externalRootURL)
+            } else {
+                continue
+            }
+            results.append(asItem)
+
+            // 扫描 Application Support 内部子目录（第三层）
+            results.append(contentsOf: scanWeChatAppSupportChildren(
+                in: containerURL,
+                parentURL: childURL,
+                priority: priority,
+                appName: appName,
+                externalRootURL: externalRootURL
+            ))
+        }
+
+        return results
+    }
+
+    /// 微信 Application Support/ 第三层：仅 com.tencent.xinWeChat 可迁移
+    private func scanWeChatAppSupportChildren(
+        in containerURL: URL,
+        parentURL: URL,
+        priority: DataDirPriority,
+        appName: String,
+        externalRootURL: URL?
+    ) -> [DataDirItem] {
+        var results: [DataDirItem] = []
+        let entries = directoryEntries(at: parentURL)
+
+        for childURL in entries {
+            let relativeSuffix = childURL.standardizedFileURL.path.replacingOccurrences(of: containerURL.standardizedFileURL.path + "/", with: "")
+            guard relativeSuffix == "Data/Library/Application Support/com.tencent.xinWeChat" else { continue }
+
+            let inspection = inspectItem(at: childURL, type: .containers)
+            let warning = "此目录位于沙盒应用容器内，迁移后应用可能无法打开。如遇此情况，请将该目录迁回本地即可恢复。".localized
+
+            if inspection.status == "已链接" || inspection.status == "待规范" {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信应用核心数据（设置、数据库等）".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = inspection.linkedDestination ?? resolveSymlinkDestination(at: childURL)
+                applyInspectionResult(
+                    to: &item,
+                    inspection: (inspection.status, item.linkedDestination),
+                    externalRootURL: externalRootURL
+                )
+                results.append(item)
+            } else if let resolvedTarget = resolveSymlinkDestination(at: childURL),
+                      shouldSurfaceNestedContainerLink(from: childURL, to: resolvedTarget, externalRootURL: externalRootURL) {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信应用核心数据（设置、数据库等）".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.linkedDestination = resolvedTarget
+                applyInspectionResult(to: &item, inspection: (inspection.status, resolvedTarget), externalRootURL: externalRootURL)
+                results.append(item)
+            } else if inspection.status == "本地" {
+                var item = DataDirItem(
+                    name: "容器子目录: \(relativeSuffix)",
+                    path: childURL,
+                    type: .containers,
+                    priority: priority,
+                    description: "微信应用核心数据（设置、数据库等）".localized,
+                    isMigratable: true
+                )
+                item.associatedAppName = appName
+                item.migrationWarning = warning
+                applyInspectionResult(to: &item, inspection: inspection, externalRootURL: externalRootURL)
+                results.append(item)
+            }
+        }
+
+        return results
     }
 
     private func shouldSurfaceNestedContainerLink(from sourceURL: URL, to targetURL: URL, externalRootURL: URL?) -> Bool {

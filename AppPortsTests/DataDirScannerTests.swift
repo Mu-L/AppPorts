@@ -276,4 +276,178 @@ final class DataDirScannerTests: XCTestCase {
             options: .atomic
         )
     }
+
+    // MARK: - 微信容器扫描策略测试
+
+    func testWeChatContainerOnlySurfacesDocumentsAndLibraryAtDataLevel() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let containerURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat")
+        let dataURL = containerURL.appendingPathComponent("Data")
+
+        try createDirectoryWithPayload(at: dataURL.appendingPathComponent("Documents"))
+        try createDirectoryWithPayload(at: dataURL.appendingPathComponent("Library"))
+        try createDirectoryWithPayload(at: dataURL.appendingPathComponent("SystemData"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        // 仅 Documents 和 Library 出现（作为不可迁移父节点）
+        let dataLevelItems = items.filter { $0.path.deletingLastPathComponent().lastPathComponent == "Data" }
+        let dataLevelNames = Set(dataLevelItems.map { $0.path.lastPathComponent })
+        XCTAssertEqual(dataLevelNames, ["Documents", "Library"])
+        for item in dataLevelItems {
+            XCTAssertFalse(item.isMigratable)
+        }
+    }
+
+    func testWeChatXwechatFilesSubdirectoriesAreIndividuallyMigratable() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let xwechatFilesURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files")
+
+        try createDirectoryWithPayload(at: xwechatFilesURL.appendingPathComponent("msg"))
+        try createDirectoryWithPayload(at: xwechatFilesURL.appendingPathComponent("file"))
+        try createDirectoryWithPayload(at: xwechatFilesURL.appendingPathComponent("video"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        let xChildren = items.filter { $0.path.path.contains("xwechat_files/") }
+        XCTAssertEqual(xChildren.count, 3)
+        for child in xChildren {
+            XCTAssertTrue(child.isMigratable)
+            XCTAssertEqual(child.status, "本地")
+        }
+    }
+
+    func testWeChatXwechatFilesItselfIsNotMigratable() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let xwechatFilesURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files")
+        try createDirectoryWithPayload(at: xwechatFilesURL)
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        let xDir = try XCTUnwrap(items.first(where: { $0.path.standardizedFileURL == xwechatFilesURL.standardizedFileURL }))
+        XCTAssertFalse(xDir.isMigratable)
+        XCTAssertNotNil(xDir.nonMigratableReason)
+    }
+
+    func testWeChatApplicationSupportComTencentXinWeChatIsMigratable() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let weChatDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat")
+        try createDirectoryWithPayload(at: weChatDataURL)
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        let weChatItem = try XCTUnwrap(items.first(where: { $0.path.standardizedFileURL == weChatDataURL.standardizedFileURL }))
+        XCTAssertTrue(weChatItem.isMigratable)
+        XCTAssertEqual(weChatItem.status, "本地")
+    }
+
+    func testWeChatOtherDocumentsChildrenAreNotSurfaced() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let documentsURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Documents")
+        try createDirectoryWithPayload(at: documentsURL.appendingPathComponent("OtherStuff"))
+        try createDirectoryWithPayload(at: documentsURL.appendingPathComponent("RandomDir"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        for item in items {
+            XCTAssertFalse(item.path.path.contains("OtherStuff"))
+            XCTAssertFalse(item.path.path.contains("RandomDir"))
+        }
+    }
+
+    func testWeChatOtherLibraryChildrenAreNotSurfaced() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let libraryURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Library")
+        try createDirectoryWithPayload(at: libraryURL.appendingPathComponent("Caches"))
+        try createDirectoryWithPayload(at: libraryURL.appendingPathComponent("Preferences"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        for item in items {
+            XCTAssertFalse(item.path.path.contains("Data/Library/Caches"))
+            XCTAssertFalse(item.path.path.contains("Data/Library/Preferences"))
+        }
+    }
+
+    func testWeChatOtherApplicationSupportChildrenAreNotSurfaced() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let appSupportURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support")
+        try createDirectoryWithPayload(at: appSupportURL.appendingPathComponent("com.other.App"))
+        try createDirectoryWithPayload(at: appSupportURL.appendingPathComponent("RandomSupport"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        for item in items {
+            XCTAssertFalse(item.path.path.contains("com.other.App"))
+            XCTAssertFalse(item.path.path.contains("RandomSupport"))
+        }
+    }
+
+    func testWeChatNonDocumentsNonLibraryDataChildrenAreNotSurfaced() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let dataURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data")
+        try createDirectoryWithPayload(at: dataURL.appendingPathComponent("SystemData"))
+
+        let items = await DataDirScanner(homeDir: workspace.homeURL).scanLibraryDirs(
+            for: AppItem(name: "WeChat.app", path: appURL, status: "本地"),
+            externalRootURL: workspace.externalRootURL
+        )
+
+        for item in items {
+            XCTAssertFalse(item.path.path.contains("SystemData"))
+        }
+    }
 }

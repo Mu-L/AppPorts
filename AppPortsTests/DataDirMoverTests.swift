@@ -307,4 +307,102 @@ final class DataDirMoverTests: XCTestCase {
     private func markerURL(for directoryURL: URL) -> URL {
         directoryURL.appendingPathComponent(".appports-link-metadata.plist")
     }
+
+    // MARK: - 微信容器迁移策略测试
+
+    func testWeChatApplicationSupportComTencentMigrationAllowed() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let weChatDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Library/Application Support/com.tencent.xinWeChat")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("WeChatAppSupport")
+        let externalDataURL = externalBaseURL.appendingPathComponent(weChatDataURL.lastPathComponent)
+
+        try createDirectoryWithPayload(at: weChatDataURL, payload: "wechat-core")
+
+        let item = DataDirItem(
+            name: "com.tencent.xinWeChat",
+            path: weChatDataURL,
+            type: .containers,
+            priority: .critical,
+            description: "微信核心数据",
+            isMigratable: true
+        )
+
+        try await DataDirMover(homeDir: workspace.homeURL).migrate(
+            item: item,
+            to: externalBaseURL,
+            progressHandler: nil
+        )
+
+        try assertSymlink(weChatDataURL, pointsTo: externalDataURL)
+        XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: externalDataURL).path))
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "wechat-core")
+    }
+
+    func testWeChatXwechatFilesSubdirectoryMigrationAllowed() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let msgURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/msg")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("WeChatXwechatFiles")
+        let externalMsgURL = externalBaseURL.appendingPathComponent("msg")
+
+        try createDirectoryWithPayload(at: msgURL, payload: "chat-messages")
+
+        let item = DataDirItem(
+            name: "msg",
+            path: msgURL,
+            type: .containers,
+            priority: .critical,
+            description: "微信消息目录",
+            isMigratable: true
+        )
+
+        try await DataDirMover(homeDir: workspace.homeURL).migrate(
+            item: item,
+            to: externalBaseURL,
+            progressHandler: nil
+        )
+
+        try assertSymlink(msgURL, pointsTo: externalMsgURL)
+        XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: externalMsgURL).path))
+        XCTAssertEqual(try String(contentsOf: externalMsgURL.appendingPathComponent("payload.txt")), "chat-messages")
+    }
+
+    func testNonWeChatContainerStillUsesUniversalStrategy() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let otherDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Containers/com.example.focus/Data/SomeDataDir")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("FocusData")
+        let externalDataURL = externalBaseURL.appendingPathComponent("SomeDataDir")
+
+        try createDirectoryWithPayload(at: otherDataURL, payload: "focus-stuff")
+
+        let item = DataDirItem(
+            name: "SomeDataDir",
+            path: otherDataURL,
+            type: .containers,
+            priority: .critical,
+            description: "普通应用数据",
+            isMigratable: true
+        )
+
+        // 非微信容器不受微信策略影响
+        try await DataDirMover(homeDir: workspace.homeURL).migrate(
+            item: item,
+            to: externalBaseURL,
+            progressHandler: nil
+        )
+
+        try assertSymlink(otherDataURL, pointsTo: externalDataURL)
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "focus-stuff")
+    }
 }
