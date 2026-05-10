@@ -172,7 +172,14 @@ struct ContentView: View {
                     onSelectExternalDrive: openPanelForExternalDrive,
                     onResignApp: performSingleResign,
                     onRestoreSignature: performRestoreSignature,
-                    onBackupSignature: performBackupSignature
+                    onBackupSignature: performBackupSignature,
+                    resolveRealAppURL: resolveRealAppURL(for:),
+                    onResignAppAtURL: { url, silent in
+                        performResign(at: url, bundleID: getBundleIdentifier(from: url), silent: silent)
+                    },
+                    onBackupSignatureForURL: { url in
+                        performBackupSignature(at: url, bundleID: getBundleIdentifier(from: url))
+                    }
                 )
             } else {
 
@@ -1586,9 +1593,11 @@ struct ContentView: View {
                 )
             } catch {
                 AppLogger.shared.logError(
-                    "迁移前备份签名身份失败",
+                    "备份签名身份失败",
                     error: error,
-                    context: [("app_name", app.displayName)]
+                    errorCode: "BACKUP-SIGNATURE-FAILED",
+                    context: [("app_name", app.displayName), ("bundle_id", bundleID)],
+                    relatedURLs: [("target_app", app.displayURL)]
                 )
             }
         }
@@ -1604,15 +1613,22 @@ struct ContentView: View {
             let signer = CodeSigner()
             do {
                 try await signer.sign(appURL: app.displayURL, bundleIdentifier: getBundleIdentifier(for: app))
+                AppLogger.shared.logContext(
+                    "重签名成功",
+                    details: [("app_name", app.displayName), ("path", app.path.path)],
+                    level: "INFO"
+                )
                 await MainActor.run {
                     scanLocalApps(calculateSizes: false)
                     scanExternalApps(calculateSizes: false)
                 }
             } catch {
                 AppLogger.shared.logError(
-                    "重签名失败",
+                    "重签名失败（应用可能无法通过 macOS 签名校验）",
                     error: error,
-                    context: [("app_name", app.displayName), ("silent", silent ? "true" : "false")]
+                    errorCode: "RESIGN-FAILED",
+                    context: [("app_name", app.displayName), ("path", app.path.path), ("silent", silent ? "true" : "false")],
+                    relatedURLs: [("target_app", app.displayURL)]
                 )
                 if !silent {
                     await MainActor.run {
@@ -1624,20 +1640,21 @@ struct ContentView: View {
     }
 
     func performRestoreSignature(app: AppItem) {
-        guard let bundleID = getBundleIdentifier(for: app) else {
+        let realURL = resolveRealAppURL(for: app)
+        guard let bundleID = getBundleIdentifier(from: realURL) else {
             showError(title: "恢复签名失败".localized, message: "无法读取应用 Bundle Identifier".localized)
             return
         }
 
         AppLogger.shared.logContext(
             "用户请求恢复原始签名",
-            details: [("app_name", app.displayName), ("bundle_id", bundleID)]
+            details: [("app_name", app.displayName), ("real_path", realURL.path), ("bundle_id", bundleID)]
         )
 
         Task {
             let signer = CodeSigner()
             do {
-                try await signer.restoreSignature(appURL: app.displayURL, bundleIdentifier: bundleID)
+                try await signer.restoreSignature(appURL: realURL, bundleIdentifier: bundleID)
                 await MainActor.run {
                     scanLocalApps(calculateSizes: false)
                     scanExternalApps(calculateSizes: false)
@@ -1657,6 +1674,116 @@ struct ContentView: View {
             return nil
         }
         return plist["CFBundleIdentifier"] as? String
+    }
+
+    /// 从指定 URL 读取 Bundle Identifier
+    nonisolated func getBundleIdentifier(from url: URL) -> String? {
+        let infoPlistURL = url.appendingPathComponent("Contents/Info.plist")
+        guard let plistData = try? Data(contentsOf: infoPlistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any] else {
+            return nil
+        }
+        return plist["CFBundleIdentifier"] as? String
+    }
+
+    /// 解析应用的真实路径（外部真实应用或本地真实应用），而非假壳
+    /// - 已链接应用：返回外部真实 .app 路径
+    /// - 未链接应用：返回本地真实 .app 路径
+    nonisolated func resolveRealAppURL(for app: AppItem) -> URL {
+        // 未链接：返回本地路径
+        guard app.status == "已链接" else {
+            return app.displayURL
+        }
+
+        // Whole-app symlink：解析符号链接目标
+        if let rawPath = try? FileManager.default.destinationOfSymbolicLink(atPath: app.path.path) {
+            return URL(fileURLWithPath: rawPath, relativeTo: app.path.deletingLastPathComponent()).standardizedFileURL
+        }
+
+        // Stub Portal：从 launcher 脚本解析外部路径
+        let launcherPath = app.path.appendingPathComponent("Contents/MacOS/launcher")
+        if let script = try? String(contentsOf: launcherPath, encoding: .utf8) {
+            // 匹配 REAL_APP='...' 中的路径
+            let pattern = "REAL_APP='([^']+)'"
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: script, range: NSRange(script.startIndex..., in: script)),
+               let range = Range(match.range(at: 1), in: script) {
+                let path = String(script[range])
+                let url = URL(fileURLWithPath: path)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    return url
+                }
+            }
+        }
+
+        // 兜底：返回本地路径
+        return app.displayURL
+    }
+
+    /// 解析符号链接目标
+    private func resolveSymlinkDestination(of url: URL) -> URL? {
+        guard let rawPath = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) else { return nil }
+        return URL(fileURLWithPath: rawPath, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
+    }
+
+    /// 对指定 URL 执行重签名（用于数据目录迁移后签名真实应用）
+    func performResign(at url: URL, bundleID: String?, silent: Bool = false) {
+        AppLogger.shared.logContext(
+            "数据迁移后重签名真实应用",
+            details: [("path", url.path), ("bundle_id", bundleID ?? "nil"), ("silent", silent ? "true" : "false")]
+        )
+
+        Task {
+            let signer = CodeSigner()
+            do {
+                try await signer.sign(appURL: url, bundleIdentifier: bundleID)
+                AppLogger.shared.logContext(
+                    "数据迁移后重签名成功",
+                    details: [("path", url.path), ("bundle_id", bundleID ?? "nil")],
+                    level: "INFO"
+                )
+                await MainActor.run {
+                    scanLocalApps(calculateSizes: false)
+                    scanExternalApps(calculateSizes: false)
+                }
+            } catch {
+                AppLogger.shared.logError(
+                    "数据迁移后重签名失败（应用可能无法通过 macOS 签名校验）",
+                    error: error,
+                    errorCode: "DATA-RESIGN-FAILED",
+                    context: [("path", url.path), ("bundle_id", bundleID ?? "nil"), ("silent", silent ? "true" : "false")],
+                    relatedURLs: [("target_app", url)]
+                )
+                if !silent {
+                    await MainActor.run {
+                        showError(title: "签名失败".localized, message: error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 对指定 URL 备份原始签名（用于数据目录迁移前）
+    func performBackupSignature(at url: URL, bundleID: String?) {
+        guard let bundleID = bundleID else { return }
+        Task {
+            let signer = CodeSigner()
+            do {
+                try await signer.backupOriginalSignature(appURL: url, bundleIdentifier: bundleID)
+                AppLogger.shared.logContext(
+                    "数据迁移前备份签名身份",
+                    details: [("path", url.path), ("bundle_id", bundleID)]
+                )
+            } catch {
+                AppLogger.shared.logError(
+                    "数据迁移前备份签名身份失败（后续恢复签名将无法使用原始身份）",
+                    error: error,
+                    errorCode: "DATA-BACKUP-SIGNATURE-FAILED",
+                    context: [("path", url.path), ("bundle_id", bundleID)],
+                    relatedURLs: [("target_app", url)]
+                )
+            }
+        }
     }
 
     // MARK: - Monitoring Helpers
@@ -1739,9 +1866,11 @@ struct ContentView: View {
                 }
             }
 
+            let finalLocalApps = newLocalApps
+            let finalExternalApps = newExternalApps
             await MainActor.run {
-                self.localApps = newLocalApps
-                self.externalApps = newExternalApps
+                self.localApps = finalLocalApps
+                self.externalApps = finalExternalApps
             }
 
             // 只重算没有大小信息的 app（新增的或状态变化的）

@@ -739,7 +739,7 @@ actor DataDirScanner {
                         let libSuffix = libChild.path.replacingOccurrences(of: containerURL.path + "/", with: "")
 
                         let libResolved = resolveSymlinkDestination(at: libChild)
-                        let libShouldSurface = libResolved.map { shouldSurfaceNestedContainerLink(from: libChild, to: $0, externalRootURL: externalRootURL) } ?? false
+                        _ = libResolved.map { shouldSurfaceNestedContainerLink(from: libChild, to: $0, externalRootURL: externalRootURL) }
 
                         let isProtectedAppSupport = libSuffix == "Data/Library/Application Support"
 

@@ -43,6 +43,12 @@ struct DataDirsView: View {
     let onRestoreSignature: ((AppItem) -> Void)?
     /// 迁移前备份原始签名的回调
     let onBackupSignature: ((AppItem) -> Void)?
+    /// 解析应用真实路径（已链接→外部，未链接→本地），不返回假壳路径
+    let resolveRealAppURL: ((AppItem) -> URL)?
+    /// 对指定 URL 重签名（autoResignEnabled 专用，签真实应用）
+    let onResignAppAtURL: ((URL, Bool) -> Void)?
+    /// 对指定 URL 备份签名（autoResignEnabled 专用）
+    let onBackupSignatureForURL: ((URL) -> Void)?
 
     // MARK: - 内部状态
     @State private var dotFolderItems: [DataDirItem] = []
@@ -1203,13 +1209,19 @@ struct DataDirsView: View {
                 ("type", item.type.rawValue),
                 ("source", item.path.path),
                 ("destination_root", dest.path)
-            ]
+            ] + appContextFields()
         )
 
         Task {
-            // 如果开启了迁移后重签名，先备份原始签名（在迁移前）
-            if self.autoResignEnabled, let app = self.selectedApp {
-                self.onBackupSignature?(app)
+            // autoResignEnabled：解析真实应用路径（外部真实应用或本地真实应用，而非假壳）
+            let realAppURL: URL? = {
+                guard self.autoResignEnabled, let app = self.selectedApp else { return nil }
+                return self.resolveRealAppURL?(app) ?? app.displayURL
+            }()
+
+            // 迁移前备份真实应用原始签名
+            if let url = realAppURL {
+                self.onBackupSignatureForURL?(url)
             }
 
             let mover = DataDirMover()
@@ -1229,9 +1241,9 @@ struct DataDirsView: View {
                     self.showProgress = false
                     self.reloadCurrentTab()
 
-                    // 数据迁移完成后自动重签名关联应用
-                    if self.autoResignEnabled, let app = self.selectedApp {
-                        self.onResignApp?(app, true)  // 静默重签名，失败不弹窗
+                    // 数据迁移完成后自动重签名真实应用
+                    if let url = realAppURL {
+                        self.onResignAppAtURL?(url, true)  // 静默重签名，失败不弹窗
                     }
                 }
             } catch {
@@ -1292,7 +1304,7 @@ struct DataDirsView: View {
                 ("type", item.type.rawValue),
                 ("local_path", item.path.path),
                 ("linked_destination", item.linkedDestination?.path)
-            ]
+            ] + appContextFields()
         )
 
         Task {
@@ -1338,7 +1350,7 @@ struct DataDirsView: View {
                 ("item_name", item.name),
                 ("local_path", item.path.path),
                 ("target", target.path)
-            ]
+            ] + appContextFields()
         )
         Task {
             let mover = DataDirMover()
@@ -1376,7 +1388,7 @@ struct DataDirsView: View {
                 ("item_name", item.name),
                 ("local_path", item.path.path),
                 ("target", target.path)
-            ]
+            ] + appContextFields()
         )
         Task {
             let mover = DataDirMover()
@@ -1495,6 +1507,27 @@ struct DataDirsView: View {
         let plistURL = app.path.appendingPathComponent("Contents/Info.plist")
         guard let dict = NSDictionary(contentsOf: plistURL) as? [String: Any] else { return nil }
         return dict["CFBundleIdentifier"] as? String
+    }
+
+    // MARK: - 日志辅助
+
+    /// 构建关联应用的背景信息字段，供各操作日志复用
+    private func appContextFields() -> [(String, String?)] {
+        guard let app = selectedApp else { return [] }
+        let realURL = resolveRealAppURL?(app) ?? app.displayURL
+        let bundleID: String? = {
+            let plistURL = realURL.appendingPathComponent("Contents/Info.plist")
+            guard let data = try? Data(contentsOf: plistURL),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else { return nil }
+            return plist["CFBundleIdentifier"] as? String
+        }()
+        return [
+            ("app_name", app.displayName),
+            ("app_status", app.status),
+            ("app_is_resigned", app.isResigned ? "true" : "false"),
+            ("app_bundle_id", bundleID),
+            ("app_real_path", realURL.path),
+        ]
     }
 
     /// 检测当前进程是否有 App 管理权限
@@ -1779,4 +1812,5 @@ struct DataDirGroupCard: View {
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
+
 }

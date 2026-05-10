@@ -1004,11 +1004,51 @@ actor AppScanner {
 
     private func checkResignedStatus(bundleURL: URL?) -> Bool {
         guard let bundleURL else { return false }
-        guard let bundleID = readBundleIdentifier(from: bundleURL) else { return false }
-        let backupPlist = Self.backupDirectoryURL.appendingPathComponent("\(bundleID).plist")
-        guard FileManager.default.fileExists(atPath: backupPlist.path) else { return false }
-        // 备份文件存在时，还需验证 app 当前签名确实是 ad-hoc（用户可能已重新安装原版）
-        return isAdHocSigned(at: bundleURL)
+
+        // 先用本地 bundle ID 检查
+        if let bundleID = readBundleIdentifier(from: bundleURL) {
+            let backupPlist = Self.backupDirectoryURL.appendingPathComponent("\(bundleID).plist")
+            if FileManager.default.fileExists(atPath: backupPlist.path) {
+                return isAdHocSigned(at: bundleURL)
+            }
+        }
+
+        // 已链接应用：备份保存在真实应用的 bundle ID 下，需要解析外部路径
+        if let externalURL = resolveExternalRealApp(from: bundleURL),
+           let realBundleID = readBundleIdentifier(from: externalURL) {
+            let backupPlist = Self.backupDirectoryURL.appendingPathComponent("\(realBundleID).plist")
+            if FileManager.default.fileExists(atPath: backupPlist.path) {
+                // 检查外部真实应用是否为 ad-hoc 签名
+                return isAdHocSigned(at: externalURL)
+            }
+        }
+
+        return false
+    }
+
+    /// 解析已链接应用的外部真实路径（支持 whole-app symlink 和 stub portal）
+    private func resolveExternalRealApp(from localURL: URL) -> URL? {
+        // Whole-app symlink
+        if let target = resolveSymlinkDestination(of: localURL) {
+            return target
+        }
+
+        // Stub Portal：从 launcher 脚本解析外部路径
+        let launcherPath = localURL.appendingPathComponent("Contents/MacOS/launcher")
+        if let script = try? String(contentsOf: launcherPath, encoding: .utf8) {
+            let pattern = "REAL_APP='([^']+)'"
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: script, range: NSRange(script.startIndex..., in: script)),
+               let range = Range(match.range(at: 1), in: script) {
+                let path = String(script[range])
+                let url = URL(fileURLWithPath: path)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    return url
+                }
+            }
+        }
+
+        return nil
     }
 
     /// 检查 app 是否为 ad-hoc 签名（非 Developer ID）
