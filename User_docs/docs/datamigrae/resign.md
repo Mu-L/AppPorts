@@ -87,9 +87,20 @@ flowchart TD
 
 ## 签名备份与恢复
 
+### 已链接应用的路径解析
+
+对于已链接应用（状态为「已链接」），签名操作会自动解析**外部真实应用路径**，而非本地的 Stub Portal 壳或符号链接。解析策略如下：
+
+| 迁移方式 | 解析方法 |
+|----------|----------|
+| Whole App Symlink | 解析符号链接目标，返回外部真实 `.app` 路径 |
+| Stub Portal | 从 `Contents/MacOS/launcher` 脚本中提取 `REAL_APP='...'` 路径 |
+
+这意味着备份、恢复和重签名操作始终作用于真实的应用包，确保签名变更生效。
+
 ### 备份
 
-备份文件保存在 `~/Library/Application Support/AppPorts/signature-backups/` 目录下，以 `BundleID.plist` 命名：
+备份文件保存在 `~/Library/Application Support/AppPorts/signature-backups/` 目录下，以**真实应用的** `BundleID.plist` 命名：
 
 | 字段 | 说明 |
 |------|------|
@@ -100,8 +111,9 @@ flowchart TD
 
 备份在以下时机触发：
 
-- 数据目录迁移前（若开启了自动重签名）
+- 数据目录迁移前（若开启了自动重签名）— 使用真实应用路径备份
 - 任何签名操作执行前（幂等，不会覆盖已有备份）
+- 手动执行「备份签名」时
 
 ### 恢复
 

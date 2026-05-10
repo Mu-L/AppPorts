@@ -89,9 +89,20 @@ flowchart TD
 
 ## Copia de Seguridad y Restauración de Firma
 
+### Resolución de Ruta para Apps Vinculadas
+
+Para apps vinculadas (estado: "Vinculada"), las operaciones de firmado resuelven automáticamente la **ruta real de la app externa** en lugar del shell Stub Portal local o el enlace simbólico. Estrategia de resolución:
+
+| Método de Migración | Resolución |
+|---------------------|-----------|
+| Whole App Symlink | Resuelve el destino del enlace simbólico a la ruta real `.app` externa |
+| Stub Portal | Extrae la ruta `REAL_APP='...'` del script `Contents/MacOS/launcher` |
+
+Esto significa que las operaciones de copia de seguridad, restauración y re-firmado siempre apuntan al paquete de aplicación real, asegurando que los cambios de firma se apliquen.
+
 ### Copia de Seguridad
 
-Los archivos de copia de seguridad se almacenan en el directorio `~/Library/Application Support/AppPorts/signature-backups/`, con el nombre `BundleID.plist`:
+Los archivos de copia de seguridad se almacenan en el directorio `~/Library/Application Support/AppPorts/signature-backups/`, con el nombre de la **app real** `BundleID.plist`:
 
 | Campo | Descripción |
 |-------|-------------|
@@ -102,8 +113,9 @@ Los archivos de copia de seguridad se almacenan en el directorio `~/Library/Appl
 
 Las copias de seguridad se activan en estos momentos:
 
-- Antes de la migración del directorio de datos (si el re-firmado automático está habilitado)
+- Antes de la migración del directorio de datos (si el re-firmado automático está habilitado) — usa la ruta real de la app para la copia de seguridad
 - Antes de cualquier operación de firmado (idempotente; no sobrescribe copias de seguridad existentes)
+- Acción manual de "Copia de seguridad de firma"
 
 ### Restauración
 

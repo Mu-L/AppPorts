@@ -74,10 +74,33 @@ Los registros de errores contienen información estructurada:
 |-------|-------------|
 | Descripción del Error | Descripción legible del error |
 | Tipo / Dominio / Código de Error | Información estructurada de NSError |
+| Código de Error | Código de error interno de AppPorts (ver tabla abajo) |
 | Razón del Fallo | Razón detallada del fallo |
 | Sugerencia de Recuperación | Sugerencia de recuperación proporcionada por el sistema |
 | Ruta de Archivo | Ruta del archivo afectado |
+| Rutas Relacionadas | Rutas de apps relacionadas en la operación (`relatedURLs`) |
 | Error Subyacente | Error anidado registrado recursivamente |
+
+### Códigos de Error
+
+| Código de Error | Significado |
+|-----------------|-------------|
+| `BACKUP-SIGNATURE-FAILED` | Copia de seguridad de firma falló |
+| `RESIGN-FAILED` | Re-firmado falló (la app puede no pasar la verificación de firma de macOS) |
+| `DATA-RESIGN-FAILED` | Re-firmado automático después de migración de directorio de datos falló |
+| `DATA-BACKUP-SIGNATURE-FAILED` | Copia de seguridad de firma antes de migración de directorio de datos falló (la firma original no se podrá restaurar después) |
+
+### Contexto de Operaciones de Directorio de Datos
+
+Las operaciones de directorio de datos (migración, restauración, normalización, re-vinculación) incluyen automáticamente información de contexto de la app asociada en los registros:
+
+| Campo | Descripción |
+|-------|-------------|
+| `app_name` | Nombre de la app asociada |
+| `app_status` | Estado de la app (Vinculada, Local, etc.) |
+| `app_is_resigned` | Si la app ha sido re-firmada |
+| `app_bundle_id` | Bundle ID de la app (leído de la ruta real) |
+| `app_real_path` | Ruta real externa de la app |
 
 ### Resumen de Operación
 

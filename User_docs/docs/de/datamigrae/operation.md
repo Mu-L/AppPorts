@@ -49,6 +49,33 @@ Für die vollständige unterstützte Liste siehe [Tool-Verzeichnis-Erkennung](/d
    - Ursprüngliches lokales Verzeichnis löschen
    - Symbolischen Link erstellen
 
+### Automatische Neuzeichnung
+
+Wenn „Automatisch neu signieren" in den Einstellungen aktiviert ist, löst die Datenverzeichnismigration automatisch die Signierung der zugehörigen App aus:
+
+1. **Vor der Migration**: Sichert die ursprüngliche Signatur des **realen externen Pfads** der zugehörigen App (nicht der lokalen Shell)
+2. **Nach der Migration**: Führt Ad-hoc-Neuzeichnung auf der **realen externen App** aus (Stillmodus; Fehler zeigen keinen Dialog)
+
+Für verknüpfte Apps löst AppPorts automatisch den realen App-Pfad hinter der Stub-Portal-Shell oder dem symbolischen Link auf und stellt sicher, dass Signaturänderungen auf das tatsächliche Anwendungspaket angewendet werden, nicht auf eine ungültige lokale Shell.
+
+::: tip 💡 Keine manuelle Aktion erforderlich
+Mit aktivierter automatischer Neuzeichnung ist der Datenverzeichnismigrations-Workflow vollständig automatisiert. Signatursicherung und Neuzeichnung betreffen beide den realen App-Pfad — keine manuelle Eingabe erforderlich.
+:::
+
+### Protokollkontext
+
+Datenverzeichnisoperationen (Migration, Wiederherstellung, Normalisierung, Neuverlinkung) fügen automatisch Kontextinformationen der zugehörigen App in die Protokolle ein:
+
+| Feld | Beschreibung |
+|------|--------------|
+| `app_name` | Name der zugehörigen App |
+| `app_status` | App-Status (Verknüpft, Lokal usw.) |
+| `app_is_resigned` | Ob die App neu signiert wurde |
+| `app_bundle_id` | Bundle ID der App (aus realem Pfad gelesen) |
+| `app_real_path` | Realer externer Pfad der App |
+
+Diese Felder helfen bei der Export von Diagnosepaketen, Probleme genauer zu lokalisieren.
+
 ### Batch-Migration
 
 1. Aktivieren Sie mehrere Verzeichnisse in der Tool-Verzeichnisliste

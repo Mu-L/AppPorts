@@ -89,9 +89,20 @@ flowchart TD
 
 ## 서명 백업 및 복원
 
+### 연결된 앱 경로 해결
+
+연결된 앱 (상태: 'Linked')의 경우, 서명 작업은 로컬 Stub Portal 셸이나 심볼릭 링크가 아닌 **외부 실제 앱 경로**를 자동으로 해결합니다. 해결 방법:
+
+| 마이그레이션 방식 | 해결 방법 |
+|-----------------|----------|
+| Whole App Symlink | 심볼릭 링크 대상을 해결하여 외부 실제 `.app` 경로 반환 |
+| Stub Portal | `Contents/MacOS/launcher` 스크립트에서 `REAL_APP='...'` 경로 추출 |
+
+즉, 백업, 복원, 재서명 작업은 항상 실제 애플리케이션 패키지를 대상으로 하여 서명 변경이 확실히 적용됩니다.
+
 ### 백업
 
-백업 파일은 `~/Library/Application Support/AppPorts/signature-backups/` 디렉토리에 `BundleID.plist`로 저장됩니다:
+백업 파일은 `~/Library/Application Support/AppPorts/signature-backups/` 디렉토리에 **실제 앱의** `BundleID.plist`로 저장됩니다:
 
 | 필드 | 설명 |
 |------|------|
@@ -102,8 +113,9 @@ flowchart TD
 
 백업은 다음 시점에 트리거됩니다:
 
-- 데이터 디렉토리 마이그레이션 전 (자동 재서명이 활성화된 경우)
+- 데이터 디렉토리 마이그레이션 전 (자동 재서명이 활성화된 경우) — 실제 앱 경로를 사용하여 백업
 - 모든 서명 작업 전 (멱등성; 기존 백업을 덮어쓰지 않음)
+- 수동 '서명 백업' 액션
 
 ### 복원
 

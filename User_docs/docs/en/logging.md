@@ -74,10 +74,33 @@ Error logs contain structured information:
 |-------|-------------|
 | Error Description | Human-readable error description |
 | Error Type / Domain / Code | NSError structured information |
+| Error Code | AppPorts internal error code (see table below) |
 | Failure Reason | Detailed failure reason |
 | Recovery Suggestion | System-provided recovery suggestion |
 | File Path | Affected file path |
+| Related Paths | Related app paths involved in the operation (`relatedURLs`) |
 | Underlying Error | Nested error recorded recursively |
+
+### Error Codes
+
+| Error Code | Meaning |
+|------------|---------|
+| `BACKUP-SIGNATURE-FAILED` | Signature backup failed |
+| `RESIGN-FAILED` | Re-signing failed (app may not pass macOS signature verification) |
+| `DATA-RESIGN-FAILED` | Auto-re-signing after data directory migration failed |
+| `DATA-BACKUP-SIGNATURE-FAILED` | Signature backup before data directory migration failed (original signature cannot be restored later) |
+
+### Data Directory Operation Context
+
+Data directory operations (migration, restore, normalization, relinking) automatically include associated app context information in logs:
+
+| Field | Description |
+|-------|-------------|
+| `app_name` | Associated app name |
+| `app_status` | App status (Linked, Local, etc.) |
+| `app_is_resigned` | Whether the app has been re-signed |
+| `app_bundle_id` | App's Bundle ID (read from real path) |
+| `app_real_path` | App's real external path |
 
 ### Operation Summary
 

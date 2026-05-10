@@ -4,11 +4,30 @@ outline: deep
 
 # Journal des modifications
 
+## v1.6.1
+
+- Corrigé : La re-signature automatique après la migration du répertoire de données signe maintenant correctement la vraie application externe au lieu du shell stub local
+- Corrigé : Les opérations de re-signature et de restauration de signature résolvent maintenant correctement le chemin réel pour les applications liées
+- Corrigé : La détection du statut « Re-signé » pour les applications liées identifie maintenant correctement le statut de signature de la vraie application externe
+- Amélioré : La sortie des logs inclut des codes d'erreur structurés et des informations de chemin associées
+
+## v1.6.0
+
+- Les applications migrées n'affichent plus de badges fléchés
+- Les applications à mise à jour automatique ne sont plus corrompues par les mises à jour après migration
+- Ajout de la fonctionnalité de gestion de signature d'application pour corriger les messages « Endommagé » après migration
+- La déconnexion du stockage externe affiche maintenant des avertissements rouges « Lien orphelin »
+- Les utilisateurs de macOS 15.1+ peuvent installer des applications App Store directement sur des disques externes
+- Migration des répertoires de données plus sûre : prévention de la migration accidentelle du répertoire système, récupération automatique après interruption
+- Scan et calcul de taille plus rapides ; la liste ne saute plus
+- Copie de fichiers vers le stockage externe plus stable ; plus d'erreurs d'interruption
+- Badges de statut d'application redessinés avec des informations plus riches et des détails cliquables
+- La liste d'applications conserve la sélection après actualisation ; les répertoires de données supportent la vue arborescente
+- Améliorations UI : recherche, tri, cartes de groupe, chargement d'icônes, etc.
+- Ajout de l'option de langue Martien
+- Mises à jour des tests automatisés
+
 ## v1.5.5
-
-Version actuelle.
-
-## v1.5.0
 
 - Ajout du support d'installation externe d'applications App Store macOS 15.1+
 - Ajout de la fonctionnalité de re-signature automatique (exécutée automatiquement après la migration du répertoire de données)

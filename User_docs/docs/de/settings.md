@@ -25,6 +25,10 @@ macOS 15.1 und neuer unterstützt die native App Store-App-Installation auf exte
 
 Wenn aktiviert, sichert jede Datenverzeichnismigration automatisch die ursprüngliche Signatur und führt die Neuzeichnung aus, um „Beschädigt"-Meldungen nach der Migration zu vermeiden.
 
+::: tip 💡 Automatische Neuzeichnung für verknüpfte Apps
+Für verknüpfte Apps (Status: „Verknüpft") löst die automatische Neuzeichnung automatisch den **realen externen App-Pfad** hinter der Stub-Portal-Shell oder dem symbolischen Link auf und stellt sicher, dass Signaturänderungen auf das tatsächliche Anwendungspaket angewendet werden. Sicherung und Neuzeichnung werden anhand der Bundle ID der realen App identifiziert.
+:::
+
 ## Protokollierungs-Einstellungen
 
 | Einstellung | Beschreibung | Standard |

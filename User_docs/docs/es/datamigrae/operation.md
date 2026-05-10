@@ -49,6 +49,33 @@ Para la lista completa soportada, consulte [Detección de Directorios de Herrami
    - Elimina el directorio local original
    - Crea un enlace simbólico
 
+### Re-firmado Automático
+
+Cuando "Re-firmado automático" está habilitado en la configuración, la migración del directorio de datos activa automáticamente el firmado para la app asociada:
+
+1. **Antes de la migración**: Respalda la firma original de la **ruta real externa** de la app asociada (no el shell local)
+2. **Después de la migración**: Ejecuta re-firmado Ad-hoc en la **app real externa** (modo silencioso; los fallos no muestran diálogo)
+
+Para apps vinculadas, AppPorts resuelve automáticamente la ruta real de la app detrás del shell Stub Portal o el enlace simbólico, asegurando que los cambios de firma se apliquen al paquete de aplicación real en lugar de un shell local inválido.
+
+::: tip 💡 No se requiere acción manual
+Con el re-firmado automático habilitado, el flujo de trabajo de migración del directorio de datos está completamente automatizado. El respaldo de firma y el re-firmado ambos apuntan a la ruta real de la app — no se requiere intervención manual.
+:::
+
+### Contexto de Logs
+
+Las operaciones de directorio de datos (migración, restauración, normalización, re-vinculación) incluyen automáticamente información de contexto de la app asociada en los logs:
+
+| Campo | Descripción |
+|-------|-------------|
+| `app_name` | Nombre de la app asociada |
+| `app_status` | Estado de la app (Vinculada, Local, etc.) |
+| `app_is_resigned` | Si la app ha sido re-firmada |
+| `app_bundle_id` | Bundle ID de la app (leído de la ruta real) |
+| `app_real_path` | Ruta real externa de la app |
+
+Estos campos ayudan a localizar problemas con más precisión al exportar paquetes de diagnóstico.
+
 ### Migración por Lotes
 
 1. Marque múltiples directorios en la lista de directorios de herramientas

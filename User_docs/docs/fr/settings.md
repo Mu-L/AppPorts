@@ -25,6 +25,10 @@ macOS 15.1 et ultérieur supportent l'installation native d'applications App Sto
 
 Quand activé, chaque migration de répertoire de données sauvegarde automatiquement la signature originale et exécute la re-signature pour éviter les messages « Endommagé » après la migration.
 
+::: tip 💡 Re-signature automatique pour les applications liées
+Pour les applications liées (statut : « Liée »), la re-signature automatique résout automatiquement le **vrai chemin de l'application externe** derrière le shell Stub Portal ou le lien symbolique, garantissant que les changements de signature sont appliqués au vrai package d'application. La sauvegarde et la re-signature sont identifiées par le Bundle ID de la vraie application.
+:::
+
 ## Réglages de journalisation
 
 | Réglage | Description | Défaut |

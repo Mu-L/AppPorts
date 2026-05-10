@@ -25,6 +25,10 @@ macOS 15.1 and later support native App Store app installation to external drive
 
 When enabled, each data directory migration automatically backs up the original signature and executes re-signing to avoid "Damaged" prompts after migration.
 
+::: tip 💡 Auto-Re-signing for Linked Apps
+For linked apps (status: "Linked"), auto-re-signing automatically resolves the **real external app path** behind the Stub Portal shell or symlink, ensuring signature changes are applied to the actual application package. Backup and re-signing operations are identified by the real app's Bundle ID.
+:::
+
 ## Logging Settings
 
 | Setting | Description | Default |

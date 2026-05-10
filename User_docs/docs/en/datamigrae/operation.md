@@ -49,6 +49,33 @@ For the full supported list, see [Tool Directory Detection](/en/datamigrae/tools
    - Delete the original local directory
    - Create a symbolic link
 
+### Auto Re-signing
+
+When "Auto Re-sign" is enabled in settings, data directory migration automatically triggers signing for the associated app:
+
+1. **Before migration**: Backs up the original signature of the associated app's **real external path** (not the local shell)
+2. **After migration**: Executes Ad-hoc re-signing on the **real external app** (silent mode; failures do not show a dialog)
+
+For linked apps, AppPorts automatically resolves the real app path behind the Stub Portal shell or symlink, ensuring signature changes are applied to the actual application package rather than an invalid local shell.
+
+::: tip 💡 No Manual Action Needed
+With auto-re-signing enabled, the data directory migration workflow is fully automated. Signature backup and re-signing both target the real app path — no manual intervention required.
+:::
+
+### Log Context
+
+Data directory operations (migration, restore, normalization, relinking) automatically include associated app context information in logs:
+
+| Field | Description |
+|-------|-------------|
+| `app_name` | Associated app name |
+| `app_status` | App status (Linked, Local, etc.) |
+| `app_is_resigned` | Whether the app has been re-signed |
+| `app_bundle_id` | App's Bundle ID (read from real path) |
+| `app_real_path` | App's real external path |
+
+These fields help pinpoint issues more precisely when exporting diagnostic packages.
+
 ### Batch Migration
 
 1. Check multiple directories in the tool directory list

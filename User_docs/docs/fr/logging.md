@@ -74,10 +74,33 @@ Les journaux d'erreur contiennent des informations structurées :
 |-------|-------------|
 | Description de l'erreur | Description d'erreur lisible par l'humain |
 | Type / Domaine / Code d'erreur | Informations structurées NSError |
+| Code d'erreur | Code d'erreur interne AppPorts (voir tableau ci-dessous) |
 | Raison de l'échec | Raison détaillée de l'échec |
 | Suggestion de récupération | Suggestion de récupération fournie par le système |
 | Chemin du fichier | Chemin du fichier affecté |
+| Chemins associés | Chemins d'applications associés à l'opération (`relatedURLs`) |
 | Erreur sous-jacente | Erreur imbriquée enregistrée récursivement |
+
+### Codes d'erreur
+
+| Code d'erreur | Signification |
+|---------------|---------------|
+| `BACKUP-SIGNATURE-FAILED` | Échec de la sauvegarde de signature |
+| `RESIGN-FAILED` | Échec de la re-signature (l'application peut ne pas passer la vérification de signature macOS) |
+| `DATA-RESIGN-FAILED` | Échec de la re-signature automatique après migration du répertoire de données |
+| `DATA-BACKUP-SIGNATURE-FAILED` | Échec de la sauvegarde de signature avant migration du répertoire de données (la signature originale ne pourra pas être restaurée ultérieurement) |
+
+### Contexte des opérations de répertoire de données
+
+Les opérations sur les répertoires de données (migration, restauration, normalisation, re-liage) incluent automatiquement les informations de contexte de l'application associée dans les journaux :
+
+| Champ | Description |
+|-------|-------------|
+| `app_name` | Nom de l'application associée |
+| `app_status` | Statut de l'application (Liée, Locale, etc.) |
+| `app_is_resigned` | Si l'application a été re-signée |
+| `app_bundle_id` | Bundle ID de l'application (lu depuis le vrai chemin) |
+| `app_real_path` | Vrai chemin externe de l'application |
 
 ### Résumé des opérations
 

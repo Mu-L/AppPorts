@@ -89,9 +89,20 @@ flowchart TD
 
 ## Sauvegarde et restauration de signature
 
+### Résolution de chemin pour les applications liées
+
+Pour les applications liées (statut : « Liée »), les opérations de signature résolvent automatiquement le **vrai chemin de l'application externe** au lieu du shell Stub Portal local ou du lien symbolique. Stratégie de résolution :
+
+| Méthode de migration | Résolution |
+|---------------------|-----------|
+| Whole App Symlink | Résout la cible du lien symbolique vers le vrai chemin `.app` externe |
+| Stub Portal | Extrait le chemin `REAL_APP='...'` du script `Contents/MacOS/launcher` |
+
+Cela signifie que les opérations de sauvegarde, restauration et re-signature ciblent toujours le vrai package d'application, garantissant que les changements de signature prennent effet.
+
 ### Sauvegarde
 
-Les fichiers de sauvegarde sont stockés dans le répertoire `~/Library/Application Support/AppPorts/signature-backups/`, nommés `BundleID.plist` :
+Les fichiers de sauvegarde sont stockés dans le répertoire `~/Library/Application Support/AppPorts/signature-backups/`, nommés d'après la **vraie application** `BundleID.plist` :
 
 | Champ | Description |
 |-------|-------------|
@@ -102,8 +113,9 @@ Les fichiers de sauvegarde sont stockés dans le répertoire `~/Library/Applicat
 
 Les sauvegardes sont déclenchées aux moments suivants :
 
-- Avant la migration du répertoire de données (si la re-signature automatique est activée)
+- Avant la migration du répertoire de données (si la re-signature automatique est activée) — utilise le vrai chemin de l'application pour la sauvegarde
 - Avant toute opération de signature (idempotente ; n'écrase pas les sauvegardes existantes)
+- Action manuelle « Sauvegarder la signature »
 
 ### Restauration
 

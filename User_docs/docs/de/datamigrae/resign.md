@@ -89,9 +89,20 @@ flowchart TD
 
 ## Signatur-Sicherung & Wiederherstellung
 
+### Pfadauflösung für verknüpfte Apps
+
+Für verknüpfte Apps (Status: „Verknüpft") lösen Signierungsoperationen automatisch den **echten externen App-Pfad** auf, anstatt die lokale Stub-Portal-Shell oder den symbolischen Link zu verwenden. Auflösungsstrategie:
+
+| Migrationsmethode | Auflösung |
+|-------------------|-----------|
+| Whole App Symlink | Löst das symbolische Link-Ziel zum echten externen `.app`-Pfad auf |
+| Stub Portal | Extrahiert den `REAL_APP='...'-Pfad aus dem `Contents/MacOS/launcher`-Skript |
+
+Das bedeutet, dass Sicherungs-, Wiederherstellungs- und Neuzeichnungsoperationen immer das tatsächliche Anwendungspaket betreffen und Signaturänderungen wirksam werden.
+
 ### Sicherung
 
-Sicherungsdateien werden im Verzeichnis `~/Library/Application Support/AppPorts/signature-backups/` gespeichert, benannt als `BundleID.plist`:
+Sicherungsdateien werden im Verzeichnis `~/Library/Application Support/AppPorts/signature-backups/` gespeichert, benannt nach der **realen App** `BundleID.plist`:
 
 | Feld | Beschreibung |
 |------|--------------|
@@ -102,8 +113,9 @@ Sicherungsdateien werden im Verzeichnis `~/Library/Application Support/AppPorts/
 
 Sicherungen werden zu folgenden Zeitpunkten ausgelöst:
 
-- Vor der Datenverzeichnismigration (falls automatische Neuzeichnung aktiviert ist)
-- Vor jeder Signierungsoperation (idempotent; überschreibt keine vorhandenen Sicherungen nicht)
+- Vor der Datenverzeichnismigration (falls automatische Neuzeichnung aktiviert ist) — verwendet den realen App-Pfad für die Sicherung
+- Vor jeder Signierungsoperation (idempotent; überschreibt keine vorhandenen Sicherungen)
+- Manuelle „Signatur sichern"-Aktion
 
 ### Wiederherstellung
 

@@ -4,11 +4,30 @@ outline: deep
 
 # Changelog
 
+## v1.6.1
+
+- Fixed: Auto-re-signing after data directory migration now correctly signs the real external app instead of the local stub shell
+- Fixed: Re-signing and signature restore operations now correctly resolve the real path for linked apps
+- Fixed: "Re-signed" status detection for linked apps now correctly identifies the signing status of the real external app
+- Improved: Log output includes structured error codes and related path information
+
+## v1.6.0
+
+- Migrated apps no longer show arrow badges
+- Auto-updating apps are no longer broken by updates after migration
+- Added app signature management feature to fix "Damaged" prompts after migration
+- External storage disconnection now shows red "Orphaned Link" warnings
+- macOS 15.1+ users can install App Store apps directly to external drives
+- Data directory migration is safer: prevents accidental system directory migration, auto-recovers from interruption
+- Scanning and size calculation are faster; list no longer jumps
+- File copying to external storage is more stable; no more errors on interruption
+- App status badges redesigned with richer information and clickable details
+- App list no longer loses selection after refresh; data directories support tree view
+- UI refinements: search, sort, group cards, icon loading, etc.
+- Added Martian language option
+- Automated test updates
+
 ## v1.5.5
-
-Current version.
-
-## v1.5.0
 
 - Added macOS 15.1+ App Store app external installation support
 - Added auto re-signing feature (auto-executed after data directory migration)

@@ -74,10 +74,33 @@ Fehlerprotokolle enthalten strukturierte Informationen:
 |------|--------------|
 | Fehlerbeschreibung | Menschenlesbare Fehlerbeschreibung |
 | Fehlertyp / Domain / Code | NSError-strukturierte Informationen |
+| Fehlercode | AppPorts interner Fehlercode (siehe Tabelle unten) |
 | Fehlergrund | Detaillierter Fehlergrund |
 | Wiederherstellungsvorschlag | Systembereitgestellter Wiederherstellungsvorschlag |
 | Dateipfad | Betroffener Dateipfad |
+| Zugehörige Pfade | Zugehörige App-Pfade der Operation (`relatedURLs`) |
 | Ursächlicher Fehler | Rekursiv aufgezeichneter verschachtelter Fehler |
+
+### Fehlercodes
+
+| Fehlercode | Bedeutung |
+|------------|-----------|
+| `BACKUP-SIGNATURE-FAILED` | Signatursicherung fehlgeschlagen |
+| `RESIGN-FAILED` | Neuzeichnung fehlgeschlagen (App kann macOS-Signaturprüfung nicht bestehen) |
+| `DATA-RESIGN-FAILED` | Automatische Neuzeichnung nach Datenverzeichnismigration fehlgeschlagen |
+| `DATA-BACKUP-SIGNATURE-FAILED` | Signatursicherung vor Datenverzeichnismigration fehlgeschlagen (ursprüngliche Signatur kann später nicht wiederhergestellt werden) |
+
+### Datenverzeichnis-Operationskontext
+
+Datenverzeichnisoperationen (Migration, Wiederherstellung, Normalisierung, Neuverlinkung) fügen automatisch Kontextinformationen der zugehörigen App in die Protokolle ein:
+
+| Feld | Beschreibung |
+|------|--------------|
+| `app_name` | Name der zugehörigen App |
+| `app_status` | App-Status (Verknüpft, Lokal usw.) |
+| `app_is_resigned` | Ob die App neu signiert wurde |
+| `app_bundle_id` | Bundle ID der App (aus realem Pfad gelesen) |
+| `app_real_path` | Realer externer Pfad der App |
 
 ### Operationszusammenfassung
 

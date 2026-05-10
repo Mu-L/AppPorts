@@ -49,6 +49,33 @@ Pour la liste complète supportée, voir [Détection des répertoires d'outils](
    - Supprimer le répertoire local original
    - Créer un lien symbolique
 
+### Re-signature automatique
+
+Lorsque « Re-signature automatique » est activée dans les paramètres, la migration du répertoire de données déclenche automatiquement la signature pour l'application associée :
+
+1. **Avant la migration** : Sauvegarde la signature originale du **vrai chemin externe** de l'application associée (pas le shell local)
+2. **Après la migration** : Exécute la re-signature Ad-hoc sur la **vraie application externe** (mode silencieux ; les échecs n'affichent pas de dialogue)
+
+Pour les applications liées, AppPorts résout automatiquement le vrai chemin de l'application derrière le shell Stub Portal ou le lien symbolique, garantissant que les changements de signature sont appliqués au vrai package d'application plutôt qu'à un shell local invalide.
+
+::: tip 💡 Aucune action manuelle requise
+Avec la re-signature automatique activée, le workflow de migration du répertoire de données est entièrement automatisé. La sauvegarde de signature et la re-signature ciblent toutes deux le vrai chemin de l'application — aucune intervention manuelle requise.
+:::
+
+### Contexte des logs
+
+Les opérations sur les répertoires de données (migration, restauration, normalisation, re-liage) incluent automatiquement les informations de contexte de l'application associée dans les logs :
+
+| Champ | Description |
+|-------|-------------|
+| `app_name` | Nom de l'application associée |
+| `app_status` | Statut de l'application (Liée, Locale, etc.) |
+| `app_is_resigned` | Si l'application a été re-signée |
+| `app_bundle_id` | Bundle ID de l'application (lu depuis le vrai chemin) |
+| `app_real_path` | Vrai chemin externe de l'application |
+
+Ces champs aident à localiser les problèmes plus précisément lors de l'exportation de packages de diagnostic.
+
 ### Migration par lots
 
 1. Cocher plusieurs répertoires dans la liste des répertoires d'outils

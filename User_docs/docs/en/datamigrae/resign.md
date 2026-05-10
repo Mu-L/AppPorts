@@ -89,9 +89,20 @@ flowchart TD
 
 ## Signature Backup & Restore
 
+### Linked App Path Resolution
+
+For linked apps (status: "Linked"), signing operations automatically resolve the **real external app path** instead of the local Stub Portal shell or symlink. Resolution strategy:
+
+| Migration Method | Resolution |
+|------------------|------------|
+| Whole App Symlink | Resolves the symlink target to the external real `.app` path |
+| Stub Portal | Extracts the `REAL_APP='...'` path from the `Contents/MacOS/launcher` script |
+
+This means backup, restore, and re-signing operations always target the real application package, ensuring signature changes take effect.
+
 ### Backup
 
-Backup files are stored in `~/Library/Application Support/AppPorts/signature-backups/` directory, named `BundleID.plist`:
+Backup files are stored in `~/Library/Application Support/AppPorts/signature-backups/` directory, named after the **real app's** `BundleID.plist`:
 
 | Field | Description |
 |-------|-------------|
@@ -102,8 +113,9 @@ Backup files are stored in `~/Library/Application Support/AppPorts/signature-bac
 
 Backups are triggered at these times:
 
-- Before data directory migration (if auto-re-signing is enabled)
+- Before data directory migration (if auto-re-signing is enabled) — uses the real app path for backup
 - Before any signing operation (idempotent; does not overwrite existing backups)
+- Manual "Backup Signature" action
 
 ### Restore
 

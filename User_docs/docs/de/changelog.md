@@ -4,11 +4,30 @@ outline: deep
 
 # Changelog
 
+## v1.6.1
+
+- Behoben: Automatische Neuzeichnung nach Datenverzeichnismigration signiert jetzt korrekt die echte externe App statt der lokalen Stub-Shell
+- Behoben: Neuzeichnung- und Signaturwiederherstellungsoperationen lösen jetzt korrekt den echten Pfad für verknüpfte Apps auf
+- Behoben: „Neu signiert"-Status-Erkennung für verknüpfte Apps erkennt jetzt korrekt den Signaturstatus der echten externen App
+- Verbessert: Log-Ausgabe enthält strukturierte Fehlercodes und zugehörige Pfadinformationen
+
+## v1.6.0
+
+- Migrierte Apps zeigen keine Pfeil-Badges mehr an
+- Auto-Update-Apps werden nach Migration durch Updates nicht mehr beschädigt
+- App-Signaturverwaltungsfunktion hinzugefügt, um „Beschädigt"-Meldungen nach Migration zu beheben
+- Externer Speicher-Trennung zeigt jetzt rote „Verwaiste Verbindung"-Warnungen
+- macOS 15.1+ Benutzer können App Store-Apps direkt auf externe Laufwerke installieren
+- Datenverzeichnismigration sicherer: Verhindert versehentliche Systemverzeichnis-Migration, automatische Wiederherstellung nach Unterbrechung
+- Scannen und Größenberechnung schneller; Liste springt nicht mehr
+- Dateikopie in externen Speicher stabiler; keine Fehler mehr bei Unterbrechung
+- App-Status-Badges neu gestaltet mit reichhaltigeren Informationen und klickbaren Details
+- App-Liste behält Auswahl nach Aktualisierung; Datenverzeichnisse unterstützen Baumansicht
+- UI-Verbesserungen: Suche, Sortierung, Gruppenkarten, Icon-Laden usw.
+- Martian-Sprachoption hinzugefügt
+- Automatisierungstest-Updates
+
 ## v1.5.5
-
-Aktuelle Version.
-
-## v1.5.0
 
 - macOS 15.1+ App Store-App externe Installationsunterstützung hinzugefügt
 - Automatische Neuzeichnung-Funktion hinzugefügt (automatisch nach Datenverzeichnismigration ausgeführt)

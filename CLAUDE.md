@@ -65,7 +65,7 @@ AppPorts/
 ├── AppPorts.xcodeproj/             # Xcode project (no SPM, no external deps)
 ├── AppPorts/                       # Main source
 │   ├── Appports.swift              # @main entry point + AppDelegate
-│   ├── ContentView.swift           # Main view (app migration tab, 1700+ lines)
+│   ├── ContentView.swift           # Main view (app migration tab, 1800+ lines)
 │   ├── WelcomeView.swift           # First-launch welcome screen
 │   ├── AboutView.swift             # About dialog with GitHub contributors
 │   ├── Localizable.xcstrings       # String catalog (20+ languages)
@@ -74,7 +74,7 @@ AppPorts/
 │   │   ├── DataDirItem.swift       # DataDirItem, DataDirType, DataDirPriority
 │   │   └── AppLanguageOption.swift # Language catalog (AppLanguageCatalog)
 │   ├── Views/
-│   │   ├── DataDirsView.swift      # Data directory management tab
+│   │   ├── DataDirsView.swift      # Data directory management tab (signing callbacks for real-path resolution)
 │   │   ├── AppStoreSettingsView.swift # Settings sheet
 │   │   └── Components/
 │   │       ├── AppIconView.swift   # Async app icon loader
@@ -88,7 +88,7 @@ AppPorts/
 │   │   ├── AppLogger.swift         # Logging + diagnostics export (1116 lines)
 │   │   └── CodeSigner.swift        # Code signing backup/restore (599 lines)
 │   └── Utils/
-│       ├── AppScanner.swift        # App scanner actor (1029 lines)
+│       ├── AppScanner.swift        # App scanner actor (1060+ lines)
 │       ├── DataDirScanner.swift    # Data dir scanner actor (~1400 lines)
 │       ├── DataDirMover.swift      # Data dir migration actor (1003 lines)
 │       ├── FileCopier.swift        # File copy with progress (458 lines)
@@ -181,7 +181,7 @@ View      View
 | File | Role |
 |------|------|
 | `Appports.swift` | `@main` entry, `AppDelegate` (prevents terminate on last window close), menu bar commands, `LanguageManager` locale injection |
-| `ContentView.swift` | Main view: app list management, migration/link/restore operations, FolderMonitor integration, debounced rescanning, inline helper views (`HeaderView`, `ActionFooter`, `EmptyStateView`, `TabButton`) |
+| `ContentView.swift` | Main view: app list management, migration/link/restore operations, FolderMonitor integration, debounced rescanning, inline helper views (`HeaderView`, `ActionFooter`, `EmptyStateView`, `TabButton`). Real-path resolution for linked apps (`resolveRealAppURL` — parses stub portal launcher script or symlink target). URL-based signing helpers (`performResign(at:bundleID:silent:)`, `performBackupSignature(at:bundleID:)`, `getBundleIdentifier(from:)`) for data directory migration signing flow |
 | `WelcomeView.swift` | First-launch screen: feature cards, Full Disk Access guidance, language switcher |
 | `AboutView.swift` | About dialog: version info, contributors (fetched from GitHub API with disk cache), links |
 
@@ -205,7 +205,7 @@ View      View
 
 | File | Role |
 |------|------|
-| `AppScanner.swift` | Actor: scans /Applications and external dirs, detects portal types (wholeApp/deepContents/stubPortal), system/running/AppStore/iOS/Electron/Sparkle/self-updater apps, resigned status, folder containers, deduplication by bundleID/name, macOS 15.1+ MAS external scanning |
+| `AppScanner.swift` | Actor: scans /Applications and external dirs, detects portal types (wholeApp/deepContents/stubPortal), system/running/AppStore/iOS/Electron/Sparkle/self-updater apps, resigned status, folder containers, deduplication by bundleID/name, macOS 15.1+ MAS external scanning. `resolveExternalRealApp(from:)` — parses stub portal launcher or symlink to find real external app for resigned status checking |
 | `DataDirScanner.swift` | Actor: scans 30+ known dotFolders (npm, maven, bun, conda, ollama, torch, whisper, cursor, vscode, docker, etc.), ~/Library/ subdirs matching by bundleID/appName, tree construction, status detection, managed link metadata verification |
 | `DataDirMover.swift` | Actor: migrate (copy→delete→symlink), restore (delete symlink→copy back), create link, normalize managed link, `.appports-link-metadata.plist` management, conflict detection, interrupted migration recovery, protected path detection |
 | `FileCopier.swift` | Actor: recursive directory copy preserving permissions/xattrs/timestamps, byte-level progress callbacks (5MB/50-file thresholds), symlink handling, socket skipping, EINTR retry for external storage |
@@ -238,6 +238,18 @@ AppPorts detects self-updating apps and applies lock protection (`chflags -R uch
 ### Data Directory Link Management
 
 `DataDirScanner` and `DataDirMover` both track managed symlinks using `.appports-link-metadata.plist` sidecar files in the external destination. This distinguishes AppPorts-created links from pre-existing symlinks. Status values: `本地` (local), `已链接` (linked), `待接回` (awaiting relink), `现有软链` (pre-existing symlink), `待规范` (needs normalization).
+
+### Real-Path Resolution for Linked Apps
+
+For linked apps (status `已链接`), the local path may be a Stub Portal shell or a whole-app symlink — neither is the real application package. Signing operations (resign, backup, restore) must target the real external app to take effect. Two resolution methods:
+
+- **`resolveRealAppURL(for:)`** in `ContentView.swift` — resolves the real app path for any `AppItem`:
+  - Whole App Symlink: resolves symlink target via `FileManager.destinationOfSymbolicLink(atPath:)`
+  - Stub Portal: extracts `REAL_APP='...'` from the `Contents/MacOS/launcher` script using regex
+  - Non-linked apps: returns `app.displayURL` as-is
+- **`resolveExternalRealApp(from:)`** in `AppScanner.swift` — same logic, used for resigned status detection. Checks both the local Bundle ID and the real external app's Bundle ID for signature backup existence.
+
+Both methods are `nonisolated` (no MainActor dependency) and support the two active portal strategies. `Deep Contents Wrapper` is legacy and not handled here.
 
 ### Key Data Models
 
@@ -278,6 +290,8 @@ AppPorts detects self-updating apps and applies lock protection (`chflags -R uch
 - **UserDefaults**: external drive path, language selection, log configuration
 - **Progress callbacks**: `FileCopier.ProgressHandler` is `@Sendable (Progress) async -> Void` for real-time UI updates from actor contexts
 - **Managed link metadata**: `.appports-link-metadata.plist` sidecar files for authoritative link tracking
+- **Real-path signing for linked apps**: signing operations (resign, backup, restore) always resolve to the real external app path via `resolveRealAppURL`/`resolveExternalRealApp`, never the local stub shell. This ensures signature changes take effect on the actual app package.
+- **Structured error logging**: `AppLogger.shared.logError` accepts `errorCode` (e.g., `BACKUP-SIGNATURE-FAILED`, `RESIGN-FAILED`, `DATA-RESIGN-FAILED`) and `relatedURLs` for machine-parseable error tracking. Data directory operations include `appContextFields()` context (app_name, app_status, app_bundle_id, app_real_path, app_is_resigned).
 - **Diagnostic export**: ZIP with redacted logs, operation summaries, system metadata
 - **Zero external dependencies**: pure Apple frameworks only (SwiftUI, AppKit, Foundation, Combine)
 

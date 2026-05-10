@@ -25,6 +25,10 @@ macOS 15.1 y posteriores soportan la instalación nativa de aplicaciones App Sto
 
 Cuando está habilitado, cada migración de directorio de datos hace automáticamente una copia de seguridad de la firma original y ejecuta el re-firmado para evitar mensajes de "Dañado" después de la migración.
 
+::: tip 💡 Re-firmado automático para apps vinculadas
+Para apps vinculadas (estado: "Vinculada"), el re-firmado automático resuelve automáticamente la **ruta real de la app externa** detrás del shell Stub Portal o el enlace simbólico, asegurando que los cambios de firma se apliquen al paquete de aplicación real. La copia de seguridad y el re-firmado se identifican por el Bundle ID de la app real.
+:::
+
 ## Configuración de Registro
 
 | Configuración | Descripción | Predeterminado |
