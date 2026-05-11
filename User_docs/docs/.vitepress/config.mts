@@ -44,6 +44,7 @@ export default defineConfig({
 
   head: [
     ["link", { rel: "icon", type: "image/png", href: "/logo.png" }],
+    ["script", { defer: true, src: "https://cloud.umami.is/script.js", "data-website-id": "2f0679ac-f605-4a76-9a55-11681b47cef5" }],
   ],
 
   locales: {
