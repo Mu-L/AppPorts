@@ -161,6 +161,15 @@ struct AppMoverApp: App {
                     AppLogger.shared.clearLog()
                 }
             }
+            
+            // 帮助菜单 — 添加文档入口
+            CommandGroup(after: .help) {
+                Button("用户文档".localized) {
+                    if let url = URL(string: "https://docs.appports.shimoko.com/") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
         }
     }
 }
