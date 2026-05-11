@@ -87,6 +87,7 @@ export default defineConfig({
                 { text: "迁移策略", link: "/migration-strategy/portal" },
                 { text: "应用类型与策略对照", link: "/migration-strategy/strategy-map" },
                 { text: "自更新应用识别", link: "/migration-strategy/updater-detection" },
+                { text: "App Store 应用更新策略", link: "/migration-strategy/appstore-update" },
               ]},
               { text: "设置", link: "/settings" },
               { text: "兼容性与限制", link: "/limitations" },
