@@ -7,7 +7,7 @@
 An application migration and linking tool designed specifically for macOS.
 Easily migrate large applications to external storage while maintaining seamless system functionality.
 
-[简体中文](README_CN.md)｜[Official Website](https://appports.shimoko.com/)｜[Documentation](https://docs.appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+[简体中文](README_CN.md)｜[Official Website](https://appports.shimoko.com/)｜[Documentation](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <div style="display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:nowrap;">
   <a href="https://www.producthunt.com/products/appports/launches/appports?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-appports" target="_blank" rel="noopener noreferrer">

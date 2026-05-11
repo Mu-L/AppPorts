@@ -7,7 +7,7 @@
 一款专为 macOS 设计的应用程序迁移与链接工具。
 轻松将庞大的应用程序迁移至外部存储，同时保持系统无感运行。
 
-[English](README.md)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs.appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+[English](README.md)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <div style="display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:nowrap;">
   <a href="https://www.producthunt.com/products/appports/launches/appports?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-appports" target="_blank" rel="noopener noreferrer">

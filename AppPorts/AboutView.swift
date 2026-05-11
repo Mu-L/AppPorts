@@ -244,7 +244,7 @@ struct AboutView: View {
                 LinkButton(
                     title: "用户文档".localized,
                     icon: "book.fill",
-                    url: "https://docs.appports.shimoko.com/"
+                    url: "https://docs-appports.shimoko.com/"
                 )
 
                 LinkButton(
