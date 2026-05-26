@@ -4,6 +4,37 @@ outline: deep
 
 # Registro de Cambios
 
+## v1.7.0
+
+### Nuevas funciones
+
+- Añadido el estado «Pendiente de mover fuera»: cuando la app local real tiene una versión superior a la app con el mismo nombre en el almacenamiento externo, AppPorts la marca como pendiente de mover fuera, indicando que la nueva versión local puede migrarse de forma segura para reemplazar la copia externa antigua.
+- Añadida confirmación de re-firmado para migración de datos: antes de migrar datos dentro del contenedor de una app, AppPorts puede preguntar si se debe aplicar automáticamente una firma Ad-hoc a la app relacionada después de la migración, reduciendo el riesgo de datos no reconocidos, advertencias o fallos de inicio tras migrar datos del contenedor (#44).
+
+### Mejoras de interfaz
+
+- Reorganizada la barra superior: los botones para cambiar entre la página de apps y la de directorios de datos ahora usan un estilo más compacto con icono + texto.
+- Optimizada la barra de acciones de directorios de datos: el cambio «Directorios de herramientas / Datos de app», el interruptor de re-firmado tras migración, el botón para restaurar la firma original y el botón de actualizar ahora están en la barra superior.
+- Añadida la insignia de estado «Pendiente de mover fuera» para identificar apps cuya versión local es superior a la copia externa antigua.
+- Localizado el diálogo de confirmación de re-firmado para migración de datos, incluyendo título, texto y botones.
+
+### Mejoras
+
+- Reforzada la seguridad de migración de apps: cuando el destino externo ya existe, AppPorts solo lo limpia automáticamente si se identifica como un portal antiguo gestionado por AppPorts, un resto de migración anterior o si la app está en estado «Pendiente de mover fuera».
+- Reforzada la validación de recuperación de directorios de datos: la recuperación automática ya no se basa en tamaños de directorio similares y ahora requiere coincidencia completa de AppPorts metadata.
+- Escaneo de datos de app más estable: al cambiar rápidamente de app, los resultados de tareas de escaneo anteriores ya no sobrescriben la lista de directorios de datos de la app actualmente seleccionada.
+- Mejorado el escape de comandos de administrador y AppleScript: las rutas con comillas, barras invertidas, espacios o caracteres chinos se gestionan de forma más segura.
+- Localización mejorada: corregidos contenidos de ayuda, avisos y confirmaciones de migración de datos que podían seguir en chino o quedar incompletos tras cambiar de idioma; completadas las traducciones para todos los idiomas soportados (#43).
+
+### Correcciones
+
+- Corregido un caso donde la migración de directorios de datos podía tratar erróneamente un directorio externo real como destino recuperable.
+- Corregido un caso donde la migración de apps podía eliminar por error una app externa real con el mismo nombre.
+- Corregida la detección y limpieza inestable de antiguos portales AppPorts externos o restos de migraciones anteriores.
+- Corregida la construcción incorrecta de AppleScript o comandos de administrador cuando la ruta contiene caracteres especiales.
+- Corregido un caso donde la migración en segundo plano o el re-firmado posterior podía leer una app ya cambiada.
+- Corregido que el estado «Pendiente de mover fuera» no apareciera como insignia en la lista de apps.
+
 ## v1.6.2
 
 - Nuevo: Re-firmado automático al iniciar sesión. Re-firma automáticamente las apps migradas con caducadas cada vez que el usuario inicia sesión, sin acción manual. Activado por defecto, se puede desactivar en Ajustes

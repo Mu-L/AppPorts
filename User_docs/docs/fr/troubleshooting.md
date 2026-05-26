@@ -15,9 +15,9 @@ Migration interrompue en raison de la déconnexion du stockage externe, d'un cra
 AppPorts dispose d'un mécanisme de récupération automatique intégré. Après le redémarrage d'AppPorts :
 
 1. Détecte les données de migration résiduelles (la copie externe existe mais le lien symbolique local n'est pas créé)
-2. Compare automatiquement les tailles des répertoires local et externe (seuil de 90%)
-3. Si les données sont complètes, termine automatiquement la migration (supprime le répertoire local original, crée le lien symbolique)
-4. Si les données sont incomplètes, nettoie la copie externe résiduelle et restaure l'état d'origine
+2. Vérifie `.appports-link-metadata.plist` dans le répertoire externe
+3. Continue la récupération ou la re-liaison uniquement si `schemaVersion`, `managedBy`, `sourcePath`, `destinationPath` et `dataDirType` correspondent complètement
+4. Si les métadonnées ne correspondent pas, arrête le traitement automatique et conserve les données existantes pour confirmation
 
 ::: tip 💡 Aucune intervention manuelle nécessaire
 Le mécanisme de récupération automatique d'AppPorts gère les migrations interrompues au lancement suivant. Si la récupération automatique échoue, vous pouvez voir les statuts « Nécessite une normalisation » ou « Nécessite une re-liaison » dans la liste des répertoires de données — exécutez simplement l'opération correspondante manuellement.
@@ -85,6 +85,10 @@ Si l'App Store ne peut pas mettre à jour les applications sur les disques exter
 3. **Vérifier le statut de verrouillage** : Si l'application est verrouillée (uchg), le programme de mise à jour automatique peut ne pas pouvoir s'exécuter
 4. **Vérifier les journaux** : Barre de menus → Journaux → Voir dans le Finder ; rechercher les messages d'erreur pertinents
 5. **Déplacer vers le local** : Dans la bibliothèque Applications externes, sélectionner « Déplacer vers le local » pour confirmer s'il s'agit d'un problème de stockage externe
+
+## La destination existe déjà
+
+AppPorts ne remplace automatiquement une destination d'application que si l'application est en état « Migration sortante en attente », ou si la destination est reconnue comme ancien portail/résidu géré par AppPorts. Les répertoires de données exigent une correspondance complète des métadonnées AppPorts. Les applications ou dossiers réels sans lien confirmé ne sont pas écrasés et sont signalés comme conflit.
 
 ## Problèmes d'affichage des répertoires de données
 

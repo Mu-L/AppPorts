@@ -25,5 +25,5 @@ When an app is marked as needing lock (`needsLock = true`), AppPorts executes `c
 ::: tip 💡 Why Custom Updater Apps Are Not Locked
 Apps using custom updaters like Chrome and Edge are not locked. These apps' updaters typically download and install new versions to local internal storage. Due to macOS Stub Portal's link isolation characteristics, this does not damage app files on external storage.
 
-When AppPorts detects that the app version on local internal storage is higher than on external storage, it automatically tags the app with "Pending Migration," prompting the user to re-migrate to synchronize the latest version.
+When AppPorts detects that the app version on local internal storage is higher than on external storage, it automatically tags the app with "Pending Move Out," prompting the user to re-migrate to synchronize the latest version.
 :::

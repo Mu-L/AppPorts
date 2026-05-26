@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "AppPorts"
   text: "外置硬盘拯救世界"
-  tagline: "无缝迁移应用到外部存储并自动建立链接，释放宝贵的本地空间"
+  tagline: "将大型应用和数据目录迁移到外部存储，自动建立本地入口，释放宝贵的本地空间"
   actions:
     - theme: brand
       text: "快速开始"
@@ -21,13 +21,13 @@ hero:
 features:
   - icon: 🔄
     title: "无角标迁移"
-    details: "一键将大型应用迁移至外置硬盘。本地仅保留轻量启动器壳，Finder 不显示快捷方式箭头，Launchpad 与应用菜单正常显示。"
+    details: "一键将大型应用迁移至外部存储。本地仅保留轻量启动器壳，Finder 不显示快捷方式箭头，Launchpad 与应用菜单正常显示。"
   - icon: 🔒
     title: "自动更新保护"
-    details: "自动识别 Sparkle、Electron 等自更新应用，提供「锁定迁移」选项，防止外置硬盘上的应用被自动更新程序删除或覆盖。"
+    details: "自动识别 Sparkle、Electron 等自更新应用，提供「锁定迁移」选项；本地新版高于外部旧副本时，会标记为「待迁出」。"
   - icon: 📦
     title: "数据目录管理"
-    details: "支持将 ~/Library/ 子目录、~/.npm 等数据迁移至外部存储，提供树形分组视图、搜索与排序功能。"
+    details: "支持将 ~/Library/ 子目录、~/.npm 等数据目录迁移至外部存储，提供树形视图、重签名确认与 metadata 恢复校验。"
 ---
 
 <script setup lang="ts">

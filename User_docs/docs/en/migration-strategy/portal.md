@@ -104,3 +104,16 @@ flowchart TD
 ::: tip About Deep Contents Wrapper
 This strategy is no longer selected for new migrations in the current version. The `preferredPortalKind()` method returns `stubPortal` for all `.app` apps. Deep Contents Wrapper is only recognized as a legacy scheme when restoring historically migrated apps.
 :::
+
+## Destination Conflicts and Replacement
+
+When the external destination already contains a same-name item, AppPorts checks whether it can be safely replaced:
+
+| Case | Behavior |
+|------|----------|
+| Current app is "Pending Move Out" | Clean the old external copy and replace it with the newer local app |
+| Target is an AppPorts Stub Portal | Clean it and continue migration |
+| Target is an old Deep Contents Wrapper or whole-app symlink entry | Treat it as a legacy AppPorts entry and clean it |
+| Target is an unrelated real app or directory | Stop migration and report a conflict |
+
+Legacy hybrid entries may keep symbolic links only at `Contents/Info.plist`, `Contents/MacOS`, `Contents/Resources`, or `Contents/Frameworks`. Current versions recognize those old structures for safe cleanup and restore, but do not delete real apps that cannot be identified as AppPorts-managed entries.

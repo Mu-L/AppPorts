@@ -21,10 +21,12 @@ macOS 15.1 and later support native App Store app installation to external drive
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Auto Re-sign | Automatically executes Ad-hoc re-signing on associated apps after data directory migration | Off |
+| Auto Re-sign | Executes Ad-hoc re-signing on associated apps after data directory migration; container migrations ask for confirmation | Off |
 | Auto Re-sign at Login | Automatically re-signs migrated apps with expired signatures each time the user logs in | On |
 
 When enabled, each data directory migration automatically backs up the original signature and executes re-signing to avoid "Damaged" prompts after migration.
+
+In the Data Directories view, the "Re-sign after migration" toggle is in the top toolbar. When migrating `Containers` or `Group Containers` data, AppPorts asks whether to re-sign after migration: accept to Ad-hoc re-sign the associated app, or decline to migrate data only.
 
 When "Auto Re-sign at Login" is enabled, a LaunchAgent (`com.shimoko.AppPorts.re-sign`) is installed to scan signature backup records at each user login and automatically re-sign apps whose Ad-hoc signatures have expired. Re-sign logs are written to the AppPorts default log file.
 

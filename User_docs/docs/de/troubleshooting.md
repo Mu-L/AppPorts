@@ -15,9 +15,9 @@ Migration wurde durch Trennung des externen Speichers, Systemabsturz oder App-Zw
 AppPorts hat einen eingebauten Auto-Wiederherstellungsmechanismus. Nach dem Neustart von AppPorts:
 
 1. Erkennt verbleibende Migrationsdaten (externe Kopie vorhanden, aber lokaler symbolischer Link nicht erstellt)
-2. Vergleicht automatisch lokale und externe Verzeichnisgrößen (90%-Schwellenwert)
-3. Sind die Daten vollständig, wird die Migration automatisch abgeschlossen (lokales Originalverzeichnis löschen, symbolischen Link erstellen)
-4. Sind die Daten unvollständig, wird die verbleibende externe Kopie bereinigt und der ursprüngliche Zustand wiederhergestellt
+2. Prüft `.appports-link-metadata.plist` im externen Verzeichnis
+3. Nur wenn `schemaVersion`, `managedBy`, `sourcePath`, `destinationPath` und `dataDirType` vollständig übereinstimmen, wird die Wiederherstellung oder Neuverlinkung fortgesetzt
+4. Stimmen die Metadaten nicht überein, stoppt AppPorts die automatische Verarbeitung und erhält die vorhandenen Daten zur manuellen Prüfung
 
 ::: tip 💡 Kein manueller Eingriff erforderlich
 Der Auto-Wiederherstellungsmechanismus von AppPorts behandelt unterbrochene Migrationen beim nächsten Start. Falls die Auto-Wiederherstellung fehlschlägt, sehen Sie möglicherweise den Status „Normalisierung erforderlich" oder „Neuverlinkung erforderlich" in der Datenverzeichnisliste — führen Sie einfach die entsprechende Operation manuell aus.
@@ -85,6 +85,10 @@ Falls der App Store Apps auf externen Laufwerken nicht aktualisieren kann:
 3. **Sperrstatus prüfen**: Falls die App gesperrt ist (uchg), kann der Selbst-Updater möglicherweise nicht ausgeführt werden
 4. **Protokolle prüfen**: Menüleiste → Protokolle → Im Finder anzeigen; nach relevanten Fehlermeldungen suchen
 5. **Zurück in den lokalen Speicher verschieben**: In der Externe-Apps-Bibliothek „Zurück in den lokalen Speicher verschieben" auswählen, um zu prüfen, ob es ein Problem mit dem externen Speicher ist
+
+## Zielpfad existiert bereits
+
+AppPorts ersetzt ein App-Ziel nur automatisch, wenn die App den Status „Ausstehendes Herausverschieben" hat oder das Ziel als alter AppPorts-Portal-Eintrag bzw. Rest erkannt wird. Datenverzeichnisse werden nur bei vollständig passenden AppPorts-Metadaten automatisch wiederhergestellt. Unabhängige echte Apps oder Verzeichnisse werden nicht überschrieben, sondern als Konflikt gemeldet.
 
 ## Datenverzeichnis-Anzeigeprobleme
 

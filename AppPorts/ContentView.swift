@@ -262,23 +262,55 @@ struct ContentView: View {
     // MARK: - Tab
     enum MainTab { case apps, dataDirs }
     @State private var mainTab: MainTab = .apps
+    @State private var selectedDataDirsTab: DataDirsView.DataTab = .toolDirs
+    @State private var selectedDataDirsApp: AppItem? = nil
+    @State private var isDataDirsScanning = false
+    @State private var dataDirsRefreshTrigger = 0
+    @AppStorage("autoResignEnabled") private var autoResignEnabled = false
 
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - Top Toolbar
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 // Tab 切换器
-                HStack(spacing: 2) {
-                    TabButton(title: "📦 " + "应用".localized, isSelected: mainTab == .apps) {
+                HStack(spacing: 4) {
+                    TabButton(title: "应用", systemImage: "cube", isSelected: mainTab == .apps) {
                         withAnimation { mainTab = .apps }
                     }
-                    TabButton(title: "🗄️ " + "数据目录".localized, isSelected: mainTab == .dataDirs) {
+                    TabButton(title: "数据目录", systemImage: "cylinder", isSelected: mainTab == .dataDirs) {
                         withAnimation { mainTab = .dataDirs }
                     }
                 }
                 .padding(3)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                        )
+                )
+
+                if mainTab == .dataDirs {
+                    HStack(spacing: 4) {
+                        TabButton(title: DataDirsView.DataTab.toolDirs.rawValue, isSelected: selectedDataDirsTab == .toolDirs) {
+                            withAnimation { selectedDataDirsTab = .toolDirs }
+                        }
+                        TabButton(title: DataDirsView.DataTab.appDirs.rawValue, isSelected: selectedDataDirsTab == .appDirs) {
+                            withAnimation { selectedDataDirsTab = .appDirs }
+                        }
+                    }
+                    .padding(3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                            )
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                }
 
                 if mainTab == .apps {
                     // Search Bar
@@ -323,6 +355,10 @@ struct ContentView: View {
 
                 Spacer()
 
+                if mainTab == .dataDirs {
+                    dataDirsToolbarControls
+                }
+
                 // App Store Settings Button（始终显示）
                 Button(action: { showAppStoreSettings = true }) {
                     Label("设置".localized, systemImage: "gearshape")
@@ -331,7 +367,7 @@ struct ContentView: View {
                 .help("App Store 应用迁移设置".localized)
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .background(.ultraThinMaterial)
 
             Divider()
@@ -341,6 +377,11 @@ struct ContentView: View {
                 DataDirsView(
                     externalDriveURL: externalDriveURL,
                     localApps: localApps,
+                    selectedTab: $selectedDataDirsTab,
+                    selectedApp: $selectedDataDirsApp,
+                    isScanning: $isDataDirsScanning,
+                    autoResignEnabled: $autoResignEnabled,
+                    refreshTrigger: dataDirsRefreshTrigger,
                     onSelectExternalDrive: openPanelForExternalDrive,
                     onResignApp: performSingleResign,
                     onRestoreSignature: performRestoreSignature,
@@ -846,23 +887,88 @@ struct ContentView: View {
         }
     }
 
+    private var dataDirsToolbarControls: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: autoResignEnabled ? "seal.fill" : "seal")
+                    .font(.system(size: 12))
+                    .foregroundColor(autoResignEnabled ? .teal : .secondary)
+
+                Text("迁移后重签名".localized)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Toggle("", isOn: $autoResignEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+
+                HelpButton(content: """
+                **什么是重签名？**
+
+                数据目录迁移到外部存储后，macOS 可能认为应用已被修改，在 Finder 中提示「已损坏」或「无法打开」。
+
+                开启此选项后，AppPorts 会在数据迁移完成后自动对关联应用执行 **Ad-hoc 自签名**，绕过此限制。
+
+                **可能的影响：**
+                • 应用原有的 Developer ID 签名将被替换
+                • 部分依赖签名验证的功能（如 Keychain 访问）可能受限
+                • 应用更新后可能需要重新迁移数据
+
+                如需恢复原始签名，可在应用列表中右键选择「恢复原始签名」。
+                """.localized)
+            }
+            .help("数据迁移完成后，自动对关联应用执行 Ad-hoc 重签名，避免 Finder 提示「已损坏」".localized)
+
+            if selectedDataDirsTab == .appDirs, let app = selectedDataDirsApp, app.isResigned {
+                Button(action: { performRestoreSignature(app: app) }) {
+                    Label("恢复原始签名".localized, systemImage: "arrow.counterclockwise")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.teal)
+                .help("恢复选中应用的原始代码签名".localized)
+            }
+
+            Button(action: { dataDirsRefreshTrigger += 1 }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .medium))
+                    .rotationEffect(.degrees(isDataDirsScanning ? 360 : 0))
+                    .animation(isDataDirsScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isDataDirsScanning)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+            .disabled(isDataDirsScanning)
+            .help("刷新列表".localized)
+        }
+    }
+
     /// Tab 切换按钮（顶部工具栏用）
     struct TabButton: View {
         let title: String
+        var systemImage: String? = nil
         let isSelected: Bool
         let action: () -> Void
 
         var body: some View {
             Button(action: action) {
-                Text(title.localized)
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
-                    )
+                HStack(spacing: 7) {
+                    if let systemImage {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                    Text(title.localized)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+                .padding(.horizontal, systemImage == nil ? 14 : 12)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(isSelected ? Color(nsColor: .windowBackgroundColor) : Color.clear)
+                        .shadow(color: isSelected ? Color.black.opacity(0.12) : Color.clear, radius: 2, x: 0, y: 1)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
             .buttonStyle(.plain)
         }
@@ -874,7 +980,7 @@ struct ContentView: View {
         // 获取所有选中且可迁移的应用
         let validApps = selectedLocalApps.compactMap { id in
             localApps.first { $0.id == id }
-        }.filter { !$0.isSystemApp && !$0.isRunning && $0.status != "已链接" }
+        }.filter { !$0.isSystemApp && !$0.isRunning && $0.status != AppStatus.linked }
         
         if selectedLocalApps.isEmpty {
             return ("迁移到外部".localized, false)
@@ -885,7 +991,7 @@ struct ContentView: View {
             let selectedAppsData = selectedLocalApps.compactMap { id in localApps.first { $0.id == id } }
             if selectedAppsData.contains(where: { $0.isSystemApp }) { return ("含系统应用".localized, true) }
             if selectedAppsData.contains(where: { $0.isRunning }) { return ("含运行中应用".localized, true) }
-            if selectedAppsData.contains(where: { $0.status == "已链接" }) { return ("已链接".localized, false) }
+            if selectedAppsData.contains(where: { $0.status == AppStatus.linked }) { return ("已链接".localized, false) }
             return ("迁移到外部".localized, false)
         }
 
@@ -902,7 +1008,7 @@ struct ContentView: View {
         // 至少有一个可迁移的应用
         let validApps = selectedLocalApps.compactMap { id in
             localApps.first { $0.id == id }
-        }.filter { !$0.isSystemApp && !$0.isRunning && $0.status != "已链接" }
+        }.filter { !$0.isSystemApp && !$0.isRunning && $0.status != AppStatus.linked }
         
         return !validApps.isEmpty
     }
@@ -911,7 +1017,7 @@ struct ContentView: View {
         // 至少有一个可链接的应用
         let validApps = selectedExternalApps.compactMap { id in
             externalApps.first { $0.id == id }
-        }.filter { $0.status == "未链接" || $0.status == "外部" }
+        }.filter { $0.status == AppStatus.unlinked || $0.status == AppStatus.external }
         
         return !validApps.isEmpty
     }
@@ -919,7 +1025,7 @@ struct ContentView: View {
     func getLinkButtonTitle() -> String {
         let validApps = selectedExternalApps.compactMap { id in
             externalApps.first { $0.id == id }
-        }.filter { $0.status == "未链接" || $0.status == "外部" }
+        }.filter { $0.status == AppStatus.unlinked || $0.status == AppStatus.external }
         
         if selectedExternalApps.isEmpty || validApps.isEmpty {
             return "链接回本地".localized
@@ -962,7 +1068,7 @@ struct ContentView: View {
         if app.isRunning {
             return "running"
         }
-        if app.status == "已链接" {
+        if app.status == AppStatus.linked {
             return "already_linked"
         }
         if app.isIOSApp && !allowIOSAppMigration {
@@ -985,10 +1091,15 @@ struct ContentView: View {
             // Gather data needed for scanning
             let runningAppURLs = await MainActor.run { self.getRunningAppURLs() }
             let scanDir = self.localAppsURL
+            let externalAppsDir = await MainActor.run { self.externalDriveURL }
             
             // Use Actor
             let scanner = AppScanner()
-            let newApps = await scanner.scanLocalApps(at: scanDir, runningAppURLs: runningAppURLs)
+            let newApps = await scanner.scanLocalApps(
+                at: scanDir,
+                runningAppURLs: runningAppURLs,
+                externalAppsDir: externalAppsDir
+            )
             
             await MainActor.run {
                 self.localApps = newApps
@@ -1292,7 +1403,7 @@ struct ContentView: View {
             localApps.first { $0.id == id }
         }.filter { app in
             // 基本过滤条件
-            guard !app.isSystemApp && !app.isRunning && app.status != "已链接" else { return false }
+            guard !app.isSystemApp && !app.isRunning && app.status != AppStatus.linked else { return false }
             
             // 如果启用了迁移 iOS 应用，iOS 应用可以迁移
             if app.isIOSApp {
@@ -1312,7 +1423,7 @@ struct ContentView: View {
         let skippedApps = selectedLocalApps.compactMap { id in
             localApps.first { $0.id == id }
         }.filter { app in
-            guard !app.isSystemApp && app.status != "已链接" else { return false }
+            guard !app.isSystemApp && app.status != AppStatus.linked else { return false }
             
             if app.isIOSApp && !allowIOSAppMigration {
                 return true
@@ -1480,7 +1591,7 @@ struct ContentView: View {
         // 获取所有选中且可链接的应用
         let validApps = selectedExternalApps.compactMap { id in
             externalApps.first { $0.id == id }
-        }.filter { $0.status == "未链接" || $0.status == "外部" || $0.status == "部分链接" }
+        }.filter { $0.status == AppStatus.unlinked || $0.status == AppStatus.external || $0.status == AppStatus.partialLinked }
 
         guard !validApps.isEmpty else { return }
 
@@ -1534,7 +1645,7 @@ struct ContentView: View {
                     name: appName,
                     path: item.sourcePath,
                     bundleURL: item.app.bundleURL,
-                    status: "未链接",
+                    status: AppStatus.unlinked,
                     isFolder: item.app.isFolder,
                     containerKind: item.app.containerKind,
                     appCount: item.app.appCount
@@ -1877,7 +1988,7 @@ struct ContentView: View {
     /// - 未链接应用：返回本地真实 .app 路径
     nonisolated func resolveRealAppURL(for app: AppItem) -> URL {
         // 未链接：返回本地路径
-        guard app.status == "已链接" else {
+        guard app.status == AppStatus.linked else {
             return app.displayURL
         }
 
@@ -2036,7 +2147,11 @@ struct ContentView: View {
             }
 
             // 并行扫描
-            async let localResult = scanner.scanLocalApps(at: localDir, runningAppURLs: runningAppURLs)
+            async let localResult = scanner.scanLocalApps(
+                at: localDir,
+                runningAppURLs: runningAppURLs,
+                externalAppsDir: externalDir
+            )
             let externalResult: [AppItem]
             if let externalDir {
                 externalResult = await scanner.scanExternalApps(at: externalDir, localAppsDir: externalLocalDir)

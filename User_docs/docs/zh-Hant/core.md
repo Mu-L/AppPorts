@@ -4,7 +4,7 @@
   
 1. 選擇單個應用或鼠標左鍵長按拖動多個應用（或 command+鼠標左鍵單擊選擇應用）     
 2. 單擊底部“遷移至外部“按鈕   
-3. 等待遷移完成     
+3. 等待遷移完成
  
   ![](https://file.shimoko.com/d/openlist/openlist/%E7%BD%91%E7%AB%99%E5%AA%92%E4%BD%93%E6%96%87%E4%BB%B6/gonomoral.gif?sign=tzb_Y7YRR9uTc4uunpWXJWYs8dOXLEa0S0AQH-qcB4I=:0)
 ::: tip 注意
@@ -24,4 +24,3 @@
 ## 解除鏈接
 單擊已鏈接應用列表的右側解除按鈕即可
 ![](https://file.shimoko.com/d/openlist/openlist/%E7%BD%91%E7%AB%99%E5%AA%92%E4%BD%93%E6%96%87%E4%BB%B6/jiechu.gif?sign=CLDMEQxHts1S2mBEnka9HUYT2XMzcnBwX1Sjfas9Dho=:0)
-

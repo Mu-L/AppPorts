@@ -29,7 +29,8 @@ flowchart TD
     A[Select data directory] --> B{Permission & protection check}
     B -->|Failed| Z[Terminate]
     B -->|Passed| C{Target path conflict detection}
-    C -->|Has managed metadata| D[Auto-recovery mode]
+    C -->|Managed metadata fully matches| D[Auto-recovery mode]
+    C -->|Real directory conflict| Y[Stop and report conflict]
     C -->|No conflict| E[Copy to external storage]
     D --> E
     E --> F[Write managed link metadata]
@@ -53,6 +54,8 @@ AppPorts writes a `.appports-link-metadata.plist` file in the external directory
 | `dataDirType` | Data directory type |
 
 This metadata is used during scanning to distinguish AppPorts-managed links from user-created symbolic links, and supports automatic recovery when migration is interrupted.
+
+Automatic recovery uses strict matching. When the external target already exists, AppPorts only treats it as recoverable if `schemaVersion`, `managedBy`, `sourcePath`, `destinationPath`, and `dataDirType` all match the current operation. A real directory without matching metadata is treated as a conflict; AppPorts no longer recovers or takes over based on similar directory size.
 
 ## Supported Data Directory Types
 
@@ -85,6 +88,7 @@ If copying fails, automatically rebuild the symbolic link to maintain consistenc
 Each critical step in the migration process includes rollback mechanisms:
 
 - **Copy failure**: No further actions taken; clean up copied external files
+- **Destination conflict**: If the external target already contains a real directory without matching metadata, migration stops and leaves both sides untouched
 - **Delete local directory failure**: Delete external copy, restore original state
 - **Create symbolic link failure**: Copy data from external back to local, delete external copy
 

@@ -19,7 +19,12 @@ AppPorts affiche le statut actuel des applications et des répertoires de donné
 | Lien orphelin | `link.badge.exclamationmark` | Rouge | Application externe perdue mais entrée locale toujours existante |
 | Non liée | `externaldrive.badge.xmark` | Orange | Application sur le stockage externe mais non liée en retour localement |
 | Externe | `externaldrive` | Orange | Application sur le stockage externe sans entrée locale |
+| Migration sortante en attente | `arrow.up.right.circle` | Cyan | La vraie application locale est plus récente que l'ancienne copie externe et peut la remplacer |
 | Locale | `macmini` | Couleur secondaire | Application locale régulière, non migrée ; affichée quand aucun autre tag n'est présent |
+
+::: tip Détection de la migration sortante en attente
+AppPorts associe d'abord les applications locales et externes par Bundle ID, puis utilise le nom d'application normalisé si nécessaire. Le statut n'apparaît que si les deux versions sont comparables et que la version locale est plus récente.
+:::
 
 ### Labels de framework
 

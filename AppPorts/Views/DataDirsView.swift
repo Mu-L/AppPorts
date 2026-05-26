@@ -35,6 +35,16 @@ struct DataDirsView: View {
     let externalDriveURL: URL?
     /// 本地已扫描的应用列表（供用户选择查关联目录用）
     let localApps: [AppItem]
+    /// 当前数据目录子页面，由 ContentView 顶部工具栏统一控制
+    @Binding var selectedTab: DataTab
+    /// 当前选中的应用数据来源应用，由 ContentView 顶部工具栏读取重签名状态。
+    @Binding var selectedApp: AppItem?
+    /// 当前扫描状态，由 ContentView 顶部刷新按钮读取。
+    @Binding var isScanning: Bool
+    /// 数据迁移完成后自动重签名开关，由 ContentView 顶部工具栏控制。
+    @Binding var autoResignEnabled: Bool
+    /// 父级工具栏触发刷新时递增。
+    let refreshTrigger: Int
     /// 选择外部存储路径的回调
     let onSelectExternalDrive: () -> Void
     /// 数据迁移完成后对关联应用执行重签名的回调（Bool = 是否静默，true 则不弹错误框）
@@ -53,17 +63,13 @@ struct DataDirsView: View {
     // MARK: - 内部状态
     @State private var dotFolderItems: [DataDirItem] = []
     @State private var libraryItems:   [DataDirItem] = []
-    @State private var selectedApp: AppItem? = nil
 
-    @State private var selectedTab: DataTab = .toolDirs
     @State private var showAppDataFilters = false
     @State private var selectedPriorityFilters: Set<DataDirPriority> = []
     @State private var selectedStatusFilters: Set<String> = []
     @State private var selectedTypeFilters: Set<DataDirType> = []
     @State private var selectedAppDataSortMode: AppDataSortMode = .defaultOrder
     @State private var selectedAppSortMode: AppSortMode = .size
-
-    @State private var isScanning = false
 
     // 进度弹窗
     @State private var showProgress = false
@@ -81,6 +87,10 @@ struct DataDirsView: View {
     @State private var showAppDataMigrationRiskConfirm = false
     @State private var pendingMigrationItem: DataDirItem? = nil
     @State private var pendingMigrationDestinationPath: URL? = nil
+    @State private var pendingMigrationShouldResign: Bool? = nil
+    @State private var pendingMigrationApp: AppItem? = nil
+    @State private var showContainerDataResignConfirm = false
+    @State private var containerDataResignMessage = ""
     @State private var showManagedLinkNormalizationConfirm = false
     @State private var managedLinkNormalizationMessage = ""
     @State private var managedLinkNormalizationItem: DataDirItem? = nil
@@ -98,12 +108,10 @@ struct DataDirsView: View {
 
     // 选中项（用于高亮）
     @State private var selectedItemID: String? = nil
+    @State private var libraryScanToken = UUID()
 
     // 搜索
     @State private var appSearchText = ""
-
-    // 重签名开关
-    @AppStorage("autoResignEnabled") private var autoResignEnabled = false
 
     enum DataTab: String, CaseIterable {
         case toolDirs  = "工具目录"
@@ -127,82 +135,6 @@ struct DataDirsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // ── 顶部 Tab 选择器 ──────────────────────────────────
-            HStack(spacing: 16) {
-                Picker("", selection: $selectedTab) {
-                    ForEach(DataTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue.localized).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-
-                Spacer()
-
-                // 数据迁移后自动重签名开关
-                HStack(spacing: 6) {
-                    Image(systemName: autoResignEnabled ? "seal.fill" : "seal")
-                        .font(.system(size: 12))
-                        .foregroundColor(autoResignEnabled ? .teal : .secondary)
-
-                    Text("迁移后重签名".localized)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    Toggle("", isOn: $autoResignEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .labelsHidden()
-
-                    HelpButton(content: """
-                    **什么是重签名？**
-
-                    数据目录迁移到外部存储后，macOS 可能认为应用已被修改，在 Finder 中提示「已损坏」或「无法打开」。
-
-                    开启此选项后，AppPorts 会在数据迁移完成后自动对关联应用执行 **Ad-hoc 自签名**，绕过此限制。
-
-                    **可能的影响：**
-                    • 应用原有的 Developer ID 签名将被替换
-                    • 部分依赖签名验证的功能（如 Keychain 访问）可能受限
-                    • 应用更新后可能需要重新迁移数据
-
-                    如需恢复原始签名，可在应用列表中右键选择「恢复原始签名」。
-                    """.localized)
-                }
-                .help("数据迁移完成后，自动对关联应用执行 Ad-hoc 重签名，避免 Finder 提示「已损坏」".localized)
-
-                // 恢复原始签名按钮（仅应用数据 Tab 且选中已重签名应用时可见）
-                if selectedTab == .appDirs, let app = selectedApp, app.isResigned {
-                    Button(action: { onRestoreSignature?(app) }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 11))
-                            Text("恢复原始签名".localized)
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundColor(.teal)
-                    .help("恢复选中应用的原始代码签名".localized)
-                }
-
-                // 刷新按钮
-                Button(action: reloadCurrentTab) {
-                    Image(systemName: isScanning ? "arrow.clockwise" : "arrow.clockwise")
-                        .rotationEffect(.degrees(isScanning ? 360 : 0))
-                        .animation(isScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isScanning)
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .disabled(isScanning)
-                .help("刷新列表".localized)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(.regularMaterial)
-
-            Divider()
-
             // ── 主内容区 ────────────────────────────────────────
             if selectedTab == .toolDirs {
                 toolDirsContent
@@ -214,6 +146,9 @@ struct DataDirsView: View {
             reloadCurrentTab()
         }
         .onChange(of: selectedTab) { _ in
+            reloadCurrentTab()
+        }
+        .onChange(of: refreshTrigger) { _ in
             reloadCurrentTab()
         }
         .onChange(of: languageManager.language) { _ in
@@ -228,7 +163,7 @@ struct DataDirsView: View {
         }
         .alert("迁移前请先备份".localized, isPresented: $showAppDataMigrationRiskConfirm) {
             Button("继续".localized, role: .none) {
-                presentPendingMigrationConfirmation()
+                continuePendingMigrationFlow()
             }
             Button("取消".localized, role: .cancel) {
                 clearPendingMigrationConfirmation()
@@ -254,15 +189,28 @@ struct DataDirsView: View {
         }
         .alert("迁移风险提示".localized, isPresented: $showMigrationRiskAlert) {
             Button("继续".localized, role: .none) {
-                if let item = pendingMigrationItem, let destPath = pendingMigrationDestinationPath {
-                    presentMigrationConfirmation(for: item, destinationPath: destPath)
-                }
+                continuePendingMigrationFlow()
             }
             Button("取消".localized, role: .cancel) {
                 clearPendingMigrationConfirmation()
             }
         } message: {
             Text(migrationRiskMessage)
+        }
+        .alert("data_dir_resign_alert_title".localized, isPresented: $showContainerDataResignConfirm) {
+            Button("data_dir_resign_alert_accept".localized, role: .none) {
+                pendingMigrationShouldResign = true
+                presentPendingMigrationConfirmation()
+            }
+            Button("data_dir_resign_alert_decline".localized, role: .none) {
+                pendingMigrationShouldResign = false
+                presentPendingMigrationConfirmation()
+            }
+            Button("取消".localized, role: .cancel) {
+                clearPendingMigrationConfirmation()
+            }
+        } message: {
+            Text(containerDataResignMessage)
         }
         // 错误弹窗
         .alert("操作失败".localized, isPresented: $showError) {
@@ -444,7 +392,11 @@ struct DataDirsView: View {
             .frame(minWidth: 200, maxWidth: 280)
             .onChange(of: selectedApp) { newApp in
                 if let app = newApp { scanLibraryDirs(for: app) }
-                else { libraryItems = [] }
+                else {
+                    libraryScanToken = UUID()
+                    libraryItems = []
+                    isScanning = false
+                }
             }
             .onChange(of: localApps) { newApps in
                 // 重签名/迁移后刷新 selectedApp，避免持有旧的 isResigned 等字段
@@ -972,9 +924,12 @@ struct DataDirsView: View {
     }
 
     private func scanLibraryDirs(for app: AppItem) {
+        let scanToken = UUID()
+        libraryScanToken = scanToken
         isScanning = true
         libraryItems = []
         let appDisplayName = app.displayName
+        let appID = app.id
         let selectedExternalRoot = externalDriveURL
         let scanID = AppLogger.shared.makeOperationID(prefix: "scan-library-dirs")
         AppLogger.shared.logContext(
@@ -991,6 +946,8 @@ struct DataDirsView: View {
             let items = await scanner.scanLibraryDirs(for: app, externalRootURL: selectedExternalRoot)
 
             await MainActor.run {
+                guard self.libraryScanToken == scanToken,
+                      self.selectedApp?.id == appID else { return }
                 self.libraryItems = items
                 self.isScanning = false
             }
@@ -1018,6 +975,8 @@ struct DataDirsView: View {
             }
 
             await MainActor.run {
+                guard self.libraryScanToken == scanToken,
+                      self.selectedApp?.id == appID else { return }
                 for (i, sizeBytes) in sizedItems {
                     guard i < self.libraryItems.count else { continue }
                     let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
@@ -1068,6 +1027,7 @@ struct DataDirsView: View {
         if let warning = item.migrationWarning {
             pendingMigrationItem = item
             pendingMigrationDestinationPath = destPath
+            pendingMigrationApp = selectedTab == .appDirs ? selectedApp : nil
             migrationRiskMessage = warning
             showMigrationRiskAlert = true
             return
@@ -1076,11 +1036,12 @@ struct DataDirsView: View {
         if selectedTab == .appDirs {
             pendingMigrationItem = item
             pendingMigrationDestinationPath = destPath
+            pendingMigrationApp = selectedApp
             showAppDataMigrationRiskConfirm = true
             return
         }
 
-        presentMigrationConfirmation(for: item, destinationPath: destPath)
+        presentMigrationConfirmation(for: item, destinationPath: destPath, associatedApp: nil)
     }
 
     private func askRestore(_ item: DataDirItem) {
@@ -1197,10 +1158,17 @@ struct DataDirsView: View {
 
     // MARK: - 执行操作
 
-    private func performMigrate(_ item: DataDirItem, to dest: URL) {
+    private func performMigrate(
+        _ item: DataDirItem,
+        to dest: URL,
+        shouldResignAssociatedApp: Bool? = nil,
+        associatedApp: AppItem? = nil
+    ) {
         progressTitle = String(format: "正在迁移「%@」".localized, item.name)
         showProgress = true
         let operationID = AppLogger.shared.makeOperationID(prefix: "view-data-migrate")
+        let shouldResign = shouldResignAssociatedApp ?? autoResignEnabled
+        let capturedApp = associatedApp
         AppLogger.shared.logContext(
             "用户确认迁移数据目录",
             details: [
@@ -1208,14 +1176,15 @@ struct DataDirsView: View {
                 ("item_name", item.name),
                 ("type", item.type.rawValue),
                 ("source", item.path.path),
-                ("destination_root", dest.path)
-            ] + appContextFields()
+                ("destination_root", dest.path),
+                ("should_resign_associated_app", shouldResign ? "true" : "false")
+            ] + appContextFields(for: capturedApp)
         )
 
         Task {
-            // autoResignEnabled：解析真实应用路径（外部真实应用或本地真实应用，而非假壳）
+            // 解析真实应用路径（外部真实应用或本地真实应用，而非假壳）
             let realAppURL: URL? = {
-                guard self.autoResignEnabled, let app = self.selectedApp else { return nil }
+                guard shouldResign, let app = capturedApp else { return nil }
                 return self.resolveRealAppURL?(app) ?? app.displayURL
             }()
 
@@ -1263,15 +1232,45 @@ struct DataDirsView: View {
         }
     }
 
-    private func presentMigrationConfirmation(for item: DataDirItem, destinationPath: URL) {
+    private func presentMigrationConfirmation(
+        for item: DataDirItem,
+        destinationPath: URL,
+        shouldResignAssociatedApp: Bool? = nil,
+        associatedApp: AppItem? = nil
+    ) {
         let sizeInfo = item.size.map { String(format: "，大小约 %@".localized, $0) } ?? ""
 
         confirmTitle = "迁移数据目录".localized
         confirmActionTitle = "继续".localized
         confirmMessage = String(format: "将「%@」迁移到外部存储%@。\n\n源路径：%@\n目标路径：%@\n\n迁移完成后，原路径将自动变成符号链接，相关工具无需任何修改即可继续使用。".localized,
             item.name, sizeInfo, item.path.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), destinationPath.path)
-        confirmAction = { performMigrate(item, to: destinationPath.deletingLastPathComponent()) }
+        confirmAction = {
+            performMigrate(
+                item,
+                to: destinationPath.deletingLastPathComponent(),
+                shouldResignAssociatedApp: shouldResignAssociatedApp,
+                associatedApp: associatedApp
+            )
+        }
         showConfirm = true
+    }
+
+    private func continuePendingMigrationFlow() {
+        guard let item = pendingMigrationItem,
+              pendingMigrationDestinationPath != nil else {
+            clearPendingMigrationConfirmation()
+            return
+        }
+
+        showMigrationRiskAlert = false
+        showAppDataMigrationRiskConfirm = false
+
+        if shouldAskForContainerDataResign(item), pendingMigrationShouldResign == nil {
+            presentContainerDataResignConfirmation(for: item, associatedApp: pendingMigrationApp)
+            return
+        }
+
+        presentPendingMigrationConfirmation()
     }
 
     private func presentPendingMigrationConfirmation() {
@@ -1280,16 +1279,45 @@ struct DataDirsView: View {
             clearPendingMigrationConfirmation()
             return
         }
+        let shouldResign = pendingMigrationShouldResign
+        let associatedApp = pendingMigrationApp
 
+        showContainerDataResignConfirm = false
         clearPendingMigrationConfirmation()
         DispatchQueue.main.async {
-            presentMigrationConfirmation(for: item, destinationPath: destinationPath)
+            self.presentMigrationConfirmation(
+                for: item,
+                destinationPath: destinationPath,
+                shouldResignAssociatedApp: shouldResign,
+                associatedApp: associatedApp
+            )
         }
+    }
+
+    private func presentContainerDataResignConfirmation(for item: DataDirItem, associatedApp: AppItem?) {
+        let appName = associatedApp?.displayName ?? item.name
+        containerDataResignMessage = String(
+            format: "data_dir_resign_alert_message".localized,
+            appName,
+            appName
+        )
+        DispatchQueue.main.async {
+            self.showContainerDataResignConfirm = true
+        }
+    }
+
+    private func shouldAskForContainerDataResign(_ item: DataDirItem) -> Bool {
+        selectedTab == .appDirs
+            && pendingMigrationApp != nil
+            && (item.type == .containers || item.type == .groupContainers)
     }
 
     private func clearPendingMigrationConfirmation() {
         pendingMigrationItem = nil
         pendingMigrationDestinationPath = nil
+        pendingMigrationShouldResign = nil
+        pendingMigrationApp = nil
+        containerDataResignMessage = ""
     }
 
     private func performRestore(_ item: DataDirItem) {
@@ -1512,8 +1540,8 @@ struct DataDirsView: View {
     // MARK: - 日志辅助
 
     /// 构建关联应用的背景信息字段，供各操作日志复用
-    private func appContextFields() -> [(String, String?)] {
-        guard let app = selectedApp else { return [] }
+    private func appContextFields(for explicitApp: AppItem? = nil) -> [(String, String?)] {
+        guard let app = explicitApp ?? selectedApp else { return [] }
         let realURL = resolveRealAppURL?(app) ?? app.displayURL
         let bundleID: String? = {
             let plistURL = realURL.appendingPathComponent("Contents/Info.plist")

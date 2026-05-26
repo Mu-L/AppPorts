@@ -15,6 +15,16 @@ enum AppContainerKind: String, Sendable {
     case appSuiteFolder
 }
 
+enum AppStatus {
+    static let local = "本地"
+    static let linked = "已链接"
+    static let unlinked = "未链接"
+    static let partialLinked = "部分链接"
+    static let orphanedLink = "孤立链接"
+    static let external = "外部"
+    static let pendingMoveOut = "待迁出"
+}
+
 /// 应用程序项目数据模型
 ///
 /// 代表一个 macOS 应用程序的完整信息，包括基本属性、状态和特殊标识。
@@ -57,9 +67,10 @@ struct AppItem: Identifiable, Equatable, Sendable {
     
     /// 应用当前状态
     /// - 可能的值：
-    ///   - "本地": 应用在本地 /Applications 目录中
-    ///   - "已链接": 应用已迁移到外部存储，本地存在符号链接
-    ///   - "未链接": 应用在外部存储中，但本地没有链接
+    ///   - AppStatus.local: 应用在本地 /Applications 目录中
+    ///   - AppStatus.linked: 应用已迁移到外部存储，本地存在入口
+    ///   - AppStatus.unlinked: 应用在外部存储中，但本地没有入口
+    ///   - AppStatus.pendingMoveOut: 本地真实应用版本高于外部同名目标，可迁出替换外部旧副本
     var status: String
     
     // MARK: - 特征标识

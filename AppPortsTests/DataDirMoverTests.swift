@@ -156,6 +156,120 @@ final class DataDirMoverTests: XCTestCase {
         XCTAssertTrue(fileManager.fileExists(atPath: workspace.externalRootURL.path))
     }
 
+    func testMigrateRejectsExistingRealDestinationWithoutMatchingMetadata() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Application Support/com.example.conflict")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("Library/Application Support")
+        let externalDataURL = externalBaseURL.appendingPathComponent(localDataURL.lastPathComponent)
+
+        try createDirectoryWithPayload(at: localDataURL, payload: "local-real-data")
+        try createDirectoryWithPayload(at: externalDataURL, payload: "external-real-data")
+
+        let item = DataDirItem(
+            name: "Conflict",
+            path: localDataURL,
+            type: .applicationSupport,
+            priority: .critical,
+            description: "Real destination conflict",
+            isMigratable: true
+        )
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("Expected existing real destination without metadata to be rejected")
+        } catch let error as DataDirError {
+            guard case .destinationExists = error else {
+                return XCTFail("Expected destinationExists, got \(error)")
+            }
+        }
+
+        try assertRealDirectory(localDataURL)
+        try assertRealDirectory(externalDataURL)
+        XCTAssertEqual(try String(contentsOf: localDataURL.appendingPathComponent("payload.txt")), "local-real-data")
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "external-real-data")
+    }
+
+    func testMigrateRejectsExistingDestinationWithMismatchedMetadata() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Caches/com.example.mismatch")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("Library/Caches")
+        let externalDataURL = externalBaseURL.appendingPathComponent(localDataURL.lastPathComponent)
+
+        try createDirectoryWithPayload(at: localDataURL, payload: "local-cache")
+        try createDirectoryWithPayload(at: externalDataURL, payload: "external-cache")
+        try writeManagedLinkMetadata(
+            in: externalDataURL,
+            sourcePath: localDataURL,
+            destinationPath: externalDataURL,
+            type: .applicationSupport
+        )
+
+        let item = DataDirItem(
+            name: "Mismatch",
+            path: localDataURL,
+            type: .caches,
+            priority: .optional,
+            description: "Metadata mismatch",
+            isMigratable: true
+        )
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("Expected mismatched metadata to be rejected")
+        } catch let error as DataDirError {
+            guard case .destinationExists = error else {
+                return XCTFail("Expected destinationExists, got \(error)")
+            }
+        }
+
+        try assertRealDirectory(localDataURL)
+        try assertRealDirectory(externalDataURL)
+        XCTAssertEqual(try String(contentsOf: localDataURL.appendingPathComponent("payload.txt")), "local-cache")
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "external-cache")
+    }
+
+    func testMigrateRecoversExistingDestinationWithMatchingMetadata() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localDataURL = workspace.homeURL
+            .appendingPathComponent("Library/Preferences/com.example.recover")
+        let externalBaseURL = workspace.externalRootURL
+            .appendingPathComponent("Library/Preferences")
+        let externalDataURL = externalBaseURL.appendingPathComponent(localDataURL.lastPathComponent)
+
+        try createDirectoryWithPayload(at: localDataURL, payload: "local-preferences")
+        try createDirectoryWithPayload(at: externalDataURL, payload: "external-preferences")
+        try writeManagedLinkMetadata(
+            in: externalDataURL,
+            sourcePath: localDataURL,
+            destinationPath: externalDataURL,
+            type: .preferences
+        )
+
+        let item = DataDirItem(
+            name: "Recover",
+            path: localDataURL,
+            type: .preferences,
+            priority: .recommended,
+            description: "Matching metadata recovery",
+            isMigratable: true
+        )
+
+        try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+
+        try assertSymlink(localDataURL, pointsTo: externalDataURL)
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "external-preferences")
+    }
+
     func testNormalizeManagedLinkMovesDataToNormalizedDestination() async throws {
         let workspace = try makeWorkspace()
         defer { cleanupWorkspace(workspace.rootURL) }
@@ -306,6 +420,23 @@ final class DataDirMoverTests: XCTestCase {
 
     private func markerURL(for directoryURL: URL) -> URL {
         directoryURL.appendingPathComponent(".appports-link-metadata.plist")
+    }
+
+    private func writeManagedLinkMetadata(
+        in directoryURL: URL,
+        sourcePath: URL,
+        destinationPath: URL,
+        type: DataDirType
+    ) throws {
+        let metadata: [String: Any] = [
+            "schemaVersion": 1,
+            "managedBy": "com.shimoko.AppPorts",
+            "sourcePath": sourcePath.standardizedFileURL.path,
+            "destinationPath": destinationPath.standardizedFileURL.path,
+            "dataDirType": type.rawValue
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: metadata, format: .binary, options: 0)
+        try data.write(to: markerURL(for: directoryURL), options: .atomic)
     }
 
     // MARK: - 微信容器迁移策略测试

@@ -19,7 +19,12 @@ AppPorts zeigt den aktuellen Status von Apps und Datenverzeichnissen mit kapself
 | Verwaister Link | `link.badge.exclamationmark` | Rot | Externe Speicher-App verloren, aber lokaler Eintrag vorhanden |
 | Nicht verknüpft | `externaldrive.badge.xmark` | Orange | App auf externem Speicher, aber lokal nicht verknüpft |
 | Extern | `externaldrive` | Orange | App auf externem Speicher ohne lokalen Eintrag |
+| Ausstehendes Herausverschieben | `arrow.up.right.circle` | Cyan | Die echte lokale App ist neuer als die alte externe Kopie und kann nach extern verschoben werden, um sie zu ersetzen |
 | Lokal | `macmini` | Sekundärfarbe | Normale lokale App, nicht migriert; wird angezeigt, wenn keine anderen Tags vorhanden sind |
+
+::: tip Erkennung von ausstehendem Herausverschieben
+AppPorts gleicht lokale und externe Apps zuerst per Bundle ID ab und nutzt bei Bedarf den normalisierten App-Namen als Fallback. Der Status erscheint nur, wenn beide Versionen vergleichbar sind und die lokale Version neuer ist.
+:::
 
 ### Framework-Labels
 

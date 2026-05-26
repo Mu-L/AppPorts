@@ -193,6 +193,150 @@ final class AppMigrationServiceTests: XCTestCase {
         XCTAssertEqual(officeItem.status, "已链接")
     }
 
+    func testMoveAndLinkRejectsExistingExternalRealAppForOrdinaryLocalStatus() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Conflict.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Conflict.app")
+        try createAppBundle(at: localAppURL, payload: "local-real")
+        try createAppBundle(at: externalAppURL, payload: "external-real")
+
+        do {
+            try await AppMigrationService().moveAndLink(
+                appToMove: AppItem(name: "Conflict.app", path: localAppURL, status: AppStatus.local),
+                destinationURL: externalAppURL,
+                isRunning: false,
+                progressHandler: nil
+            )
+            XCTFail("Expected existing external real app to be rejected")
+        } catch {
+            try assertRealAppBundle(localAppURL)
+            try assertRealAppBundle(externalAppURL)
+            XCTAssertEqual(try String(contentsOf: localAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "local-real")
+            XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "external-real")
+        }
+    }
+
+    func testMoveAndLinkAllowsReplacingExternalRealAppWhenPendingMoveOut() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Replace.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Replace.app")
+        try createAppBundle(at: localAppURL, payload: "new-local")
+        try createAppBundle(at: externalAppURL, payload: "old-external")
+
+        try await AppMigrationService().moveAndLink(
+            appToMove: AppItem(name: "Replace.app", path: localAppURL, status: AppStatus.pendingMoveOut),
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "new-local")
+    }
+
+    func testMoveAndLinkAllowsCleaningExistingAppPortsStubPortalAtExternalTarget() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("StubResidue.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("StubResidue.app")
+        let staleRealAppURL = workspace.rootURL.appendingPathComponent("OldExternal/StubResidue.app")
+        try createAppBundle(at: localAppURL, payload: "fresh-local")
+        try createAppBundle(at: staleRealAppURL, payload: "stale-real")
+        try createStubPortal(at: externalAppURL, pointingTo: staleRealAppURL)
+
+        try await AppMigrationService().moveAndLink(
+            appToMove: AppItem(name: "StubResidue.app", path: localAppURL, status: AppStatus.local),
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "fresh-local")
+    }
+
+    func testMoveAndLinkAllowsCleaningExistingAppPortsDeepPortalAtExternalTarget() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("DeepResidue.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("DeepResidue.app")
+        let staleRealAppURL = workspace.rootURL.appendingPathComponent("OldExternal/DeepResidue.app")
+        try createAppBundle(at: localAppURL, payload: "fresh-local")
+        try createAppBundle(at: staleRealAppURL, payload: "stale-real")
+        try fileManager.createDirectory(at: externalAppURL, withIntermediateDirectories: false)
+        try fileManager.createSymbolicLink(
+            at: externalAppURL.appendingPathComponent("Contents"),
+            withDestinationURL: staleRealAppURL.appendingPathComponent("Contents")
+        )
+
+        try await AppMigrationService().moveAndLink(
+            appToMove: AppItem(name: "DeepResidue.app", path: localAppURL, status: AppStatus.local),
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "fresh-local")
+    }
+
+    func testMoveAndLinkAllowsCleaningExistingAppPortsHybridPortalAtExternalTarget() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("HybridResidue.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("HybridResidue.app")
+        let staleRealAppURL = workspace.rootURL.appendingPathComponent("OldExternal/HybridResidue.app")
+        try createAppBundle(at: localAppURL, payload: "fresh-local")
+        try createAppBundle(at: staleRealAppURL, payload: "stale-real")
+        try fileManager.createDirectory(
+            at: externalAppURL.appendingPathComponent("Contents"),
+            withIntermediateDirectories: true
+        )
+        try fileManager.createSymbolicLink(
+            at: externalAppURL.appendingPathComponent("Contents/MacOS"),
+            withDestinationURL: staleRealAppURL.appendingPathComponent("Contents/MacOS")
+        )
+
+        try await AppMigrationService().moveAndLink(
+            appToMove: AppItem(name: "HybridResidue.app", path: localAppURL, status: AppStatus.local),
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "fresh-local")
+    }
+
+    func testAppleScriptEscapingHandlesQuotesBackslashesSpacesAndUnicode() {
+        let path = "/tmp/AppPorts it's \"quoted\"/中文/Slash\\Name.app"
+        let literal = AppMigrationService.appleScriptStringLiteral(path)
+
+        XCTAssertTrue(literal.hasPrefix("\""))
+        XCTAssertTrue(literal.hasSuffix("\""))
+        XCTAssertTrue(literal.contains("\\\"quoted\\\""))
+        XCTAssertTrue(literal.contains("Slash\\\\Name.app"))
+        XCTAssertTrue(literal.contains("it's"))
+
+        let script = CodeSigner.ownershipRepairAppleScript(username: "user'name", appPath: path)
+        XCTAssertTrue(script.contains("set targetPath to \(literal)"))
+        XCTAssertTrue(script.contains("set userName to \"user'name\""))
+        XCTAssertTrue(script.contains("quoted form of userName"))
+        XCTAssertTrue(script.contains("quoted form of targetPath"))
+        XCTAssertFalse(script.contains("'\\(path)'"))
+    }
+
     private func makeWorkspace() throws -> (rootURL: URL, localAppsURL: URL, externalRootURL: URL) {
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent("AppPortsTests-\(UUID().uuidString)")
         let localAppsURL = rootURL.appendingPathComponent("Applications")
@@ -210,20 +354,48 @@ final class AppMigrationServiceTests: XCTestCase {
 
     private func createAppBundle(
         at appURL: URL,
-        wrappedBundle: Bool = false
+        wrappedBundle: Bool = false,
+        payload: String = "resource"
     ) throws {
+        let contentsURL = appURL.appendingPathComponent("Contents")
         let macOSURL = appURL.appendingPathComponent("Contents/MacOS")
         let resourcesURL = appURL.appendingPathComponent("Contents/Resources")
         try fileManager.createDirectory(at: macOSURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: resourcesURL, withIntermediateDirectories: true)
 
-        let executableURL = macOSURL.appendingPathComponent(appURL.deletingPathExtension().lastPathComponent)
+        let executableName = appURL.deletingPathExtension().lastPathComponent
+        let executableURL = macOSURL.appendingPathComponent(executableName)
         try "echo test".write(to: executableURL, atomically: true, encoding: .utf8)
-        try "resource".write(to: resourcesURL.appendingPathComponent("payload.txt"), atomically: true, encoding: .utf8)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executableURL.path)
+        try payload.write(to: resourcesURL.appendingPathComponent("payload.txt"), atomically: true, encoding: .utf8)
+
+        let plist: [String: Any] = [
+            "CFBundleExecutable": executableName,
+            "CFBundleIdentifier": "com.appports.tests.\(executableName.lowercased())",
+            "CFBundleName": executableName,
+            "CFBundleDisplayName": executableName,
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion": "1",
+            "CFBundlePackageType": "APPL"
+        ]
+        let plistData = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        try plistData.write(to: contentsURL.appendingPathComponent("Info.plist"))
+        try "APPL????".write(to: contentsURL.appendingPathComponent("PkgInfo"), atomically: true, encoding: .utf8)
 
         if wrappedBundle {
             try fileManager.createDirectory(at: appURL.appendingPathComponent("WrappedBundle"), withIntermediateDirectories: true)
         }
+    }
+
+    private func createStubPortal(at localURL: URL, pointingTo externalURL: URL) throws {
+        let macOSURL = localURL.appendingPathComponent("Contents/MacOS")
+        try fileManager.createDirectory(at: macOSURL, withIntermediateDirectories: true)
+        let script = """
+        #!/bin/bash
+        REAL_APP='\(externalURL.path)'
+        open "$REAL_APP"
+        """
+        try script.write(to: macOSURL.appendingPathComponent("launcher"), atomically: true, encoding: .utf8)
     }
 
     private func assertDeepPortal(_ localURL: URL, pointsTo externalURL: URL, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -253,14 +425,18 @@ final class AppMigrationServiceTests: XCTestCase {
         let launcherURL = localURL.appendingPathComponent("Contents/MacOS/launcher")
         XCTAssertTrue(fileManager.fileExists(atPath: launcherURL.path), "launcher script should exist", file: file, line: line)
 
-        let script = try String(contentsOf: launcherURL, encoding: .utf8)
-        XCTAssertTrue(script.contains(externalURL.path), "launcher should reference external app", file: file, line: line)
+        let pathFileURL = localURL.appendingPathComponent("Contents/Resources/real_app_path.txt")
+        if fileManager.fileExists(atPath: pathFileURL.path) {
+            let path = try String(contentsOf: pathFileURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            XCTAssertEqual(path, externalURL.path, "launcher path file should reference external app", file: file, line: line)
+        } else {
+            let script = try String(contentsOf: launcherURL, encoding: .utf8)
+            XCTAssertTrue(script.contains(externalURL.path), "launcher should reference external app", file: file, line: line)
+        }
     }
 
     private func assertWholeAppSymlink(_ localURL: URL, pointsTo externalURL: URL, file: StaticString = #filePath, line: UInt = #line) throws {
-        let localValues = try localURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-        XCTAssertEqual(localValues.isSymbolicLink, true, file: file, line: line)
-
         let destination = try fileManager.destinationOfSymbolicLink(atPath: localURL.path)
         let resolvedDestination = URL(fileURLWithPath: destination, relativeTo: localURL.deletingLastPathComponent()).standardizedFileURL
         XCTAssertEqual(resolvedDestination, externalURL.standardizedFileURL, file: file, line: line)

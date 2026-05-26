@@ -52,7 +52,7 @@ struct AppRowView: View {
             
             Spacer()
             
-            if showDeleteLinkButton && (app.status == "已链接" || app.status == "孤立链接") {
+            if showDeleteLinkButton && (app.status == AppStatus.linked || app.status == AppStatus.orphanedLink) {
                 Button(action: { onDeleteLink(app) }) {
                     Image(systemName: "link.badge.plus")
                         .foregroundColor(.red)
@@ -100,21 +100,21 @@ struct AppRowView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([app.path])
             }
 
-            if app.status == "本地" && !app.isSystemApp, let onMoveOutWholeSymlink {
+            if (app.status == AppStatus.local || app.status == AppStatus.pendingMoveOut) && !app.isSystemApp, let onMoveOutWholeSymlink {
                 Divider()
                 Button("使用传统链接迁移".localized) {
                     onMoveOutWholeSymlink(app)
                 }
             }
 
-            if app.status == "孤立链接" {
+            if app.status == AppStatus.orphanedLink {
                 Divider()
                 Button("删除孤立链接".localized) {
                     onDeleteLink(app)
                 }
             }
 
-            if app.status == "已链接" {
+            if app.status == AppStatus.linked {
                 Divider()
 
                 if let onResign {

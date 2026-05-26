@@ -4,6 +4,37 @@ outline: deep
 
 # Changelog
 
+## v1.7.0
+
+### Neue Funktionen
+
+- Status „Auslagern ausstehend" hinzugefügt: Wenn die echte lokale App neuer ist als die gleichnamige App im externen Speicher, markiert AppPorts sie als ausstehend. Dies zeigt an, dass die lokale neue Version sicher in den externen Speicher migriert und die alte externe Kopie ersetzt werden kann.
+- Bestätigung für Neusignierung bei Datenmigration hinzugefügt: Vor der Migration von Daten innerhalb eines App-Containers kann AppPorts fragen, ob die zugehörige App nach der Migration automatisch per Ad-hoc neu signiert werden soll. Dadurch sinkt das Risiko, dass Containerdaten nach der Migration nicht erkannt werden, Warnungen erscheinen oder die App nicht startet (#44).
+
+### UI-Verbesserungen
+
+- Obere Werkzeugleiste neu angeordnet: Die Umschaltflächen für App-Seite und Datenverzeichnis-Seite verwenden jetzt einen kompakteren Stil mit Symbol + Text.
+- Aktionsleiste der Datenverzeichnis-Seite optimiert: Umschaltung „Tool-Verzeichnisse / App-Daten", Neusignierung nach Migration, Wiederherstellung der Originalsignatur und Aktualisieren befinden sich jetzt gemeinsam in der oberen Werkzeugleiste.
+- App-Status-Badge „Auslagern ausstehend" hinzugefügt, um Apps zu kennzeichnen, deren lokale Version neuer ist als die alte externe Kopie.
+- Dialog zur Neusignierungsbestätigung bei Datenmigration lokalisiert, einschließlich Titel, Text und Schaltflächen.
+
+### Verbesserungen
+
+- Sicherheit der App-Migration verbessert: Wenn das externe Ziel bereits existiert, bereinigt AppPorts es nur automatisch, wenn es als alter von AppPorts verwalteter Portal-Eintrag, altes Migrationsrelikt oder als Ziel einer App im Status „Auslagern ausstehend" erkannt wird.
+- Prüfung der Datenverzeichnis-Wiederherstellung verstärkt: Automatische Wiederherstellung basiert nicht mehr auf ähnlicher Verzeichnisgröße, sondern erfordert vollständig passende AppPorts metadata.
+- App-Datenscan stabiler gemacht: Ergebnisse älterer Scan-Aufgaben überschreiben beim schnellen Wechseln zwischen Apps nicht mehr die Datenverzeichnisliste der aktuell ausgewählten App.
+- Escaping für Administratorbefehle und AppleScript verbessert: Pfade mit Anführungszeichen, Backslashes, Leerzeichen oder chinesischen Zeichen werden sicherer verarbeitet.
+- Lokalisierung verbessert: Hilfetexte, Hinweise und Datenmigrationsbestätigungen bleiben nach Sprachwechsel nicht mehr teilweise auf Chinesisch oder unvollständig übersetzt; Übersetzungen für alle unterstützten Sprachen wurden ergänzt (#43).
+
+### Fehlerbehebungen
+
+- Behoben: Datenverzeichnismigration konnte ein echtes externes Verzeichnis fälschlich als wiederherstellbares Ziel behandeln.
+- Behoben: App-Migration konnte versehentlich eine echte externe App mit gleichem Namen löschen.
+- Behoben: Alte externe AppPorts portals / alte Migrationsreste wurden nicht stabil erkannt und bereinigt.
+- Behoben: AppleScript oder Administratorbefehle konnten bei Sonderzeichen im Pfad falsch erzeugt werden.
+- Behoben: Hintergrundmigration oder Neusignierung nach Migration konnte eine bereits gewechselte App lesen.
+- Behoben: Status „Auslagern ausstehend" wurde nicht als Badge in der App-Liste angezeigt.
+
 ## v1.6.2
 
 - Neu: Automatische Neuzeichnung bei Anmeldung. Signiert migrierte Apps mit abgelaufenen Signaturen bei jedem Benutzeranmeldung automatisch neu, ohne manuelle Aktion. Standardmäßig aktiviert, kann in den Einstellungen deaktiviert werden

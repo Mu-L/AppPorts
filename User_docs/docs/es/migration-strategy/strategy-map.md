@@ -25,5 +25,5 @@ Cuando una app está marcada como que necesita bloqueo (`needsLock = true`), App
 ::: tip 💡 Por Qué las Apps con Actualizador Personalizado No Se Bloquean
 Las apps que usan actualizadores personalizados como Chrome y Edge no se bloquean. Los actualizadores de estas apps típicamente descargan e instalan nuevas versiones en el almacenamiento interno local. Debido a las características de aislamiento de enlace de macOS Stub Portal, esto no daña los archivos de la app en el almacenamiento externo.
 
-Cuando AppPorts detecta que la versión de la app en el almacenamiento interno local es superior a la del almacenamiento externo, etiqueta automáticamente la app como "Migración Pendiente", indicando al usuario que re-migre para sincronizar la última versión.
+Cuando AppPorts detecta que la versión de la app en el almacenamiento interno local es superior a la del almacenamiento externo, etiqueta automáticamente la app como "Pendiente de mover fuera", indicando al usuario que re-migre para sincronizar la última versión.
 :::

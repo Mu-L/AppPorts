@@ -4,6 +4,37 @@ outline: deep
 
 # Changelog
 
+## v1.7.0
+
+### New Features
+
+- Added "Pending Move Out" status: when the real local app is newer than the app with the same name on external storage, AppPorts marks it as pending move out, indicating that the local newer version can be safely migrated out to replace the external older copy.
+- Added re-sign confirmation for data migration: before migrating data inside an app container, AppPorts can ask whether to automatically apply Ad-hoc re-signing to the related app after migration, reducing the risk of unrecognized data, warnings, or launch failures after container data migration (#44).
+
+### UI Improvements
+
+- Rearranged the top toolbar: app/data-directory tab buttons now use a more compact icon + text style.
+- Optimized the data-directory action bar: the Tool Directories / App Data switch, post-migration re-sign toggle, restore original signature button, and refresh button now live in the top toolbar.
+- Added a "Pending Move Out" app status badge for apps whose local version is newer than the external old copy.
+- Localized the data migration re-sign confirmation dialog, including title, body text, and buttons.
+
+### Improvements
+
+- Strengthened app migration safety: when the external destination already exists, AppPorts only auto-cleans it if it is identified as an AppPorts-managed old portal, a stale migration remnant, or the app is in "Pending Move Out" state.
+- Strengthened data-directory recovery checks: automatic recovery no longer relies on similar directory size and now requires full AppPorts metadata matching.
+- Made app data scanning more stable: results from older scan tasks no longer overwrite the data-directory list for the currently selected app.
+- Improved escaping for admin commands and AppleScript: paths containing quotes, backslashes, spaces, or Chinese characters are handled more safely.
+- Improved localization: fixed help content, prompts, and data migration confirmation text that could remain in Chinese or be incomplete after switching languages, and completed translations for all supported languages (#43).
+
+### Fixes
+
+- Fixed data directory migration incorrectly treating a real external directory as a recoverable target.
+- Fixed app migration potentially deleting a real external app with the same name by mistake.
+- Fixed unstable detection and cleanup of old external AppPorts portals or stale migration remnants.
+- Fixed malformed AppleScript or admin commands when paths contain special characters.
+- Fixed background migration or post-migration re-signing reading the app after the selected app had changed.
+- Fixed the "Pending Move Out" status badge not appearing in the app list.
+
 ## v1.6.2
 
 - New: Auto re-sign at login. Automatically re-signs migrated apps with expired signatures each time the user logs in, no manual action needed. Enabled by default, can be turned off in Settings

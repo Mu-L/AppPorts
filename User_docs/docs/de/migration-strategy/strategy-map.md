@@ -25,5 +25,5 @@ Wenn eine App als Sperrung benötigend markiert ist (`needsLock = true`), führt
 ::: tip 💡 Warum Custom-Updater-Apps nicht gesperrt werden
 Apps, die Custom-Updater wie Chrome und Edge verwenden, werden nicht gesperrt. Diese Apps' Updater installieren neue Versionen typischerweise in den lokalen internen Speicher. Aufgrund der Link-Isolations-Eigenschaften von macOS Stub Portal werden App-Dateien auf dem externen Speicher nicht beschädigt.
 
-Wenn AppPorts erkennt, dass die App-Version auf dem lokalen internen Speicher höher ist als auf dem externen Speicher, markiert es die App automatisch mit „Ausstehende Migration" und fordert den Benutzer auf, die neueste Version zu synchronisieren.
+Wenn AppPorts erkennt, dass die App-Version auf dem lokalen internen Speicher höher ist als auf dem externen Speicher, markiert es die App automatisch mit „Ausstehendes Herausverschieben" und fordert den Benutzer auf, die neueste Version erneut zu migrieren.
 :::

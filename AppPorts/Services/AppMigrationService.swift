@@ -73,9 +73,15 @@ struct AppMigrationService {
         volumeRoot(for: externalDriveURL).appendingPathComponent("Applications")
     }
 
+    static func appleScriptStringLiteral(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+
     static func removeItemViaFinder(at url: URL) throws {
-        let escapedPath = url.path.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "tell application \"Finder\" to delete POSIX file \"\(escapedPath)\""
+        let script = "tell application \"Finder\" to delete POSIX file \(appleScriptStringLiteral(url.path))"
 
         AppLogger.shared.log("执行 AppleScript: \(script)")
 
@@ -187,35 +193,35 @@ struct AppMigrationService {
         if fileManager.fileExists(atPath: destinationURL.path) {
             AppLogger.shared.log("目标位置已存在文件，检查冲突类型")
             AppLogger.shared.logPathState("迁移冲突-目标现状[\(operationID)]", url: destinationURL)
-            let existingItemResourceValues = try? destinationURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-            if existingItemResourceValues?.isSymbolicLink == true {
-                try fileManager.removeItem(at: destinationURL)
-                AppLogger.shared.log("已删除目标位置的符号链接")
-            } else {
-                // 目标是真实目录 — 检查本地源是否也是真实目录（旧迁移被自动更新覆盖的情况）
-                let sourceIsSymlink = (try? fileManager.destinationOfSymbolicLink(atPath: appToMove.path.path)) != nil
-                if !sourceIsSymlink {
-                    // 本地是真实目录，外部是旧副本 — 解锁后清理旧副本，继续迁移
-                    AppLogger.shared.log("检测到旧迁移残留（本地为真实目录，外部为旧副本），清理外部副本后继续", level: "WARN")
-                    unlockImmutableRecursive(at: destinationURL)
-                    try fileManager.removeItem(at: destinationURL)
-                } else {
-                    operationErrorCode = "APP-MOVE-DESTINATION-CONFLICT"
-                    AppLogger.shared.logError(
-                        "目标位置存在真实文件，无法覆盖",
-                        errorCode: operationErrorCode,
-                        context: [("operation_id", operationID), ("destination_path", destinationURL.path)],
-                        relatedURLs: [("destination", destinationURL)]
+
+            guard let replacementReason = externalTargetReplacementReason(for: appToMove, destinationURL: destinationURL) else {
+                operationErrorCode = "APP-MOVE-DESTINATION-CONFLICT"
+                AppLogger.shared.logError(
+                    "目标位置存在真实文件，无法覆盖",
+                    errorCode: operationErrorCode,
+                    context: [("operation_id", operationID), ("destination_path", destinationURL.path)],
+                    relatedURLs: [("destination", destinationURL)]
+                )
+                throw AppMoverError.generalError(
+                    NSError(
+                        domain: "AppMover",
+                        code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "目标已存在真实文件".localized]
                     )
-                    throw AppMoverError.generalError(
-                        NSError(
-                            domain: "AppMover",
-                            code: 3,
-                            userInfo: [NSLocalizedDescriptionKey: "目标已存在真实文件".localized]
-                        )
-                    )
-                }
+                )
             }
+
+            AppLogger.shared.logContext(
+                "允许清理外部目标后继续迁移",
+                details: [
+                    ("operation_id", operationID),
+                    ("reason", replacementReason),
+                    ("destination_path", destinationURL.path)
+                ],
+                level: "WARN"
+            )
+            unlockImmutableRecursive(at: destinationURL)
+            try fileManager.removeItem(at: destinationURL)
         }
 
         do {
@@ -637,41 +643,25 @@ struct AppMigrationService {
 
         if fileManager.fileExists(atPath: localDestinationURL.path) {
             AppLogger.shared.log("本地存在同名项目，正在清理...")
-            let resourceValues = try? localDestinationURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
 
-            if resourceValues?.isSymbolicLink == true {
-                guard existingPortalKind == .wholeAppSymlink else {
-                    let error = NSError(
-                        domain: "AppMover",
-                        code: 6,
-                        userInfo: [NSLocalizedDescriptionKey: "本地入口并未指向当前外部应用，无法自动覆盖".localized]
-                    )
-                    operationErrorCode = "APP-RESTORE-LOCAL-CONFLICT"
-                    AppLogger.shared.logError("还原失败", error: error, errorCode: operationErrorCode)
-                    throw AppMoverError.generalError(error)
-                }
+            if let existingPortalKind {
                 try fileManager.removeItem(at: localDestinationURL)
-                AppLogger.shared.log("已清理本地符号链接")
-            } else if resourceValues?.isDirectory == true {
-                if existingPortalKind == .deepContentsWrapper || existingPortalKind == .stubPortal {
-                    try fileManager.removeItem(at: localDestinationURL)
-                    AppLogger.shared.log("已清理本地假壳/符号链接结构")
-                } else {
-                    let error = NSError(
-                        domain: "AppMover",
-                        code: 6,
-                        userInfo: [NSLocalizedDescriptionKey: "本地已存在同名真实文件，无法覆盖".localized]
-                    )
-                    operationErrorCode = "APP-RESTORE-LOCAL-CONFLICT"
-                    AppLogger.shared.logError("还原失败", error: error, errorCode: operationErrorCode)
-                    throw AppMoverError.generalError(error)
-                }
-            } else {
+                AppLogger.shared.log("已清理本地 AppPorts 入口: \(portalKindDescription(existingPortalKind))")
+            } else if resolveSymlinkDestination(at: localDestinationURL) != nil {
                 let error = NSError(
                     domain: "AppMover",
                     code: 6,
-                    userInfo: [NSLocalizedDescriptionKey: "本地已存在同名文件，无法覆盖".localized]
+                    userInfo: [NSLocalizedDescriptionKey: "本地入口并未指向当前外部应用，无法自动覆盖".localized]
                 )
+                operationErrorCode = "APP-RESTORE-LOCAL-CONFLICT"
+                AppLogger.shared.logError("还原失败", error: error, errorCode: operationErrorCode)
+                throw AppMoverError.generalError(error)
+            } else {
+                let resourceValues = try? localDestinationURL.resourceValues(forKeys: [.isDirectoryKey])
+                let descriptionKey = (resourceValues?.isDirectory == true)
+                    ? "本地已存在同名真实文件，无法覆盖".localized
+                    : "本地已存在同名文件，无法覆盖".localized
+                let error = NSError(domain: "AppMover", code: 6, userInfo: [NSLocalizedDescriptionKey: descriptionKey])
                 operationErrorCode = "APP-RESTORE-LOCAL-CONFLICT"
                 AppLogger.shared.logError("还原失败", error: error, errorCode: operationErrorCode)
                 throw AppMoverError.generalError(error)
@@ -1001,13 +991,30 @@ struct AppMigrationService {
     }
 
     private func resolveSymlinkDestination(at url: URL) -> URL? {
-        guard let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey]),
-              values.isSymbolicLink == true,
-              let rawPath = try? fileManager.destinationOfSymbolicLink(atPath: url.path) else {
+        guard let rawPath = try? fileManager.destinationOfSymbolicLink(atPath: url.path) else {
             return nil
         }
 
         return URL(fileURLWithPath: rawPath, relativeTo: url.deletingLastPathComponent()).standardizedFileURL
+    }
+
+    private func externalTargetReplacementReason(for appToMove: AppItem, destinationURL: URL) -> String? {
+        if appToMove.status == AppStatus.pendingMoveOut {
+            return "pending_move_out"
+        }
+
+        guard let portalKind = localPortalKind(at: destinationURL) else {
+            return nil
+        }
+
+        switch portalKind {
+        case .stubPortal:
+            return "appports_stub_portal"
+        case .deepContentsWrapper:
+            return "appports_legacy_portal"
+        case .wholeAppSymlink:
+            return "appports_whole_app_symlink"
+        }
     }
 
     private func localPortalKind(at localURL: URL) -> LocalPortalKind? {
@@ -1021,12 +1028,7 @@ struct AppMigrationService {
         }
 
         // 旧 sparkleHybrid/electronHybrid portal 检测（向后兼容，映射为 wholeAppSymlink）
-        let localInfoPlist = localContentsURL.appendingPathComponent("Info.plist")
-        if resolveSymlinkDestination(at: localInfoPlist) != nil {
-            return .wholeAppSymlink
-        }
-        let localFrameworks = localContentsURL.appendingPathComponent("Frameworks")
-        if resolveSymlinkDestination(at: localFrameworks) != nil {
+        if legacyHybridSymlinkComponent(in: localContentsURL) != nil {
             return .wholeAppSymlink
         }
 
@@ -1062,14 +1064,7 @@ struct AppMigrationService {
         }
 
         // 旧 sparkleHybrid/electronHybrid 入口检测（向后兼容）
-        let localInfoPlist = localContentsURL.appendingPathComponent("Info.plist")
-        if let infoPlistDest = resolveSymlinkDestination(at: localInfoPlist),
-           infoPlistDest == standardizedExternalURL.appendingPathComponent("Contents/Info.plist").standardizedFileURL {
-            return .wholeAppSymlink
-        }
-        let localFrameworks = localContentsURL.appendingPathComponent("Frameworks")
-        if let frameworksDestination = resolveSymlinkDestination(at: localFrameworks),
-           frameworksDestination == standardizedExternalURL.appendingPathComponent("Contents/Frameworks").standardizedFileURL {
+        if legacyHybridSymlinkComponent(in: localContentsURL, linkedTo: standardizedExternalURL) != nil {
             return .wholeAppSymlink
         }
 
@@ -1092,6 +1087,32 @@ struct AppMigrationService {
         }
 
         return nil
+    }
+
+    private func legacyHybridSymlinkComponent(in contentsURL: URL) -> String? {
+        for relativePath in legacyHybridRelativePaths {
+            if resolveSymlinkDestination(at: contentsURL.appendingPathComponent(relativePath)) != nil {
+                return relativePath
+            }
+        }
+        return nil
+    }
+
+    private func legacyHybridSymlinkComponent(in contentsURL: URL, linkedTo externalURL: URL) -> String? {
+        let externalContentsURL = externalURL.appendingPathComponent("Contents").standardizedFileURL
+        for relativePath in legacyHybridRelativePaths {
+            let componentURL = contentsURL.appendingPathComponent(relativePath)
+            let expectedURL = externalContentsURL.appendingPathComponent(relativePath).standardizedFileURL
+            if let destination = resolveSymlinkDestination(at: componentURL),
+               destination == expectedURL {
+                return relativePath
+            }
+        }
+        return nil
+    }
+
+    private var legacyHybridRelativePaths: [String] {
+        ["Info.plist", "MacOS", "Resources", "Frameworks"]
     }
 
     private func createLocalPortal(

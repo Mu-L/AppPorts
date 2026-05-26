@@ -10,7 +10,7 @@ This page covers the practical workflow for data directory migration. For techni
 
 1. Switch to the "Data Directories" tab in the main AppPorts window
 2. The left panel shows all installed apps
-3. Click an app; the right panel displays its associated data directories under `~/Library/`
+3. Use the top toolbar to switch between "Tool Directories" and "App Data"; when viewing app data, click an app and the right panel displays its associated directories under `~/Library/`
 
 AppPorts automatically scans the following directories, matching by app Bundle ID or name:
 
@@ -51,15 +51,15 @@ For the full supported list, see [Tool Directory Detection](/en/datamigrae/tools
 
 ### Auto Re-signing
 
-When "Auto Re-sign" is enabled in settings, data directory migration automatically triggers signing for the associated app:
+The Data Directories top toolbar contains the "Re-sign after migration" toggle. When enabled, data directory migration triggers signing for the associated app:
 
 1. **Before migration**: Backs up the original signature of the associated app's **real external path** (not the local shell)
 2. **After migration**: Executes Ad-hoc re-signing on the **real external app** (silent mode; failures do not show a dialog)
 
 For linked apps, AppPorts automatically resolves the real app path behind the Stub Portal shell or symlink, ensuring signature changes are applied to the actual application package rather than an invalid local shell.
 
-::: tip 💡 No Manual Action Needed
-With auto-re-signing enabled, the data directory migration workflow is fully automated. Signature backup and re-signing both target the real app path — no manual intervention required.
+::: tip Container Data Confirmation
+When migrating `Containers` or `Group Containers` app data, AppPorts asks before migration whether to re-sign after completion. Accept to back up and Ad-hoc re-sign the associated app; decline to migrate data only.
 :::
 
 ### Log Context
@@ -100,6 +100,8 @@ It is recommended to prioritize migrating directories marked as "Recommended".
    - Delete the local symbolic link
    - Copy data from external storage back to local
    - Delete the external directory (best effort)
+
+If an external target already exists during restore or recovery, AppPorts checks `.appports-link-metadata.plist`. It only reconnects or recovers automatically when metadata fully matches the current source path, destination path, and data directory type; otherwise it reports a destination conflict and leaves the directory untouched.
 
 ## Handling Abnormal States
 

@@ -181,6 +181,81 @@ final class AppScannerTests: XCTestCase {
         XCTAssertEqual(item.status, "未链接")
     }
 
+    func testLocalScanMarksNewerLocalAppAsPendingMoveOut() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Newer.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("ExternalName.app")
+
+        try createAppBundle(at: localAppURL, payloadSize: 1024, bundleID: "com.example.newer", version: "2.0")
+        try createAppBundle(at: externalAppURL, payloadSize: 1024, bundleID: "com.example.newer", version: "1.0")
+
+        let items = await AppScanner().scanLocalApps(
+            at: workspace.localAppsURL,
+            runningAppURLs: Set<URL>(),
+            externalAppsDir: workspace.externalRootURL
+        )
+
+        let item = try XCTUnwrap(items.first(where: { $0.name == "Newer.app" }))
+        XCTAssertEqual(item.status, AppStatus.pendingMoveOut)
+        XCTAssertEqual(item.version, "2.0")
+    }
+
+    func testLocalScanDoesNotMarkPendingMoveOutWhenExternalVersionIsSameHigherMissingOrInvalid() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let cases: [(name: String, localVersion: String?, externalVersion: String?)] = [
+            ("Same", "2.0", "2.0"),
+            ("HigherExternal", "2.0", "3.0"),
+            ("MissingExternal", "2.0", nil),
+            ("InvalidExternal", "2.0", "2.beta"),
+            ("MissingLocal", nil, "1.0"),
+            ("InvalidLocal", "2.beta", "1.0")
+        ]
+
+        for testCase in cases {
+            let localAppURL = workspace.localAppsURL.appendingPathComponent("\(testCase.name).app")
+            let externalAppURL = workspace.externalRootURL.appendingPathComponent("\(testCase.name).app")
+            let bundleID = "com.example.\(testCase.name.lowercased())"
+
+            try createAppBundle(at: localAppURL, payloadSize: 1024, bundleID: bundleID, version: testCase.localVersion)
+            try createAppBundle(at: externalAppURL, payloadSize: 1024, bundleID: bundleID, version: testCase.externalVersion)
+        }
+
+        let items = await AppScanner().scanLocalApps(
+            at: workspace.localAppsURL,
+            runningAppURLs: Set<URL>(),
+            externalAppsDir: workspace.externalRootURL
+        )
+
+        for testCase in cases {
+            let item = try XCTUnwrap(items.first(where: { $0.name == "\(testCase.name).app" }))
+            XCTAssertEqual(item.status, AppStatus.local, "\(testCase.name) should stay local")
+        }
+    }
+
+    func testLocalScanDoesNotMarkPendingMoveOutForSameNameDifferentBundleID() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("SameName.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("SameName.app")
+
+        try createAppBundle(at: localAppURL, payloadSize: 1024, bundleID: "com.example.local", version: "2.0")
+        try createAppBundle(at: externalAppURL, payloadSize: 1024, bundleID: "com.example.external", version: "1.0")
+
+        let items = await AppScanner().scanLocalApps(
+            at: workspace.localAppsURL,
+            runningAppURLs: Set<URL>(),
+            externalAppsDir: workspace.externalRootURL
+        )
+
+        let item = try XCTUnwrap(items.first(where: { $0.name == "SameName.app" }))
+        XCTAssertEqual(item.status, AppStatus.local)
+    }
+
     private func makeWorkspace() throws -> (rootURL: URL, localAppsURL: URL, externalRootURL: URL) {
         let rootURL = fileManager.temporaryDirectory.appendingPathComponent("AppScannerTests-\(UUID().uuidString)")
         let localAppsURL = rootURL.appendingPathComponent("Applications")
@@ -196,7 +271,12 @@ final class AppScannerTests: XCTestCase {
         try? fileManager.removeItem(at: rootURL)
     }
 
-    private func createAppBundle(at appURL: URL, payloadSize: Int, bundleID: String? = nil) throws {
+    private func createAppBundle(
+        at appURL: URL,
+        payloadSize: Int,
+        bundleID: String? = nil,
+        version: String? = nil
+    ) throws {
         let contentsURL = appURL.appendingPathComponent("Contents")
         let macOSURL = contentsURL.appendingPathComponent("MacOS")
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
@@ -210,9 +290,12 @@ final class AppScannerTests: XCTestCase {
         let payloadURL = resourcesURL.appendingPathComponent("payload.bin")
         try Data(repeating: 0x42, count: payloadSize).write(to: payloadURL)
 
-        let plist: [String: Any] = [
+        var plist: [String: Any] = [
             "CFBundleIdentifier": bundleID ?? "com.example.\(appURL.deletingPathExtension().lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "-"))"
         ]
+        if let version {
+            plist["CFBundleShortVersionString"] = version
+        }
         let plistData = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try plistData.write(to: contentsURL.appendingPathComponent("Info.plist"))
     }

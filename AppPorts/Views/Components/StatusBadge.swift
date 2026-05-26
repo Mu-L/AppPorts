@@ -44,7 +44,7 @@ struct StatusBadge: View {
         var result: [BadgeConfig] = []
 
         // 1. 链接状态标签
-        if app.status == "已链接" {
+        if app.status == AppStatus.linked {
             if app.needsLock {
                 let locked = Self.isExternalAppLocked(app: app)
                 result.append(BadgeConfig(
@@ -55,18 +55,20 @@ struct StatusBadge: View {
                 ))
             } else if app.hasSelfUpdater {
                 // 原生自更新 app（Chrome、Edge 等）不加锁，显示"已链接"
-                result.append(BadgeConfig(text: "已链接", icon: "link", color: .green, isTappable: false))
+                result.append(BadgeConfig(text: AppStatus.linked, icon: "link", color: .green, isTappable: false))
             } else {
-                result.append(BadgeConfig(text: "已链接", icon: "link", color: .green, isTappable: false))
+                result.append(BadgeConfig(text: AppStatus.linked, icon: "link", color: .green, isTappable: false))
             }
-        } else if app.status == "部分链接" {
-            result.append(BadgeConfig(text: "部分链接", icon: "link.badge.plus", color: .yellow, isTappable: false))
-        } else if app.status == "孤立链接" {
-            result.append(BadgeConfig(text: "孤立链接", icon: "link.badge.exclamationmark", color: .red, isTappable: false))
-        } else if app.status == "未链接" {
-            result.append(BadgeConfig(text: "未链接", icon: "externaldrive.badge.xmark", color: .orange, isTappable: false))
-        } else if app.status == "外部" {
-            result.append(BadgeConfig(text: "外部", icon: "externaldrive", color: .orange, isTappable: false))
+        } else if app.status == AppStatus.partialLinked {
+            result.append(BadgeConfig(text: AppStatus.partialLinked, icon: "link.badge.plus", color: .yellow, isTappable: false))
+        } else if app.status == AppStatus.orphanedLink {
+            result.append(BadgeConfig(text: AppStatus.orphanedLink, icon: "link.badge.exclamationmark", color: .red, isTappable: false))
+        } else if app.status == AppStatus.unlinked {
+            result.append(BadgeConfig(text: AppStatus.unlinked, icon: "externaldrive.badge.xmark", color: .orange, isTappable: false))
+        } else if app.status == AppStatus.external {
+            result.append(BadgeConfig(text: AppStatus.external, icon: "externaldrive", color: .orange, isTappable: false))
+        } else if app.status == AppStatus.pendingMoveOut {
+            result.append(BadgeConfig(text: AppStatus.pendingMoveOut, icon: "arrow.up.right.circle", color: .cyan, isTappable: false))
         }
 
         // 2. 框架标签（独立于链接状态）
@@ -95,7 +97,7 @@ struct StatusBadge: View {
 
         // 4. 如果没有任何标签，显示"本地"
         if result.isEmpty {
-            result.append(BadgeConfig(text: "本地", icon: "macmini", color: .secondary, isTappable: false))
+            result.append(BadgeConfig(text: AppStatus.local, icon: "macmini", color: .secondary, isTappable: false))
         }
 
         return result

@@ -37,6 +37,18 @@ actor AppScanner {
         let priority: Int
     }
 
+    private struct ExternalComparisonIndex {
+        var byBundleID: [String: ExternalComparableApp] = [:]
+        var byName: [String: ExternalComparableApp] = [:]
+    }
+
+    private struct ExternalComparableApp {
+        let bundleURL: URL
+        let containerURL: URL
+        let bundleID: String?
+        let version: String?
+    }
+
     enum AppSizeMode {
         /// 解析到真实 bundle 或目录后计算内容体积。
         case logicalContent
@@ -112,7 +124,7 @@ actor AppScanner {
     ///
     /// 本地列表中的“已链接”应用应显示本地入口大小，避免看起来像在本地保留了一整份实体副本。
     func calculateDisplayedSize(for app: AppItem, isLocalEntry: Bool) -> Int64 {
-        let mode: AppSizeMode = (isLocalEntry && app.status == "已链接") ? .localPortal : .logicalContent
+        let mode: AppSizeMode = (isLocalEntry && app.status == AppStatus.linked) ? .localPortal : .logicalContent
         return calculateDirectorySize(at: app.path, mode: mode)
     }
     
@@ -131,19 +143,21 @@ actor AppScanner {
     ///   - 系统应用识别（路径以 /System 开头）
     ///   - 运行状态检测
     ///   - App Store 应用和 iOS 应用检测
-    func scanLocalApps(at dir: URL, runningAppURLs: Set<URL>) -> [AppItem] {
+    func scanLocalApps(at dir: URL, runningAppURLs: Set<URL>, externalAppsDir: URL? = nil) -> [AppItem] {
         let scanID = AppLogger.shared.makeOperationID(prefix: "app-scanner-local")
         AppLogger.shared.logContext(
             "AppScanner 开始扫描本地应用",
             details: [
                 ("scan_id", scanID),
                 ("directory", dir.path),
+                ("external_directory", externalAppsDir?.path),
                 ("running_app_count", String(runningAppURLs.count))
             ],
             level: "TRACE"
         )
         let fileManager = FileManager.default
         var candidates: [ScanCandidate] = []
+        let externalComparisonIndex = makeExternalComparisonIndex(for: externalAppsDir)
         
         // 性能优化：预先获取需要的资源键
         let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isDirectoryKey]
@@ -153,9 +167,16 @@ actor AppScanner {
             // 只处理 .app 扩展名的项目
             if itemURL.pathExtension == "app" {
                 let appName = itemURL.lastPathComponent
-                let status = detectLocalAppStatus(at: itemURL)
+                let baseStatus = detectLocalAppStatus(at: itemURL)
+                let status = statusForLocalApp(
+                    baseStatus: baseStatus,
+                    localBundleURL: itemURL,
+                    fallbackName: appName,
+                    externalComparisonIndex: externalComparisonIndex
+                )
                 let isSystem = itemURL.path.hasPrefix("/System")
                 let isRunning = runningAppURLs.contains(itemURL)
+                let version = readBundleVersion(from: itemURL)
                 
                 // 检测是否为 App Store 应用和 iOS 应用
                 let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: itemURL)
@@ -177,6 +198,7 @@ actor AppScanner {
                     isSparkleApp: isSparkle,
                     hasSelfUpdater: hasUpdater,
                     needsLock: needsLock,
+                    version: version,
                     containerKind: .standaloneApp
                 )
                 candidates.append(makeCandidate(for: app, bundleURL: itemURL, priority: 10))
@@ -188,7 +210,7 @@ actor AppScanner {
                 if !appsInFolder.isEmpty {
                     let folderName = itemURL.lastPathComponent
                     let appCount = appsInFolder.count
-                    let status = detectLocalFolderStatus(at: itemURL)
+                    let baseStatus = detectLocalFolderStatus(at: itemURL)
 
                     let hasRunning = appsInFolder.contains { bundleURL in
                         runningAppURLs.contains(bundleURL)
@@ -196,8 +218,15 @@ actor AppScanner {
                     }
 
                     if appCount == 1, let bundleURL = appsInFolder.first {
+                        let status = statusForLocalApp(
+                            baseStatus: baseStatus,
+                            localBundleURL: bundleURL,
+                            fallbackName: bundleURL.lastPathComponent,
+                            externalComparisonIndex: externalComparisonIndex
+                        )
                         let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: bundleURL)
                         let isResigned = checkResignedStatus(bundleURL: bundleURL)
+                        let version = readBundleVersion(from: bundleURL)
                         let app = AppItem(
                             name: folderName,
                             path: itemURL,
@@ -208,6 +237,7 @@ actor AppScanner {
                             isAppStoreApp: isAppStore,
                             isIOSApp: isIOS,
                             isResigned: isResigned,
+                            version: version,
                             containerKind: .singleAppContainer,
                             appCount: 1
                         )
@@ -216,7 +246,7 @@ actor AppScanner {
                         let app = AppItem(
                             name: folderName,
                             path: itemURL,
-                            status: status,
+                            status: baseStatus,
                             isSystemApp: false,
                             isRunning: hasRunning,
                             isFolder: true,
@@ -255,9 +285,9 @@ actor AppScanner {
         // wholeAppSymlink：整个 .app 是符号链接
         if let linkDest = resolveSymlinkDestination(of: appURL) {
             if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
-                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+                return fm.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
             }
-            return "本地"
+            return AppStatus.local
         }
 
         let contentsURL = appURL.appendingPathComponent("Contents")
@@ -265,32 +295,32 @@ actor AppScanner {
         // deepContentsWrapper：Contents/ 是符号链接
         if let linkDest = resolveSymlinkDestination(of: contentsURL) {
             if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
-                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+                return fm.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
             }
-            return "本地"
+            return AppStatus.local
         }
 
         // 旧版混合入口：MacOS/Resources/Frameworks 是符号链接
         let macOSURL = contentsURL.appendingPathComponent("MacOS")
         if let linkDest = resolveSymlinkDestination(of: macOSURL) {
             if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
-                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+                return fm.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
             }
-            return "本地"
+            return AppStatus.local
         }
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
         if let linkDest = resolveSymlinkDestination(of: resourcesURL) {
             if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
-                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+                return fm.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
             }
-            return "本地"
+            return AppStatus.local
         }
         let frameworksURL = contentsURL.appendingPathComponent("Frameworks")
         if let linkDest = resolveSymlinkDestination(of: frameworksURL) {
             if isCrossVolumeLink(fromPortalAt: appURL, to: linkDest) {
-                return fm.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+                return fm.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
             }
-            return "本地"
+            return AppStatus.local
         }
 
         // Stub Portal：检查 launcher 引用的外部 app 是否存在
@@ -301,7 +331,7 @@ actor AppScanner {
             if let raw = try? String(contentsOf: pathFile, encoding: .utf8) {
                 let realPath = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !realPath.isEmpty {
-                    return fm.fileExists(atPath: realPath) ? "已链接" : "孤立链接"
+                    return fm.fileExists(atPath: realPath) ? AppStatus.linked : AppStatus.orphanedLink
                 }
             }
             // 旧版 bash launcher：提取 REAL_APP='...'
@@ -310,21 +340,21 @@ actor AppScanner {
                     let afterQuote = script[range.upperBound...]
                     if let endQuote = afterQuote.range(of: "'") {
                         let realAppPath = String(afterQuote[..<endQuote.lowerBound])
-                        return fm.fileExists(atPath: realAppPath) ? "已链接" : "孤立链接"
+                        return fm.fileExists(atPath: realAppPath) ? AppStatus.linked : AppStatus.orphanedLink
                     }
                 }
             }
         }
 
-        return "本地"
+        return AppStatus.local
     }
 
     private func detectLocalFolderStatus(at folderURL: URL) -> String {
         if let linkDest = resolveSymlinkDestination(of: folderURL) {
-            return FileManager.default.fileExists(atPath: linkDest.path) ? "已链接" : "孤立链接"
+            return FileManager.default.fileExists(atPath: linkDest.path) ? AppStatus.linked : AppStatus.orphanedLink
         }
 
-        return "本地"
+        return AppStatus.local
     }
 
     /// 为体积计算解析真实目标。
@@ -368,9 +398,7 @@ actor AppScanner {
     }
 
     private func resolveSymlinkDestination(of url: URL) -> URL? {
-        guard let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey]),
-              values.isSymbolicLink == true,
-              let rawPath = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) else {
+        guard let rawPath = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) else {
             return nil
         }
 
@@ -687,6 +715,116 @@ actor AppScanner {
         return false
     }
 
+    private func makeExternalComparisonIndex(for externalAppsDir: URL?) -> ExternalComparisonIndex? {
+        guard let externalAppsDir else { return nil }
+
+        var index = ExternalComparisonIndex()
+        let fileManager = FileManager.default
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
+        let items = (try? fileManager.contentsOfDirectory(at: externalAppsDir, includingPropertiesForKeys: keys, options: .skipsHiddenFiles)) ?? []
+
+        func addComparable(bundleURL: URL, containerURL: URL) {
+            let bundleID = readBundleIdentifier(from: bundleURL)
+            let version = readBundleVersion(from: bundleURL)
+            let comparable = ExternalComparableApp(
+                bundleURL: bundleURL.standardizedFileURL,
+                containerURL: containerURL.standardizedFileURL,
+                bundleID: bundleID,
+                version: version
+            )
+
+            if let bundleID, !bundleID.isEmpty {
+                index.byBundleID[bundleID.lowercased()] = comparable
+            }
+            index.byName[normalizedAppName(bundleURL.lastPathComponent)] = comparable
+            index.byName[normalizedAppName(containerURL.lastPathComponent)] = comparable
+        }
+
+        for itemURL in items {
+            if itemURL.pathExtension == "app" {
+                addComparable(bundleURL: itemURL, containerURL: itemURL)
+                continue
+            }
+
+            let appsInFolder = appBundlesInsideFolderPortal(at: itemURL)
+            if appsInFolder.count == 1, let bundleURL = appsInFolder.first {
+                addComparable(bundleURL: bundleURL, containerURL: itemURL)
+            }
+        }
+
+        return index
+    }
+
+    private func statusForLocalApp(
+        baseStatus: String,
+        localBundleURL: URL,
+        fallbackName: String,
+        externalComparisonIndex: ExternalComparisonIndex?
+    ) -> String {
+        guard baseStatus == AppStatus.local,
+              let externalComparisonIndex,
+              let localVersion = readBundleVersion(from: localBundleURL),
+              let externalApp = matchingExternalApp(for: localBundleURL, fallbackName: fallbackName, in: externalComparisonIndex),
+              let externalVersion = externalApp.version,
+              compareBundleVersions(localVersion, externalVersion) == .orderedDescending else {
+            return baseStatus
+        }
+
+        return AppStatus.pendingMoveOut
+    }
+
+    private func matchingExternalApp(
+        for localBundleURL: URL,
+        fallbackName: String,
+        in index: ExternalComparisonIndex
+    ) -> ExternalComparableApp? {
+        if let bundleID = readBundleIdentifier(from: localBundleURL)?.lowercased(),
+           !bundleID.isEmpty {
+            return index.byBundleID[bundleID]
+        }
+
+        return index.byName[normalizedAppName(fallbackName)]
+            ?? index.byName[normalizedAppName(localBundleURL.lastPathComponent)]
+    }
+
+    private func compareBundleVersions(_ lhs: String, _ rhs: String) -> ComparisonResult? {
+        guard let lhsComponents = parseBundleVersion(lhs),
+              let rhsComponents = parseBundleVersion(rhs) else {
+            return nil
+        }
+
+        let maxCount = max(lhsComponents.count, rhsComponents.count)
+        for index in 0..<maxCount {
+            let left = index < lhsComponents.count ? lhsComponents[index] : 0
+            let right = index < rhsComponents.count ? rhsComponents[index] : 0
+
+            if left < right { return .orderedAscending }
+            if left > right { return .orderedDescending }
+        }
+
+        return .orderedSame
+    }
+
+    private func parseBundleVersion(_ version: String) -> [Int]? {
+        let trimmed = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        guard !parts.isEmpty else { return nil }
+
+        var components: [Int] = []
+        for part in parts {
+            guard !part.isEmpty,
+                  part.allSatisfy(\.isNumber),
+                  let value = Int(part) else {
+                return nil
+            }
+            components.append(value)
+        }
+
+        return components
+    }
+
     /// 扫描外部存储目录
     ///
     /// 扫描外部存储设备上的应用目录，并检测这些应用是否已链接回本地。
@@ -717,13 +855,13 @@ actor AppScanner {
         for itemURL in items {
             if itemURL.pathExtension == "app" {
                 let appName = itemURL.lastPathComponent
-                var status = "未链接"
+                var status = AppStatus.unlinked
                 
                 // 检查本地是否存在符号链接
                 let localAppURL = localAppsDir.appendingPathComponent(appName)
                 if fileManager.fileExists(atPath: localAppURL.path),
                    isLocalApp(localAppURL, linkedTo: itemURL) {
-                    status = "已链接"
+                    status = AppStatus.linked
                 }
                 let isResigned = checkResignedStatus(bundleURL: itemURL)
                 let (isElectron, isSparkle) = detectElectronAndSparkle(at: itemURL)
@@ -755,15 +893,15 @@ actor AppScanner {
                     let localFolderURL = localAppsDir.appendingPathComponent(folderName)
 
                     if appCount == 1, let bundleURL = appsInFolder.first {
-                        var status = "未链接"
+                        var status = AppStatus.unlinked
                         if fileManager.fileExists(atPath: localFolderURL.path),
                            isLocalFolder(localFolderURL, linkedTo: itemURL) {
-                            status = "已链接"
+                            status = AppStatus.linked
                         } else {
                             let localAppURL = localAppsDir.appendingPathComponent(bundleURL.lastPathComponent)
                             if fileManager.fileExists(atPath: localAppURL.path),
                                isLocalApp(localAppURL, linkedTo: bundleURL) {
-                                status = "已链接"
+                                status = AppStatus.linked
                             }
                         }
 
@@ -787,7 +925,7 @@ actor AppScanner {
                         let status: String
                         if fileManager.fileExists(atPath: localFolderURL.path),
                            isLocalFolder(localFolderURL, linkedTo: itemURL) {
-                            status = "已链接"
+                                status = AppStatus.linked
                         } else {
                             var linkedCount = 0
                             for appURL in appsInFolder {
@@ -799,7 +937,7 @@ actor AppScanner {
                                 }
                             }
 
-                            status = linkedCount == 0 ? "未链接" : "部分链接"
+                            status = linkedCount == 0 ? AppStatus.unlinked : AppStatus.partialLinked
                         }
 
                         let app = AppItem(
@@ -833,7 +971,7 @@ actor AppScanner {
                     name: externalTargetURL.lastPathComponent,
                     path: externalTargetURL,
                     bundleURL: externalTargetURL,
-                    status: "已链接",
+                    status: AppStatus.linked,
                     isSystemApp: false,
                     isRunning: false,
                     isAppStoreApp: isAppStore,
@@ -862,7 +1000,7 @@ actor AppScanner {
                     name: externalTargetURL.lastPathComponent,
                     path: externalTargetURL,
                     bundleURL: bundleURL,
-                    status: "已链接",
+                    status: AppStatus.linked,
                     isSystemApp: false,
                     isRunning: false,
                     isAppStoreApp: isAppStore,
@@ -876,7 +1014,7 @@ actor AppScanner {
                 let app = AppItem(
                     name: externalTargetURL.lastPathComponent,
                     path: externalTargetURL,
-                    status: "已链接",
+                    status: AppStatus.linked,
                     isSystemApp: false,
                     isRunning: false,
                     isFolder: true,
@@ -893,11 +1031,11 @@ actor AppScanner {
             let masItems = (try? fileManager.contentsOfDirectory(at: masDir, includingPropertiesForKeys: keys, options: .skipsHiddenFiles)) ?? []
             for itemURL in masItems where itemURL.pathExtension == "app" {
                 let appName = itemURL.lastPathComponent
-                var status = "未链接"
+                var status = AppStatus.unlinked
                 let localAppURL = localAppsDir.appendingPathComponent(appName)
                 if fileManager.fileExists(atPath: localAppURL.path),
                    isLocalApp(localAppURL, linkedTo: itemURL) {
-                    status = "已链接"
+                    status = AppStatus.linked
                 }
                 let (isAppStore, isIOS) = detectAppStoreAndIOSApp(at: itemURL)
                 let isResigned = checkResignedStatus(bundleURL: itemURL)
@@ -941,8 +1079,8 @@ actor AppScanner {
     /// - Returns: 排序后的应用列表
     private func sortApps(_ apps: [AppItem]) -> [AppItem] {
          return apps.sorted { app1, app2 in
-            let isApp1Linked = (app1.status == "已链接")
-            let isApp2Linked = (app2.status == "已链接")
+            let isApp1Linked = (app1.status == AppStatus.linked)
+            let isApp2Linked = (app2.status == AppStatus.linked)
             
             // "已链接" 状态优先
             if isApp1Linked && !isApp2Linked { return true }
@@ -993,9 +1131,11 @@ actor AppScanner {
 
     private func statusRank(for status: String) -> Int {
         switch status {
-        case "已链接":
+        case AppStatus.linked:
             return 3
-        case "部分链接":
+        case AppStatus.partialLinked:
+            return 2
+        case AppStatus.pendingMoveOut:
             return 2
         default:
             return 1
@@ -1007,11 +1147,15 @@ actor AppScanner {
             return "bundle:\(bundleID.lowercased())"
         }
 
-        let normalized = fallbackName
+        let normalized = normalizedAppName(fallbackName)
+        return "name:\(normalized)"
+    }
+
+    private func normalizedAppName(_ name: String) -> String {
+        name
             .replacingOccurrences(of: ".app", with: "", options: [.caseInsensitive])
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             .lowercased()
-        return "name:\(normalized)"
     }
 
     private func readBundleIdentifier(from appURL: URL) -> String? {

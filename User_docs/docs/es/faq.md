@@ -44,7 +44,7 @@ Depende del tipo de app:
 | Tipo de App | Puede Auto-Actualizar | Notas |
 |-------------|:---:|-------|
 | Apps nativas (sin auto-actualización) | ✓ | Actualizaciones normales |
-| Chrome, Edge (actualizador personalizado) | ✓ | Las actualizaciones se instalan en local; AppPorts detecta diferencia de versión y etiqueta "Migración Pendiente" |
+| Chrome, Edge (actualizador personalizado) | ✓ | Las actualizaciones se instalan en local; AppPorts detecta una versión local más reciente y etiqueta "Pendiente de mover fuera" |
 | Apps Sparkle / Electron | ✗ | El bloqueo previene actualizaciones en la app; debe restaurar a local vía AppPorts antes de actualizar |
 | Apps App Store (macOS 15.1+) | ✓ | App Store puede actualizar in situ en el disco externo |
 | Apps App Store (macOS <15.1) | ✗ | Se requiere re-migración manual |

@@ -86,6 +86,9 @@ Error logs contain structured information:
 | Error Code | Meaning |
 |------------|---------|
 | `BACKUP-SIGNATURE-FAILED` | Signature backup failed |
+| `APP-MOVE-DESTINATION-CONFLICT` | App migration target already exists and cannot be confirmed safe to replace |
+| `APP-RESTORE-LOCAL-CONFLICT` | Move-back found a same-name local item that cannot be overwritten automatically |
+| `DATA-MIGRATE-DESTINATION-CONFLICT` | Data migration target already exists and metadata does not fully match |
 | `RESIGN-FAILED` | Re-signing failed (app may not pass macOS signature verification) |
 | `DATA-RESIGN-FAILED` | Auto-re-signing after data directory migration failed |
 | `DATA-BACKUP-SIGNATURE-FAILED` | Signature backup before data directory migration failed (original signature cannot be restored later) |

@@ -4,6 +4,37 @@ outline: deep
 
 # Journal des modifications
 
+## v1.7.0
+
+### Nouveautés
+
+- Ajout du statut « Migration sortante en attente » : lorsque la vraie application locale est plus récente que l'application du même nom sur le stockage externe, AppPorts la marque comme prête à être migrée vers l'extérieur afin de remplacer l'ancienne copie externe.
+- Ajout d'une confirmation de re-signature pour la migration des données : avant de migrer des données à l'intérieur d'un conteneur d'application, AppPorts peut demander s'il faut appliquer automatiquement une re-signature Ad-hoc à l'application associée après la migration, afin de réduire le risque de données non reconnues, d'avertissements ou d'échecs de lancement (#44).
+
+### Améliorations de l'interface
+
+- Réorganisation de la barre d'outils supérieure : les boutons de bascule entre la page des applications et celle des répertoires de données utilisent désormais un style plus compact avec icône + texte.
+- Optimisation de la barre d'actions des répertoires de données : le sélecteur « Répertoires d'outils / Données d'application », l'option de re-signature après migration, le bouton de restauration de la signature d'origine et le bouton d'actualisation sont regroupés dans la barre d'outils supérieure.
+- Ajout du badge d'état « Migration sortante en attente » pour identifier les applications dont la version locale est plus récente que l'ancienne copie externe.
+- Localisation de la boîte de dialogue de confirmation de re-signature lors de la migration des données, y compris le titre, le texte et les boutons.
+
+### Améliorations
+
+- Sécurité de migration d'application renforcée : lorsque la destination externe existe déjà, AppPorts ne la nettoie automatiquement que si elle est reconnue comme ancien portail géré par AppPorts, reste d'une ancienne migration, ou si l'application est en état « Migration sortante en attente ».
+- Vérification de récupération des répertoires de données renforcée : la récupération automatique ne repose plus sur une taille de dossier proche, mais exige une correspondance complète des AppPorts metadata.
+- Analyse des données d'application plus stable : lors d'un changement rapide d'application, les résultats d'anciennes tâches d'analyse n'écrasent plus la liste des répertoires de données de l'application actuellement sélectionnée.
+- Échappement renforcé pour les commandes administrateur et AppleScript : les chemins contenant guillemets, barres obliques inverses, espaces ou caractères chinois sont traités plus sûrement.
+- Localisation améliorée : correction des contenus d'aide, invites et confirmations de migration de données qui pouvaient rester en chinois ou être incomplètement traduits après un changement de langue ; traductions complétées pour toutes les langues prises en charge (#43).
+
+### Corrections
+
+- Correction d'un cas où la migration de répertoire de données pouvait traiter à tort un vrai répertoire externe comme cible récupérable.
+- Correction d'un cas où la migration d'application pouvait supprimer par erreur une vraie application externe portant le même nom.
+- Correction de la détection et du nettoyage instables des anciens portails AppPorts externes ou des restes d'anciennes migrations.
+- Correction de la construction incorrecte d'AppleScript ou de commandes administrateur lorsque le chemin contient des caractères spéciaux.
+- Correction d'un cas où la migration en arrière-plan ou la re-signature après migration pouvait lire une application déjà changée.
+- Correction du badge « Migration sortante en attente » qui n'apparaissait pas dans la liste des applications.
+
 ## v1.6.2
 
 - Nouveau : Re-signature automatique à la connexion. Re-signe automatiquement les applications migrées avec des signatures expirées à chaque connexion de l'utilisateur, sans action manuelle. Activé par défaut, peut être désactivé dans les Paramètres

@@ -25,5 +25,5 @@ Quand une application est marquée comme nécessitant un verrouillage (`needsLoc
 ::: tip 💡 Pourquoi les applications avec mise à jour auto personnalisée ne sont pas verrouillées
 Les applications utilisant des mises à jour automatiques personnalisées comme Chrome et Edge ne sont pas verrouillées. Les programmes de mise à jour de ces applications installent généralement les nouvelles versions sur le stockage interne local. En raison des caractéristiques d'isolation de liaison de macOS Stub Portal, cela n'endommage pas les fichiers de l'application sur le stockage externe.
 
-Quand AppPorts détecte que la version de l'application sur le stockage interne local est supérieure à celle sur le stockage externe, il marque automatiquement l'application avec « Migration en attente », incitant l'utilisateur à re-migrer pour synchroniser la dernière version.
+Quand AppPorts détecte que la version de l'application sur le stockage interne local est supérieure à celle sur le stockage externe, il marque automatiquement l'application avec « Migration sortante en attente », incitant l'utilisateur à re-migrer pour synchroniser la dernière version.
 :::

@@ -36,6 +36,14 @@ actor CodeSigner {
 
     private let fileManager = FileManager.default
 
+    static func ownershipRepairAppleScript(username: String, appPath: String) -> String {
+        """
+        set targetPath to \(AppMigrationService.appleScriptStringLiteral(appPath))
+        set userName to \(AppMigrationService.appleScriptStringLiteral(username))
+        do shell script "/usr/sbin/chown -R " & quoted form of userName & " " & quoted form of targetPath with administrator privileges
+        """
+    }
+
     // MARK: - Public API
 
     /// Ad-hoc 重签名
@@ -529,8 +537,7 @@ actor CodeSigner {
     /// App Store 应用受 SIP 保护，chown 可能部分失败，不抛出错误仅记录日志。
     private func elevateAndFixOwnership(at appURL: URL) throws {
         let username = NSUserName()
-        let shellCmd = "/usr/sbin/chown -R \(username) '\(appURL.path)'"
-        let script = "do shell script \"\(shellCmd)\" with administrator privileges"
+        let script = Self.ownershipRepairAppleScript(username: username, appPath: appURL.path)
 
         let appleScript = NSAppleScript(source: script)
         var errorInfo: NSDictionary?

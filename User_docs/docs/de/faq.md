@@ -44,7 +44,7 @@ Hängt vom App-Typ ab:
 | App-Typ | Kann automatisch aktualisieren | Hinweise |
 |---------|:---:|----------|
 | Native Apps (ohne Selbstupdate) | ✓ | Normale Updates |
-| Chrome, Edge (Custom Updater) | ✓ | Updates installieren lokal; AppPorts erkennt Versionsunterschied und markiert „Ausstehende Migration" |
+| Chrome, Edge (Custom Updater) | ✓ | Updates installieren lokal; AppPorts erkennt eine neuere lokale Version und markiert „Ausstehendes Herausverschieben" |
 | Sparkle / Electron Apps | ✗ | Sperrung verhindert In-App-Updates; muss vor Update über AppPorts lokal wiederhergestellt werden |
 | App Store-Apps (macOS 15.1+) | ✓ | App Store kann direkt auf externem Laufwerk aktualisieren |
 | App Store-Apps (macOS <15.1) | ✗ | Manuelle Re-Migration erforderlich |

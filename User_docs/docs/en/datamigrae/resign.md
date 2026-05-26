@@ -36,6 +36,12 @@ macOS's code signing mechanism (`codesign`) verifies the integrity of the applic
 
 ## Re-signing Mechanism
 
+### Post-Migration Re-sign Confirmation
+
+When migrating app data under `Containers` or `Group Containers`, AppPorts asks whether to Ad-hoc re-sign the associated app after migration. Accepting backs up the original signature and re-signs the real app path after migration; declining migrates the data only.
+
+This confirmation reduces the chance that an app fails to recognize moved container data, shows an abnormal prompt, or fails to launch after migration. For apps that rely heavily on containers or Keychain access, make an independent backup before choosing.
+
 ### Ad-hoc Signing
 
 AppPorts uses **Ad-hoc signing** (certificate-less local signing) to fix app signatures after migration. Execution command:
@@ -96,7 +102,7 @@ For linked apps (status: "Linked"), signing operations automatically resolve the
 | Migration Method | Resolution |
 |------------------|------------|
 | Whole App Symlink | Resolves the symlink target to the external real `.app` path |
-| Stub Portal | Extracts the `REAL_APP='...'` path from the `Contents/MacOS/launcher` script |
+| Stub Portal | Reads the real external app path recorded in the local portal |
 
 This means backup, restore, and re-signing operations always target the real application package, ensuring signature changes take effect.
 

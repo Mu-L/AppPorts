@@ -19,7 +19,12 @@ AppPorts displays the current status of apps and data directories using capsule-
 | Orphan Link | `link.badge.exclamationmark` | Red | External storage app lost but local entry still exists |
 | Unlinked | `externaldrive.badge.xmark` | Orange | App on external storage but not linked back locally |
 | External | `externaldrive` | Orange | App on external storage with no local entry |
+| Pending Move Out | `arrow.up.right.circle` | Cyan | The real local app is newer than the old external copy and can be moved out to replace it |
 | Local | `macmini` | Secondary color | Regular local app, not migrated; shown when no other tags present |
+
+::: tip How Pending Move Out Is Detected
+AppPorts matches local and external apps by Bundle ID first, then falls back to a normalized app name when needed. The badge only appears when both versions can be compared and the local version is higher. Missing or non-comparable versions, or same-name apps with different Bundle IDs, stay in the normal local state to avoid accidental replacement.
+:::
 
 ### Framework Labels
 
@@ -77,3 +82,8 @@ Meaning: iOS app (Mac version) on external storage, installed via App Store.
 [Orphan Link]
 ```
 Meaning: External storage app lost or removed, but local entry still retained. Manual unlinking required.
+
+```text
+[Pending Move Out]
+```
+Meaning: A newer real app exists locally while the external storage still has an older copy. Re-run migration to move the local version out and replace the old external copy.

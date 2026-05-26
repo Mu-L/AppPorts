@@ -15,9 +15,9 @@ Migración interrumpida debido a desconexión del almacenamiento externo, fallo 
 AppPorts tiene un mecanismo de recuperación automática integrado. Después de reiniciar AppPorts:
 
 1. Detecta datos de migración residuales (copia externa existe pero el enlace simbólico local no fue creado)
-2. Compara automáticamente los tamaños de directorios local y externo (umbral del 90%)
-3. Si los datos están completos, completa automáticamente la migración (elimina directorio local original, crea enlace simbólico)
-4. Si los datos están incompletos, limpia la copia externa residual y restaura el estado original
+2. Comprueba `.appports-link-metadata.plist` en el directorio externo
+3. Solo continúa la recuperación o revinculación si `schemaVersion`, `managedBy`, `sourcePath`, `destinationPath` y `dataDirType` coinciden por completo
+4. Si los metadatos no coinciden, detiene el procesamiento automático y conserva los datos existentes para confirmación
 
 ::: tip 💡 No Se Necesita Intervención Manual
 El mecanismo de recuperación automática de AppPorts maneja las migraciones interrumpidas en el siguiente inicio. Si la recuperación automática falla, puede ver el estado "Necesita Normalización" o "Necesita Revinculación" en la lista de directorios de datos — simplemente ejecute la operación correspondiente manualmente.
@@ -85,6 +85,10 @@ Si App Store no puede actualizar apps en discos externos:
 3. **Verifique el estado de bloqueo**: Si la app está bloqueada (uchg), el auto-actualizador podría no poder ejecutarse
 4. **Verifique los registros**: Barra de menú → Registros → Ver en Finder; busque mensajes de error relevantes
 5. **Mover de vuelta a local**: En la biblioteca de Aplicaciones Externas, seleccione "Mover de Vuelta a Local" para confirmar si es un problema del almacenamiento externo
+
+## La ruta de destino ya existe
+
+AppPorts solo reemplaza automáticamente un destino de app cuando la app está en estado "Pendiente de mover fuera", o cuando el destino se reconoce como un portal antiguo o residuo gestionado por AppPorts. Los directorios de datos requieren metadatos de AppPorts completamente coincidentes. Las apps o carpetas reales no relacionadas no se sobrescriben y se informan como conflicto.
 
 ## Problemas de Visualización de Directorios de Datos
 

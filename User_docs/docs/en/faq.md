@@ -44,10 +44,20 @@ Depends on app type:
 | App Type | Can Auto-Update | Notes |
 |----------|:---:|-------|
 | Native apps (no self-update) | ✓ | Normal updates |
-| Chrome, Edge (custom updater) | ✓ | Updates install to local; AppPorts detects version difference and tags "Pending Migration" |
+| Chrome, Edge (custom updater) | ✓ | Updates install to local; AppPorts detects a newer local version and tags "Pending Move Out" |
 | Sparkle / Electron apps | ✗ | Lock prevents in-app updates; must restore to local via AppPorts before updating |
 | App Store apps (macOS 15.1+) | ✓ | App Store can update in-place on external drive |
 | App Store apps (macOS <15.1) | ✗ | Manual re-migration required |
+
+### What does "Pending Move Out" mean?
+
+"Pending Move Out" means a real local app is newer than the matching copy on external storage. This often happens when a custom updater, such as Chrome or Edge, installs the new version back into `/Applications`.
+
+You can migrate the app again to replace the old external copy with the newer local version. AppPorts matches by Bundle ID first and falls back to normalized app name when needed. If versions are missing or not comparable, or if same-name apps have different Bundle IDs, the badge is not shown.
+
+### Will AppPorts overwrite an existing external target?
+
+Not blindly. AppPorts only auto-cleans the external target when the app is in "Pending Move Out" state, or when the target is recognized as an AppPorts-managed old portal or stale migration remnant. If the external path contains an unrelated real app or directory, migration stops with a destination conflict.
 
 ### How to migrate App Store apps to external drive?
 
@@ -68,11 +78,15 @@ Depends on app type:
 
 No. AppPorts uses the symbolic link strategy: data is completely copied to external storage first; only after confirming successful copy is the original local directory deleted. Any failed step triggers automatic rollback.
 
+If the external target already exists, AppPorts only continues recovery when `.appports-link-metadata.plist` fully matches the current source path, destination path, and data directory type. A real directory without matching metadata is treated as a conflict; AppPorts no longer takes it over based on similar size.
+
 ### When might data directory migration cause app issues?
 
 - Apps using file locks or SQLite WAL logs
 - Extended attributes may be lost across symbolic links
 - Group Containers directories shared by multiple apps under the same Team
+
+When migrating data under `~/Library/Containers/` or `~/Library/Group Containers/`, AppPorts asks whether to Ad-hoc re-sign the associated app after migration. Choose the re-sign option for apps that may fail to recognize moved data or show launch/signature prompts; choose migrate only if you want to leave the app signature unchanged.
 
 ### How to restore migrated data directories?
 

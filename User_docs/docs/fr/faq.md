@@ -44,7 +44,7 @@ Cela dépend du type d'application :
 | Type d'application | Peut se mettre à jour auto | Notes |
 |---------------------|:---:|-------|
 | Applications natives (sans mise à jour auto) | ✓ | Mises à jour normales |
-| Chrome, Edge (mise à jour auto personnalisée) | ✓ | Les mises à jour s'installent en local ; AppPorts détecte la différence de version et marque « Migration en attente » |
+| Chrome, Edge (mise à jour auto personnalisée) | ✓ | Les mises à jour s'installent en local ; AppPorts détecte une version locale plus récente et marque « Migration sortante en attente » |
 | Applications Sparkle / Electron | ✗ | Le verrouillage empêche les mises à jour dans l'application ; doit restaurer vers le local via AppPorts avant de mettre à jour |
 | Applications App Store (macOS 15.1+) | ✓ | L'App Store peut mettre à jour in situ sur le disque externe |
 | Applications App Store (macOS <15.1) | ✗ | Re-migration manuelle requise |

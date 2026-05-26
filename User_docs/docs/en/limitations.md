@@ -43,6 +43,10 @@ macOS versions before 15.1 (Sequoia) do not support App Store app installation t
 | iOS app (Mac version) | ✓ | ✓ | ✓ | Uses iOS Stub Portal |
 | System apps | ✗ | — | — | SIP protection; cannot be migrated |
 
+::: tip About Pending Move Out
+"Pending Move Out" depends on comparable app versions and a reliable same-app match. AppPorts matches by Bundle ID first, then by normalized app name when necessary. Missing or non-comparable versions, or same-name apps with different Bundle IDs, will not show this state.
+:::
+
 ### By Data Directory Type
 
 | Data Directory Type | Migration | Risk |
@@ -58,6 +62,10 @@ macOS versions before 15.1 (Sequoia) do not support App Store app installation t
 | `~/Library/Application Scripts/` | ✓ | Low — extension scripts |
 | `~/Library/Saved Application State/` | ✓ | Low — window state restoration |
 | `~/.npm`, `~/.m2` etc. dot-folder | ✓ | Low — development tool caches |
+
+::: warning Destination Conflicts
+Data directory migration does not take over an external directory merely because its size is similar. AppPorts only continues automatic recovery when AppPorts metadata fully matches the current task; otherwise it treats the existing real directory as a conflict and stops.
+:::
 
 ## Non-migratable Content
 

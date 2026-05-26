@@ -19,7 +19,12 @@ AppPorts muestra el estado actual de las aplicaciones y directorios de datos med
 | Enlace Huérfano | `link.badge.exclamationmark` | Rojo | Aplicación del almacenamiento externo perdida pero la entrada local aún existe |
 | Desvinculado | `externaldrive.badge.xmark` | Naranja | Aplicación en almacenamiento externo pero no vinculada localmente |
 | Externo | `externaldrive` | Naranja | Aplicación en almacenamiento externo sin entrada local |
+| Pendiente de mover fuera | `arrow.up.right.circle` | Cian | La app local real es más reciente que la copia externa antigua y puede moverse fuera para reemplazarla |
 | Local | `macmini` | Color secundario | Aplicación local regular, no migrada; se muestra cuando no hay otras etiquetas |
+
+::: tip Cómo se detecta Pendiente de mover fuera
+AppPorts empareja primero las apps locales y externas por Bundle ID y, si es necesario, usa el nombre normalizado de la app como respaldo. El estado solo aparece cuando ambas versiones se pueden comparar y la versión local es más reciente.
+:::
 
 ### Etiquetas de Framework
 
