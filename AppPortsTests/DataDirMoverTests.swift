@@ -105,6 +105,49 @@ final class DataDirMoverTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "rollback-safe")
     }
 
+    func testRetryAfterLinkFailurePreservesNewLocalDataAndTheExternalCopy() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localDataURL = workspace.homeURL.appendingPathComponent("Library/Caches/com.example.retry")
+        let externalBaseURL = workspace.externalRootURL.appendingPathComponent("Library/Caches")
+        let externalDataURL = externalBaseURL.appendingPathComponent(localDataURL.lastPathComponent)
+        try createDirectoryWithPayload(at: localDataURL, payload: "before-link-failure")
+        let item = DataDirItem(name: "Retry", path: localDataURL, type: .caches,
+                               priority: .optional, description: "Retry after a failed link")
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL, failSymlinkCreation: true)
+                .migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("The initial link creation must fail")
+        } catch let error as DataDirError {
+            guard case .symlinkFailed = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+
+        try assertRealDirectory(localDataURL)
+        try assertRealDirectory(externalDataURL)
+        XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: externalDataURL).path))
+        try createDirectoryWithPayload(at: localDataURL, payload: "updated-after-failure")
+        let newFileURL = localDataURL.appendingPathComponent("new-after-failure.txt")
+        try Data("only-local-copy".utf8).write(to: newFileURL)
+
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL)
+                .migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("Matching metadata cannot make the stale external copy authoritative")
+        } catch let error as DataDirError {
+            guard case .destinationExists = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+
+        try assertRealDirectory(localDataURL)
+        try assertRealDirectory(externalDataURL)
+        XCTAssertEqual(try String(contentsOf: localDataURL.appendingPathComponent("payload.txt")), "updated-after-failure")
+        XCTAssertEqual(try Data(contentsOf: newFileURL), Data("only-local-copy".utf8))
+        XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "before-link-failure")
+        XCTAssertFalse(fileManager.fileExists(atPath: externalDataURL.appendingPathComponent("new-after-failure.txt").path))
+        XCTAssertFalse(try fileManager.contentsOfDirectory(atPath: localDataURL.deletingLastPathComponent().path)
+            .contains { $0.hasPrefix(".appports-migration-backup-") })
+    }
+
     func testMigrateKeepsExternalCopyWhenLocalBackupCleanupFails() async throws {
         let workspace = try makeWorkspace()
         defer { cleanupWorkspace(workspace.rootURL) }
@@ -268,7 +311,7 @@ final class DataDirMoverTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "external-cache")
     }
 
-    func testMigrateRecoversExistingDestinationWithMatchingMetadata() async throws {
+    func testMigrateRejectsExistingDestinationEvenWithMatchingMetadata() async throws {
         let workspace = try makeWorkspace()
         defer { cleanupWorkspace(workspace.rootURL) }
 
@@ -292,14 +335,22 @@ final class DataDirMoverTests: XCTestCase {
             path: localDataURL,
             type: .preferences,
             priority: .recommended,
-            description: "Matching metadata recovery",
+            description: "Matching metadata does not establish equal contents",
             isMigratable: true
         )
 
-        try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+        do {
+            try await DataDirMover(homeDir: workspace.homeURL).migrate(item: item, to: externalBaseURL, progressHandler: nil)
+            XCTFail("A managed destination must not replace a different real source")
+        } catch let error as DataDirError {
+            guard case .destinationExists = error else { return XCTFail("Unexpected error: \(error)") }
+        }
 
-        try assertSymlink(localDataURL, pointsTo: externalDataURL)
+        try assertRealDirectory(localDataURL)
+        try assertRealDirectory(externalDataURL)
+        XCTAssertEqual(try String(contentsOf: localDataURL.appendingPathComponent("payload.txt")), "local-preferences")
         XCTAssertEqual(try String(contentsOf: externalDataURL.appendingPathComponent("payload.txt")), "external-preferences")
+        XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: externalDataURL).path))
     }
 
     func testNormalizeManagedLinkMovesDataToNormalizedDestination() async throws {
@@ -477,6 +528,234 @@ final class DataDirMoverTests: XCTestCase {
         XCTAssertFalse(fileManager.fileExists(atPath: localDataURL.path))
         XCTAssertEqual(try String(contentsOf: currentExternalURL), "not a directory")
         XCTAssertFalse(fileManager.fileExists(atPath: normalizedExternalURL.path))
+    }
+
+    func testReadOnlyDirectoryMigrationAndRestorePreservesPermissions() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localURL = workspace.homeURL.appendingPathComponent("Library/Application Support/ReadOnly")
+        let externalBaseURL = workspace.externalRootURL.appendingPathComponent("Application Support")
+        let externalURL = externalBaseURL.appendingPathComponent("ReadOnly")
+        try createDirectoryWithPayload(at: localURL, payload: "read-only-data")
+        try createDirectoryWithPayload(at: localURL.appendingPathComponent("nested"), payload: "nested-data")
+        for url in [localURL.appendingPathComponent("nested"), localURL] {
+            try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: url.path)
+        }
+        defer {
+            for root in [localURL, externalURL] {
+                for url in [root, root.appendingPathComponent("nested")] {
+                    try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+                }
+            }
+        }
+
+        var item = DataDirItem(name: "ReadOnly", path: localURL, type: .applicationSupport,
+                               priority: .critical, description: "Read-only directory fixture")
+        let mover = DataDirMover(homeDir: workspace.homeURL)
+        try await mover.migrate(item: item, to: externalBaseURL, progressHandler: nil)
+        try assertSymlink(localURL, pointsTo: externalURL)
+        XCTAssertTrue(fileManager.fileExists(atPath: markerURL(for: externalURL).path))
+        for url in [externalURL, externalURL.appendingPathComponent("nested")] {
+            XCTAssertEqual(try fileManager.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o555)
+        }
+        XCTAssertFalse(try fileManager.contentsOfDirectory(atPath: localURL.deletingLastPathComponent().path)
+            .contains { $0.hasPrefix(".appports-migration-backup-") })
+
+        item.status = "已链接"
+        try await mover.restore(item: item, progressHandler: nil)
+        try assertRealDirectory(localURL)
+        XCTAssertFalse(fileManager.fileExists(atPath: externalURL.path))
+        XCTAssertFalse(fileManager.fileExists(atPath: markerURL(for: localURL).path))
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "read-only-data")
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("nested/payload.txt")), "nested-data")
+        for url in [localURL, localURL.appendingPathComponent("nested")] {
+            XCTAssertEqual(try fileManager.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o555)
+        }
+    }
+
+    func testMetadataFailureCleansReadOnlyCopyAndAllowsRetry() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localURL = workspace.homeURL.appendingPathComponent("Library/Caches/ReadOnly")
+        let externalBaseURL = workspace.externalRootURL.appendingPathComponent("Caches")
+        let externalURL = externalBaseURL.appendingPathComponent("ReadOnly")
+        try createDirectoryWithPayload(at: localURL, payload: "keep-source")
+        try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: localURL.path)
+        defer {
+            try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: localURL.path)
+            try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: externalURL.path)
+        }
+
+        let item = DataDirItem(name: "ReadOnly", path: localURL, type: .caches,
+                               priority: .optional, description: "Metadata failure fixture")
+        let mover = DataDirMover(homeDir: workspace.homeURL)
+        do {
+            try await mover.migrate(item: item, to: externalBaseURL) { progress in
+                guard progress.currentFile.isEmpty else { return }
+                // A conflicting directory at the marker path forces a real atomic write failure.
+                do {
+                    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: externalURL.path)
+                    try FileManager.default.createDirectory(
+                        at: externalURL.appendingPathComponent(".appports-link-metadata.plist"),
+                        withIntermediateDirectories: false
+                    )
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: externalURL.path)
+                } catch {
+                    XCTFail("Failed to prepare the metadata conflict: \(error)")
+                }
+            }
+            XCTFail("The metadata conflict must fail migration")
+        } catch let error as DataDirError {
+            guard case .metadataWriteFailed = error else { return XCTFail("Unexpected error: \(error)") }
+        }
+
+        try assertRealDirectory(localURL)
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "keep-source")
+        XCTAssertEqual(try fileManager.attributesOfItem(atPath: localURL.path)[.posixPermissions] as? Int, 0o555)
+        XCTAssertFalse(fileManager.fileExists(atPath: externalURL.path))
+
+        try await mover.migrate(item: item, to: externalBaseURL, progressHandler: nil)
+        try assertSymlink(localURL, pointsTo: externalURL)
+        XCTAssertEqual(try String(contentsOf: externalURL.appendingPathComponent("payload.txt")), "keep-source")
+    }
+
+    func testRestoreCleanupFailureDoesNotTraverseDirectorySymlinks() async throws {
+        let workspace = try makeWorkspace()
+        let localURL = workspace.homeURL.appendingPathComponent("Cache")
+        let externalURL = workspace.externalRootURL.appendingPathComponent("Cache")
+        let outsideURL = workspace.rootURL.appendingPathComponent("Unrelated")
+        defer {
+            try? fileManager.setAttributes([.immutable: false], ofItemAtPath: externalURL.path)
+            cleanupWorkspace(workspace.rootURL)
+        }
+        try createDirectoryWithPayload(at: externalURL, payload: "restore-data")
+        try createDirectoryWithPayload(at: outsideURL, payload: "only-unrelated-copy")
+        try fileManager.createSymbolicLink(at: externalURL.appendingPathComponent("outside-link"), withDestinationURL: outsideURL)
+        try fileManager.createSymbolicLink(at: localURL, withDestinationURL: externalURL)
+        // A locked source root prevents any of its entries from being deleted, forcing cleanup to fail.
+        try fileManager.setAttributes([.immutable: true], ofItemAtPath: externalURL.path)
+        let item = DataDirItem(name: "Cache", path: localURL, type: .custom,
+                               priority: .recommended, description: "Locked external cleanup", status: "已链接")
+
+        try await DataDirMover(homeDir: workspace.homeURL).restore(item: item, progressHandler: nil)
+
+        try assertRealDirectory(localURL)
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "restore-data")
+        try assertSymlink(localURL.appendingPathComponent("outside-link"), pointsTo: outsideURL)
+        XCTAssertEqual(try String(contentsOf: outsideURL.appendingPathComponent("payload.txt")), "only-unrelated-copy")
+        XCTAssertEqual(try String(contentsOf: externalURL.appendingPathComponent("payload.txt")), "restore-data")
+        try assertSymlink(externalURL.appendingPathComponent("outside-link"), pointsTo: outsideURL)
+    }
+
+    func testRestoreResolvesRelativeSymlinkFromItsParent() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localURL = workspace.homeURL.appendingPathComponent("Relative")
+        let externalURL = workspace.externalRootURL.appendingPathComponent("Relative")
+        try createDirectoryWithPayload(at: externalURL, payload: "relative-link-data")
+        try fileManager.createSymbolicLink(atPath: localURL.path, withDestinationPath: "../External/Relative")
+        let item = DataDirItem(name: "Relative", path: localURL, type: .custom,
+                               priority: .recommended, description: "Relative symlink", status: "已链接")
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "relative-link-data")
+
+        try await DataDirMover(homeDir: workspace.homeURL).restore(item: item, progressHandler: nil)
+
+        try assertRealDirectory(localURL)
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "relative-link-data")
+        XCTAssertFalse(fileManager.fileExists(atPath: externalURL.path))
+    }
+
+    func testRestoreThroughSymlinkedParentUsesActualSourceAndPreservesDecoy() async throws {
+        for absoluteTarget in [false, true] {
+            let workspace = try makeWorkspace()
+            defer { cleanupWorkspace(workspace.rootURL) }
+            let actualHomeURL = workspace.rootURL.appendingPathComponent("Actual/Home")
+            let homeAliasURL = workspace.rootURL.appendingPathComponent("HomeAlias")
+            let actualExternalURL = workspace.rootURL.appendingPathComponent("Actual/External/Real")
+            let decoyURL = workspace.externalRootURL.appendingPathComponent("Real")
+            try fileManager.createDirectory(at: actualHomeURL, withIntermediateDirectories: true)
+            try fileManager.createSymbolicLink(at: homeAliasURL, withDestinationURL: actualHomeURL)
+            try createDirectoryWithPayload(at: actualExternalURL, payload: "actual-source")
+            try createDirectoryWithPayload(at: decoyURL, payload: "unrelated-decoy")
+
+            let localURL = homeAliasURL.appendingPathComponent("Data")
+            let target = absoluteTarget ? homeAliasURL.path + "/../External/Real" : "../External/Real"
+            try fileManager.createSymbolicLink(atPath: localURL.path, withDestinationPath: target)
+            let item = DataDirItem(name: "Data", path: localURL, type: .custom,
+                                   priority: .recommended, description: "Symlinked parent", status: "已链接")
+            XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "actual-source")
+
+            try await DataDirMover(homeDir: homeAliasURL).restore(item: item, progressHandler: nil)
+
+            try assertRealDirectory(localURL)
+            XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "actual-source")
+            XCTAssertFalse(fileManager.fileExists(atPath: actualExternalURL.path))
+            try assertRealDirectory(decoyURL)
+            XCTAssertEqual(try String(contentsOf: decoyURL.appendingPathComponent("payload.txt")), "unrelated-decoy")
+            XCTAssertEqual(try fileManager.destinationOfSymbolicLink(atPath: homeAliasURL.path), actualHomeURL.path)
+            XCTAssertEqual(try fileManager.contentsOfDirectory(atPath: actualHomeURL.path), ["Data"])
+        }
+    }
+
+    func testRestoreBrokenLinkThroughSymlinkedParentPreservesTheLinkAndDecoy() async throws {
+        for absoluteTarget in [false, true] {
+            let workspace = try makeWorkspace()
+            defer { cleanupWorkspace(workspace.rootURL) }
+            let actualHomeURL = workspace.rootURL.appendingPathComponent("Actual/Home")
+            let homeAliasURL = workspace.rootURL.appendingPathComponent("HomeAlias")
+            let decoyURL = workspace.externalRootURL.appendingPathComponent("Missing")
+            try fileManager.createDirectory(at: actualHomeURL, withIntermediateDirectories: true)
+            try fileManager.createSymbolicLink(at: homeAliasURL, withDestinationURL: actualHomeURL)
+            try createDirectoryWithPayload(at: decoyURL, payload: "unrelated-decoy")
+
+            let localURL = homeAliasURL.appendingPathComponent("Data")
+            let target = absoluteTarget ? homeAliasURL.path + "/../External/Missing" : "../External/Missing"
+            try fileManager.createSymbolicLink(atPath: localURL.path, withDestinationPath: target)
+            let item = DataDirItem(name: "Data", path: localURL, type: .custom,
+                                   priority: .recommended, description: "Broken link with symlinked parent", status: "已链接")
+            XCTAssertFalse(fileManager.fileExists(atPath: localURL.path))
+
+            do {
+                try await DataDirMover(homeDir: homeAliasURL).restore(item: item, progressHandler: nil)
+                XCTFail("A broken link must not select the unrelated directory at the lexical path")
+            } catch let error as DataDirError {
+                guard case .externalNotFound = error else { return XCTFail("Unexpected error: \(error)") }
+            }
+
+            XCTAssertEqual(try fileManager.destinationOfSymbolicLink(atPath: localURL.path), target)
+            XCTAssertFalse(fileManager.fileExists(atPath: localURL.path))
+            XCTAssertEqual(try String(contentsOf: decoyURL.appendingPathComponent("payload.txt")), "unrelated-decoy")
+            XCTAssertEqual(try fileManager.contentsOfDirectory(atPath: actualHomeURL.path), ["Data"])
+        }
+    }
+
+    func testRestorePreservesUnrelatedSiblingsWhoseNamesLookLikeStaging() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localURL = workspace.homeURL.appendingPathComponent("Cache")
+        let externalURL = workspace.externalRootURL.appendingPathComponent("Cache")
+        let siblingDirectoryNames = ["restore-staging-\(UUID().uuidString)", "partial-recovery-\(UUID().uuidString)"]
+        let siblingFileName = "notes-partial-recovery-important.txt"
+        for name in siblingDirectoryNames {
+            try createDirectoryWithPayload(at: workspace.homeURL.appendingPathComponent(name), payload: name)
+        }
+        try Data("unrelated-notes".utf8).write(to: workspace.homeURL.appendingPathComponent(siblingFileName))
+        try createDirectoryWithPayload(at: externalURL, payload: "restore-data")
+        try fileManager.createSymbolicLink(at: localURL, withDestinationURL: externalURL)
+        let item = DataDirItem(name: "Cache", path: localURL, type: .custom,
+                               priority: .recommended, description: "Unrelated siblings", status: "已链接")
+
+        try await DataDirMover(homeDir: workspace.homeURL).restore(item: item, progressHandler: nil)
+
+        try assertRealDirectory(localURL)
+        XCTAssertEqual(try String(contentsOf: localURL.appendingPathComponent("payload.txt")), "restore-data")
+        for name in siblingDirectoryNames {
+            XCTAssertEqual(try String(contentsOf: workspace.homeURL.appendingPathComponent("\(name)/payload.txt")), name)
+        }
+        XCTAssertEqual(try Data(contentsOf: workspace.homeURL.appendingPathComponent(siblingFileName)), Data("unrelated-notes".utf8))
+        XCTAssertEqual(Set(try fileManager.contentsOfDirectory(atPath: workspace.homeURL.path)),
+                       Set(siblingDirectoryNames + [siblingFileName, localURL.lastPathComponent]))
+        XCTAssertFalse(fileManager.fileExists(atPath: externalURL.path))
     }
 
     private func makeWorkspace() throws -> (rootURL: URL, homeURL: URL, externalRootURL: URL) {

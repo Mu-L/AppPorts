@@ -55,6 +55,12 @@ struct AppUpdateInfo: Equatable {
     let sha256: String?
 }
 
+enum UpdateCheckResult: Equatable {
+    case available(AppUpdateInfo)
+    case upToDate
+    case failed
+}
+
 // MARK: - Update Checker
 
 /// 应用更新检查工具。
@@ -104,54 +110,41 @@ final class UpdateChecker {
         self.githubUpdatesDisabledProvider = githubUpdatesDisabledProvider
     }
 
-    /// 检查是否有应用更新。
-    ///
-    /// - Returns: 有新版本时返回统一更新信息；无更新或两个来源均失败时返回 nil。
+    /// Background checks stay silent when no update can be offered.
     func checkForUpdates() async -> AppUpdateInfo? {
-        guard let currentVersion = normalizedVersion(currentVersionProvider() ?? "") else {
-            AppLogger.shared.logContext(
-                "跳过更新检查：无法读取当前版本",
-                details: [],
-                level: "WARN"
-            )
-            return nil
-        }
+        if case let .available(update) = await checkForUpdatesResult() { return update }
+        return nil
+    }
 
-        async let githubOutcome = fetchGitHubUpdateIfEnabled(currentVersion: currentVersion)
+    /// Manual checks distinguish a successful check from unavailable sources.
+    func checkForUpdatesResult() async -> UpdateCheckResult {
+        guard let currentVersion = normalizedVersion(currentVersionProvider() ?? "") else {
+            return .failed
+        }
+        let githubEnabled = !githubUpdatesDisabledProvider()
+        async let githubOutcome = githubEnabled
+            ? fetchGitHubUpdate(currentVersion: currentVersion)
+            : SourceFetchOutcome(update: nil, error: nil)
         async let officialOutcome = fetchOfficialUpdate(currentVersion: currentVersion)
         let outcomes = await (github: githubOutcome, official: officialOutcome)
-
-        if outcomes.github.error != nil, outcomes.official.error != nil {
-            AppLogger.shared.logContext(
-                "更新检查失败：GitHub 与官网更新源均不可用",
-                details: [],
-                level: "WARN"
-            )
+        if let update = chooseUpdate(github: outcomes.github.update, official: outcomes.official.update) {
+            return .available(update)
         }
-
-        return chooseUpdate(github: outcomes.github.update, official: outcomes.official.update)
+        if outcomes.official.error == nil || (githubEnabled && outcomes.github.error == nil) {
+            return .upToDate
+        }
+        return .failed
     }
 
     // MARK: - Source Fetching
 
-    private func fetchGitHubUpdateIfEnabled(currentVersion: String) async -> SourceFetchOutcome {
-        guard !githubUpdatesDisabledProvider() else {
-            AppLogger.shared.logContext(
-                "跳过 GitHub 更新源：测试开关已开启",
-                details: [],
-                level: "WARN"
-            )
-            return SourceFetchOutcome(update: nil, error: nil)
-        }
-
-        return await fetchGitHubUpdate(currentVersion: currentVersion)
-    }
-
     private func fetchGitHubUpdate(currentVersion: String) async -> SourceFetchOutcome {
         do {
             let release = try await fetchGitHubRelease()
-            guard let version = normalizedVersion(release.tagName),
-                  compareVersions(version, currentVersion) == .orderedDescending else {
+            guard let version = normalizedVersion(release.tagName) else {
+                throw UpdateCheckerError.invalidResponse(source: "GitHub")
+            }
+            guard compareVersions(version, currentVersion) == .orderedDescending else {
                 return SourceFetchOutcome(update: nil, error: nil)
             }
 
@@ -174,8 +167,10 @@ final class UpdateChecker {
         do {
             let release = try await fetchOfficialRelease()
             let versionCandidate = release.version.isEmpty ? release.tag : release.version
-            guard let version = normalizedVersion(versionCandidate),
-                  compareVersions(version, currentVersion) == .orderedDescending else {
+            guard let version = normalizedVersion(versionCandidate) else {
+                throw UpdateCheckerError.invalidResponse(source: "Official")
+            }
+            guard compareVersions(version, currentVersion) == .orderedDescending else {
                 return SourceFetchOutcome(update: nil, error: nil)
             }
 

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // MARK: - 应用入口
 
@@ -24,7 +25,10 @@ import SwiftUI
 ///
 /// - Note: 使用 `@main` 标记为 SwiftUI 应用的入口点
 /// App 生命周期代理
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    lazy var aboutWindowController = AboutWindowController()
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -37,7 +41,10 @@ struct AppMoverApp: App {
 
     /// 控制欢迎界面显示（首次启动为 true）
     @State private var showWelcome = true
-    @State private var showAboutSheet = false
+    @ObservedObject private var operationState = AppOperationState.shared
+    @StateObject private var logMenuState = LogMenuState()
+    @AppStorage("LogEnabled") private var loggingEnabled = true
+    @AppStorage("MaxLogSizeBytes") private var maximumLogSize = 2 * 1024 * 1024
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -60,23 +67,18 @@ struct AppMoverApp: App {
 
             .id(languageManager.language)
             
-            // 关于页面弹窗
-            .sheet(isPresented: $showAboutSheet) {
-                AboutView()
-                    // 确保弹出的 Sheet 也能收到语言更新
-                    .environment(\.locale, languageManager.locale)
-                    .id(languageManager.language)
-            }
+
         }
         .commands {
             // 原有的关于菜单
             CommandGroup(replacing: .appInfo) {
                 Button("关于 AppPorts...".localized) {
-                    showAboutSheet = true
+                    appDelegate.aboutWindowController.present()
                 }
             }
             
             CommandMenu("语言".localized) {
+                Group {
                 Button(AppLanguageCatalog.systemOptionTitle) { languageManager.language = "system" }
                 .keyboardShortcut("0", modifiers: [.command, .option])
                 
@@ -99,6 +101,8 @@ struct AppMoverApp: App {
                 ForEach(AppLanguageCatalog.aiTranslatedLanguages) { option in
                     Button(option.menuTitle) { languageManager.language = option.code }
                 }
+                }
+                .disabled(operationState.isBusy)
             }
             
             // 日志管理菜单
@@ -121,44 +125,36 @@ struct AppMoverApp: App {
                     if panel.runModal() == .OK, let url = panel.url {
                         let logFile = url.appendingPathComponent("AppPorts_Log.txt")
                         AppLogger.shared.setLogPath(logFile)
+                        logMenuState.refresh()
                     }
                 }
                 
                 Divider()
                 
                 // 日志开关
-                Button(AppLogger.shared.isLoggingEnabled ? "✅ " + "启用日志记录".localized : "启用日志记录".localized) {
-                    AppLogger.shared.isLoggingEnabled.toggle()
-                }
+                Toggle("启用日志记录".localized, isOn: Binding(
+                    get: { loggingEnabled },
+                    set: { AppLogger.shared.isLoggingEnabled = $0 }
+                ))
                 
                 // 日志大小设置
-                Menu("最大日志大小".localized) {
-                    let currentSize = AppLogger.shared.maxLogSize
-                    
-                    Button(currentSize == 1 * 1024 * 1024 ? "✅ 1 MB" : "1 MB") {
-                        AppLogger.shared.maxLogSize = 1 * 1024 * 1024
-                    }
-                    Button(currentSize == 5 * 1024 * 1024 ? "✅ 5 MB" : "5 MB") {
-                        AppLogger.shared.maxLogSize = 5 * 1024 * 1024
-                    }
-                    Button(currentSize == 10 * 1024 * 1024 ? "✅ 10 MB" : "10 MB") {
-                        AppLogger.shared.maxLogSize = 10 * 1024 * 1024
-                    }
-                    Button(currentSize == 50 * 1024 * 1024 ? "✅ 50 MB" : "50 MB") {
-                        AppLogger.shared.maxLogSize = 50 * 1024 * 1024
-                    }
-                    Button(currentSize == 100 * 1024 * 1024 ? "✅ 100 MB" : "100 MB") {
-                        AppLogger.shared.maxLogSize = 100 * 1024 * 1024
+                Picker("最大日志大小".localized, selection: Binding(
+                    get: { maximumLogSize },
+                    set: { AppLogger.shared.maxLogSize = Int64($0) }
+                )) {
+                    ForEach([1, 2, 5, 10, 50, 100], id: \.self) { megabytes in
+                        Text(verbatim: "\(megabytes) MB").tag(megabytes * 1024 * 1024)
                     }
                 }
                 
                 Divider()
                 
-                Text(String(format: "当前大小: %@".localized, AppLogger.shared.getLogSizeString()))
+                Text(String(format: "当前大小: %@".localized, logMenuState.size))
                     .font(.caption)
                 
                 Button("清空日志".localized) {
                     AppLogger.shared.clearLog()
+                    logMenuState.refresh()
                 }
             }
             
@@ -171,5 +167,22 @@ struct AppMoverApp: App {
                 }
             }
         }
+    }
+}
+
+/// Commands 的标签不会安装普通视图生命周期，在应用层持有菜单观察者。
+@MainActor
+private final class LogMenuState: ObservableObject {
+    @Published private(set) var size = AppLogger.shared.getLogSizeString()
+    private var menuObserver: AnyCancellable?
+
+    init() {
+        menuObserver = NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refresh() }
+    }
+
+    func refresh() {
+        size = AppLogger.shared.getLogSizeString()
     }
 }

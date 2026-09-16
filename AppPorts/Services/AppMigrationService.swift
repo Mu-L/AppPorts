@@ -10,6 +10,7 @@ import Foundation
 struct AppMigrationService {
     typealias FinderRemover = (URL) throws -> Void
     typealias PortalCreationOverride = (AppItem, URL) throws -> Void
+    typealias DockShortcutUpdater = (URL, URL) throws -> Int
 
     private enum LocalPortalKind {
         case wholeAppSymlink
@@ -41,13 +42,18 @@ struct AppMigrationService {
 
     private let fileManager: FileManager
     private let portalCreationOverride: PortalCreationOverride?
+    private let dockShortcutUpdater: DockShortcutUpdater
 
     init(
         fileManager: FileManager = .default,
-        portalCreationOverride: PortalCreationOverride? = nil
+        portalCreationOverride: PortalCreationOverride? = nil,
+        dockShortcutUpdater: @escaping DockShortcutUpdater = { source, destination in
+            try DockShortcutService.shared.redirectShortcuts(from: source, to: destination)
+        }
     ) {
         self.fileManager = fileManager
         self.portalCreationOverride = portalCreationOverride
+        self.dockShortcutUpdater = dockShortcutUpdater
     }
 
     static func checkWritePermission(at localURL: URL, fileManager: FileManager = .default) throws {
@@ -243,11 +249,32 @@ struct AppMigrationService {
         do {
             AppLogger.shared.log("步骤1: 开始复制应用到外部存储...")
             let copier = FileCopier()
-            try await copier.copyDirectory(
-                from: appToMove.path,
-                to: destinationURL,
-                progressHandler: progressHandler
-            )
+            do {
+                try await copier.copyDirectory(
+                    from: appToMove.path,
+                    to: destinationURL,
+                    estimatedTotalBytes: appToMove.sizeBytes,
+                    removeQuarantine: true,
+                    progressHandler: progressHandler
+                )
+            } catch {
+                // Only clean up failures from copying, while the complete source still exists.
+                // A failed source deletion below must not enter this cleanup path.
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    do {
+                        try FileCopier.removeCopy(at: destinationURL)
+                    } catch let cleanupError {
+                        AppLogger.shared.logError(
+                            "清理未完成的外部副本失败",
+                            error: cleanupError,
+                            errorCode: "APP-MOVE-PARTIAL-COPY-CLEANUP-FAILED",
+                            context: [("operation_id", operationID)],
+                            relatedURLs: [("destination", destinationURL)]
+                        )
+                    }
+                }
+                throw error
+            }
             AppLogger.shared.log("步骤1: 复制成功")
             AppLogger.shared.logPathState("步骤1后-外部副本[\(operationID)]", url: destinationURL)
 
@@ -271,28 +298,25 @@ struct AppMigrationService {
                         AppLogger.shared.logPathState("Finder 删除后-本地源[\(operationID)]", url: appToMove.path)
                     } catch let finderError {
                         AppLogger.shared.logError(
-                            "步骤2: Finder 删除也失败，执行回滚",
+                            "步骤2: Finder 删除也失败，保留完整外部副本",
                             error: finderError,
                             errorCode: "APP-MOVE-SOURCE-DELETE-FAILED",
                             context: [("operation_id", operationID)],
                             relatedURLs: [("source", appToMove.path), ("destination", destinationURL)]
                         )
-                        try? fileManager.removeItem(at: destinationURL)
-                        AppLogger.shared.log("回滚: 已删除外部存储中的副本")
-                        operationResult = "rolled_back"
+                        // removeItem can fail after deleting part of the source.
+                        // The external copy is now the only guaranteed complete copy.
                         operationErrorCode = "APP-MOVE-SOURCE-DELETE-FAILED"
                         throw AppMoverError.appStoreAppError(finderError)
                     }
                 } else {
                     AppLogger.shared.logError(
-                        "步骤2: 删除失败，执行回滚",
+                        "步骤2: 删除源失败，保留完整外部副本",
                         error: normalError,
                         errorCode: "APP-MOVE-SOURCE-DELETE-FAILED",
                         context: [("operation_id", operationID)],
                         relatedURLs: [("source", appToMove.path), ("destination", destinationURL)]
                     )
-                    try? fileManager.removeItem(at: destinationURL)
-                    operationResult = "rolled_back"
                     operationErrorCode = "APP-MOVE-SOURCE-DELETE-FAILED"
                     throw AppMoverError.generalError(normalError)
                 }
@@ -358,21 +382,17 @@ struct AppMigrationService {
             lockExternalApp(at: destinationURL)
         }
 
-        // 清除外部 app 的隔离属性，避免 Gatekeeper 拦截
-        let xattr = Process()
-        xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        xattr.arguments = ["-cr", destinationURL.path]
-        xattr.standardOutput = FileHandle.nullDevice
-        xattr.standardError = FileHandle.nullDevice
-        try? xattr.run()
-        xattr.waitUntilExit()
-        if xattr.terminationStatus != 0 {
-            AppLogger.shared.log("清除隔离属性失败（退出码 \(xattr.terminationStatus)），可能触发 Gatekeeper", level: "WARN")
-        }
+        // FileCopier removes only quarantine as each item is copied. Do not strip
+        // unrelated metadata or traverse the entire external tree again here.
 
         AppLogger.shared.logPathState("迁移完成-本地入口[\(operationID)]", url: appToMove.path)
         AppLogger.shared.logPathState("迁移完成-外部目标[\(operationID)]", url: destinationURL)
-        operationResult = "success"
+        if synchronizeDockShortcuts(from: appToMove.path, to: destinationURL, operationID: operationID) {
+            operationResult = "success"
+        } else {
+            operationResult = "success_with_warning"
+            operationErrorCode = "APP-DOCK-SYNC-FAILED"
+        }
     }
 
     func linkApp(appToLink: AppItem, destinationURL: URL) throws {
@@ -509,7 +529,12 @@ struct AppMigrationService {
         }
         try? fileManager.setAttributes([.modificationDate: Date()], ofItemAtPath: destinationURL.path)
         AppLogger.shared.logPathState("链接完成-本地目标[\(operationID)]", url: destinationURL)
-        operationResult = "success"
+        if synchronizeDockShortcuts(from: destinationURL, to: appToLink.path, operationID: operationID) {
+            operationResult = "success"
+        } else {
+            operationResult = "success_with_warning"
+            operationErrorCode = "APP-DOCK-SYNC-FAILED"
+        }
     }
 
     func deleteLink(app: AppItem) throws {
@@ -648,7 +673,7 @@ struct AppMigrationService {
         AppLogger.shared.log("权限检查通过")
 
         let existingPortalKind = localPortalKind(at: localDestinationURL, linkedTo: app.path)
-        let suitePortalSnapshots = app.isFolder
+        let suitePortalSnapshots = app.usesFolderOperation
             ? folderPortalSnapshots(for: app.path, localAppsDir: localDestinationURL.deletingLastPathComponent())
             : []
         AppLogger.shared.logContext(
@@ -688,7 +713,7 @@ struct AppMigrationService {
             }
         }
 
-        if app.isFolder, !suitePortalSnapshots.isEmpty {
+        if app.usesFolderOperation, !suitePortalSnapshots.isEmpty {
             for snapshot in suitePortalSnapshots {
                 try fileManager.removeItem(at: snapshot.localURL)
                 AppLogger.shared.log("已清理套件入口: \(snapshot.localURL.lastPathComponent)")
@@ -711,11 +736,12 @@ struct AppMigrationService {
             try await copier.copyDirectory(
                 from: app.path,
                 to: localDestinationURL,
+                estimatedTotalBytes: app.sizeBytes,
                 progressHandler: progressHandler
             )
         } catch {
             if fileManager.fileExists(atPath: localDestinationURL.path) {
-                try? fileManager.removeItem(at: localDestinationURL)
+                try? FileCopier.removeCopy(at: localDestinationURL)
             }
 
             if let existingPortalKind {
@@ -736,7 +762,7 @@ struct AppMigrationService {
                 }
             }
 
-            if app.isFolder, !suitePortalSnapshots.isEmpty {
+            if app.usesFolderOperation, !suitePortalSnapshots.isEmpty {
                 recreatePortals(from: suitePortalSnapshots, operationID: operationID)
             }
 
@@ -761,6 +787,22 @@ struct AppMigrationService {
             sourcePath: app.path.path,
             destPath: localDestinationURL.path
         )
+
+        // 本地副本完整后即可切回；外部副本清理失败也不应让 Dock 继续打开旧副本。
+        var dockSynchronized = synchronizeDockShortcuts(
+            from: app.path, to: localDestinationURL, operationID: operationID
+        )
+        for snapshot in suitePortalSnapshots {
+            // 兼容旧版本把套件内部应用展开到本地根目录的入口。
+            let restoredAppURL = localDestinationURL.appendingPathComponent(snapshot.externalURL.lastPathComponent)
+            if !synchronizeDockShortcuts(from: snapshot.localURL, to: restoredAppURL, operationID: operationID) {
+                dockSynchronized = false
+            }
+        }
+        if !dockSynchronized {
+            operationResult = "success_with_warning"
+            operationErrorCode = "APP-DOCK-SYNC-FAILED"
+        }
 
         AppLogger.shared.log("步骤2: 解锁并删除外部存储源文件...")
         do {
@@ -787,23 +829,106 @@ struct AppMigrationService {
         }
     }
 
+    /// 恢复到已有入口所在的扫描目录；旧版展开入口仍恢复整个应用容器。
+    func localDestinationForRestore(
+        of app: AppItem,
+        defaultDirectory: URL,
+        additionalDirectories: [URL] = []
+    ) -> URL {
+        for directory in [defaultDirectory] + additionalDirectories {
+            let candidate = directory.appendingPathComponent(app.name)
+            if localPortalKind(at: candidate, linkedTo: app.path) != nil {
+                return candidate
+            }
+            if let bundleURL = app.bundleURL, bundleURL.lastPathComponent != app.name {
+                let bundleCandidate = directory.appendingPathComponent(bundleURL.lastPathComponent)
+                if localPortalKind(at: bundleCandidate, linkedTo: bundleURL) != nil {
+                    return app.usesFolderOperation ? candidate : bundleCandidate
+                }
+            }
+        }
+        return defaultDirectory.appendingPathComponent(app.name)
+    }
+
+    /// 显式修复既有本地入口对应的固定项；扫描与版本刷新不会改动用户的 Dock。
+    func repairDockShortcuts(for app: AppItem) throws -> Int {
+        let sourceURL = app.path
+        guard localPortalKind(at: sourceURL) != nil else {
+            throw NSError(domain: "AppPorts.Dock", code: 2)
+        }
+        let destinationURL: URL
+        if app.usesFolderOperation {
+            guard let externalURL = folderMirrorExternalURL(at: sourceURL) ?? resolveSymlinkDestination(at: sourceURL),
+                  externalURL.path != sourceURL.standardizedFileURL.path,
+                  fileManager.fileExists(atPath: externalURL.path) else {
+                throw NSError(domain: "AppPorts.Dock", code: 1)
+            }
+            destinationURL = externalURL
+        } else {
+            var resolvedURL = try CodeSigner.resolveAppURL(at: sourceURL)
+            // 旧 Hybrid 只链接 Contents/MacOS 等组件，没有 launcher 的目标文件。
+            // 仅从标准 <App>.app/Contents/<component> 结构推导，不按应用名猜路径。
+            let contentsURL = sourceURL.appendingPathComponent("Contents")
+            if resolvedURL == sourceURL.resolvingSymlinksInPath().standardizedFileURL,
+               let component = legacyHybridSymlinkComponent(in: contentsURL),
+               let linkedComponent = resolveSymlinkDestination(at: contentsURL.appendingPathComponent(component)),
+               linkedComponent.lastPathComponent == component,
+               linkedComponent.deletingLastPathComponent().lastPathComponent == "Contents" {
+                let externalURL = linkedComponent.deletingLastPathComponent().deletingLastPathComponent()
+                resolvedURL = try CodeSigner.resolveAppURL(at: externalURL)
+            }
+            destinationURL = resolvedURL
+        }
+        guard destinationURL.standardizedFileURL.path != sourceURL.standardizedFileURL.path else {
+            throw NSError(domain: "AppPorts.Dock", code: 2)
+        }
+        return try dockShortcutUpdater(sourceURL, destinationURL)
+    }
+
+    /// Dock 属于迁移后的附加同步：失败应可重试，不能回滚已经完整迁移的应用。
+    @discardableResult
+    private func synchronizeDockShortcuts(from sourceURL: URL, to destinationURL: URL, operationID: String) -> Bool {
+        do {
+            let updatedCount = try dockShortcutUpdater(sourceURL, destinationURL)
+            if updatedCount > 0 {
+                AppLogger.shared.logContext(
+                    "已同步 Dock 固定项",
+                    details: [("operation_id", operationID), ("updated_count", String(updatedCount)),
+                              ("source", sourceURL.path), ("destination", destinationURL.path)]
+                )
+            }
+            return true
+        } catch {
+            AppLogger.shared.logError(
+                "应用迁移已完成，但 Dock 固定项未能同步，可从应用菜单重试",
+                error: error,
+                errorCode: "APP-DOCK-SYNC-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("source", sourceURL), ("destination", destinationURL)]
+            )
+            return false
+        }
+    }
+
     private func isIOSAppBundle(at appURL: URL) -> Bool {
         fileManager.fileExists(atPath: appURL.appendingPathComponent("WrappedBundle").path)
     }
 
     /// 递归解除目录及其内容的 immutable 标志（旧迁移会锁定外部副本）
     private func unlockImmutableRecursive(at url: URL) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/chflags")
-        process.arguments = ["-R", "nouchg", url.path]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
+        unlockExternalApp(at: url)
     }
 
     /// 锁定外部 app（uchg），防止自更新应用的 updater 删除
     func lockExternalApp(at url: URL) {
+        guard !FileCopier.isNetworkVolume(at: url) else {
+            AppLogger.shared.logContext(
+                "网络卷跳过本地文件锁，避免递归请求不支持的 uchg 标志",
+                details: [("path", url.path)],
+                level: "WARN"
+            )
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/chflags")
         process.arguments = ["-R", "uchg", url.path]
@@ -825,6 +950,7 @@ struct AppMigrationService {
     /// 解锁外部 app（nouchg），用于迁回前
     @discardableResult
     func unlockExternalApp(at url: URL) -> Bool {
+        guard !FileCopier.isNetworkVolume(at: url) else { return true }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/chflags")
         process.arguments = ["-R", "nouchg", url.path]
@@ -1105,8 +1231,9 @@ struct AppMigrationService {
     private func localPortalKind(at localURL: URL, linkedTo externalURL: URL) -> LocalPortalKind? {
         let standardizedExternalURL = externalURL.standardizedFileURL
 
-        // Folder Mirror：真实文件夹 + 标记文件（标记是套件入口的权威标识，优先识别）
-        if fileManager.fileExists(atPath: localURL.appendingPathComponent(Self.folderPortalMarkerName).path) {
+        // 只有标记指向本次操作的外部套件，才允许替换或清理这个本地入口。
+        if let recorded = Self.folderMirrorExternalURL(at: localURL, fileManager: fileManager),
+           recorded.path == standardizedExternalURL.path {
             return .folderMirror
         }
 
@@ -1920,6 +2047,8 @@ struct AppMigrationService {
 
         let copier = FileCopier()
         try await copier.copyDirectory(from: destinationURL, to: appToMove.path, progressHandler: nil)
+        // 部分入口可能已被 Dock 识别为 Stub；只在完整本地应用恢复后纠正缓存。
+        synchronizeDockShortcuts(from: destinationURL, to: appToMove.path, operationID: operationID)
         unlockImmutableRecursive(at: destinationURL)
         try fileManager.removeItem(at: destinationURL)
         AppLogger.shared.logPathState("回滚完成-本地源[\(operationID)]", url: appToMove.path, level: "WARN")

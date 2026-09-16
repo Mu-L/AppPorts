@@ -19,8 +19,6 @@ struct Contributor: Identifiable, Codable, Equatable {
 
     var id: String { github }
     var profileURL: URL? { URL(string: url) }
-    var resolvedAvatarURL: URL? { avatarURL.flatMap(URL.init(string:)) }
-    var showsSeparateNameLine: Bool { name != github }
 
     init(name: String, github: String, url: String? = nil, avatarURL: String? = nil) {
         self.name = name
@@ -86,6 +84,7 @@ private struct ContributorsService {
 
     func fetchContributors() async throws -> [Contributor] {
         var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 10
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("AppPorts", forHTTPHeaderField: "User-Agent")
 
@@ -154,270 +153,200 @@ private final class ContributorsViewModel: ObservableObject {
     }
 }
 
-// MARK: - 关于界面
+// MARK: - 关于窗口
 
-/// 应用的"关于"弹窗界面
-///
-/// 展示应用的基本信息和相关链接：
-/// - 🖼 应用图标和名称
-/// - 📌 当前版本号
-/// - 💬 感谢文案
-/// - 👥 项目贡献者列表
-/// - 🔗 官方网站与 GitHub 项目链接
-///
-/// ## 界面尺寸
-/// 固定尺寸：440 x 660 点
-///
-/// ## 使用方式
-/// 通过应用菜单栏的"关于"选项打开此弹窗
-///
-/// - Note: 使用 SwiftUI Environment 的 dismiss 关闭弹窗
-struct AboutView: View {
-    /// 环境变量：用于关闭弹窗
-    @Environment(\.dismiss) var dismiss
-    @StateObject private var contributorsViewModel = ContributorsViewModel()
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // 1. LOGO 区域
-            Image(nsImage: NSApplication.shared.applicationIconImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 104, height: 104)
-                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                .padding(.top, 32)
-                .padding(.bottom, 10)
+/// A separate, reusable window also works when the main window is closed (macOS 12+).
+@MainActor
+final class AboutWindowController: NSWindowController {
+    private var languageObserver: AnyCancellable?
 
-            // 2. 文字信息
-            VStack(spacing: 6) {
-                Text("AppPorts".localized)
-                    .font(.system(size: 22, weight: .bold))
-                    .fontWeight(.bold)
-
-                Text(String(format: "Version %@".localized, Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 760),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered, defer: false
+        )
+        super.init(window: window)
+        window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: 520, height: 480)
+        window.contentView = NSHostingView(rootView: AboutWindowContent())
+        window.title = "关于 AppPorts...".localized.replacingOccurrences(of: "...", with: "")
+        window.center()
+        languageObserver = LanguageManager.shared.$language
+            .receive(on: RunLoop.main)
+            .sink { [weak window] _ in
+                window?.title = "关于 AppPorts...".localized.replacingOccurrences(of: "...", with: "")
             }
-            .padding(.bottom, 8)
+    }
 
-            // 3. 可滚动内容区域
-            ScrollView {
-                VStack(spacing: 20) {
-                    // 描述文案
-                    Text("感谢你使用本工具，外置硬盘拯救世界！".localized)
-                        .font(.body)
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.primary.opacity(0.9))
-                        .padding(.horizontal, 12)
+    required init?(coder: NSCoder) { nil }
 
-                    // 4. 贡献者区域
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("项目贡献者".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+    func present() {
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
 
-                        LazyVStack(spacing: 10) {
-                            ForEach(contributorsViewModel.contributors) { contributor in
-                                ContributorButton(contributor: contributor)
+private struct AboutWindowContent: View {
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        AboutView()
+            .environment(\.locale, languageManager.locale)
+    }
+}
+
+struct AboutView: View {
+    @StateObject private var contributorsViewModel = ContributorsViewModel()
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    private var version: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return String(format: "Version %@".localized, "\(version) (\(build))")
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(spacing: 20) {
+                    Image(nsImage: NSApplication.shared.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(verbatim: "AppPorts").font(.largeTitle.bold())
+                        Text("macOS 应用迁移工具".localized).font(.headline).foregroundStyle(.secondary)
+                        Text(version).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                }
+                .padding(.vertical, 8)
+
+                Divider()
+                AboutSection(title: "项目".localized) {
+                    Text("将应用和数据迁移到外部存储，保留本地入口，释放磁盘空间。".localized)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 9) {
+                        AboutLinkRow(label: "作者".localized, title: "wzh4869", url: "https://github.com/wzh4869")
+                        AboutLinkRow(label: "项目地址".localized, title: "AppPorts on GitHub", url: "https://github.com/wzh4869/AppPorts")
+                        AboutLinkRow(label: "官方网站".localized, title: "appports.shimoko.com", url: "https://appports.shimoko.com/")
+                        AboutLinkRow(label: "用户文档".localized, title: "docs-appports.shimoko.com", url: "https://docs-appports.shimoko.com/")
+                        AboutLinkRow(label: "发布".localized, title: "GitHub Releases", url: "https://github.com/wzh4869/AppPorts/releases")
+                    }
+                }
+
+                Divider()
+                AboutSection(title: "项目贡献者".localized) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 10) {
+                        ForEach(contributorsViewModel.contributors) { contributor in
+                            if let url = contributor.profileURL {
+                                Link(destination: url) { Text(verbatim: contributor.name) }
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        .frame(maxWidth: .infinity)
                     }
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(Color.primary.opacity(0.04))
-                    )
-                    .padding(.horizontal, 24)
-
-                    // 5. 官方链接
-                    VStack(spacing: 10) {
-                        LinkButton(
-                            title: "官方网站".localized,
-                            icon: "globe",
-                            url: "https://appports.shimoko.com/"
-                        )
-
-                        LinkButton(
-                            title: "用户文档".localized,
-                            icon: "book.fill",
-                            url: "https://docs-appports.shimoko.com/"
-                        )
-
-                        LinkButton(
-                            title: "项目地址".localized,
-                            icon: "terminal.fill",
-                            url: "https://github.com/wzh4869/AppPorts"
-                        )
-                    }
-                    .padding(.horizontal, 24)
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-            }
 
-            // 6. 关闭按钮（固定在底部）
-            Divider()
-            Button("关闭".localized) {
-                dismiss()
+                Divider()
+                AboutUpdateSection()
+
+                Divider()
+                AboutSection(title: "版权与许可".localized) {
+                    Text(verbatim: "© 2025–2026 shimoko.com")
+                        .foregroundStyle(.secondary)
+                    Link(destination: URL(string: "https://github.com/wzh4869/AppPorts/blob/main/LICENSE")!) {
+                        Text(verbatim: "Apache License 2.0")
+                    }
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-            .keyboardShortcut(.defaultAction)
-            .padding(.vertical, 16)
+            .padding(32)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: 440, height: 640)
-        .task {
-            contributorsViewModel.loadIfNeeded()
-        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .task { contributorsViewModel.loadIfNeeded() }
     }
 }
 
-// MARK: - 贡献者按钮组件
-
-/// 贡献者链接按钮
-struct ContributorButton: View {
-    let contributor: Contributor
-    @State private var isHovering = false
-    
-    var body: some View {
-        if let profileURL = contributor.profileURL {
-            Link(destination: profileURL) {
-                contributorContent
-            }
-            .buttonStyle(.plain)
-            .onHover { hover in
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isHovering = hover
-                }
-            }
-        }
-    }
-
-    private var contributorContent: some View {
-        HStack(spacing: 12) {
-            avatarView
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(contributor.name)
-                    .font(.body.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                if contributor.showsSeparateNameLine {
-                    Text("@\(contributor.github)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-
-            Spacer()
-
-            Image(systemName: "arrow.up.right")
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .foregroundColor(.primary)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.primary.opacity(isHovering ? 0.10 : 0.04), lineWidth: 1)
-        )
-    }
-
-    @ViewBuilder
-    private var avatarView: some View {
-        AsyncImage(url: contributor.resolvedAvatarURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            default:
-                Image(systemName: "person.circle.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(.accentColor)
-                    .padding(3)
-            }
-        }
-        .frame(width: 28, height: 28)
-        .clipShape(Circle())
-    }
-}
-
-// MARK: - 链接按钮组件
-
-/// 外部链接按钮组件
-///
-/// 带有图标和悬停效果的链接按钮，用于跳转到外部网页。
-///
-/// ## 设计特点
-/// - 左侧：图标
-/// - 中间：链接文本
-/// - 右侧：外部链接箭头
-/// - 悬停时：背景颜色加深
-///
-/// - Note: 使用 SwiftUI Link 组件，点击自动在浏览器打开
-struct LinkButton: View {
-    /// 按钮显示文本（本地化字符串键）
+private struct AboutSection<Content: View>: View {
     let title: String
-    
-    /// SF Symbols 图标名称
-    let icon: String
-    
-    /// 跳转的目标 URL
-    let url: String
-    
-    /// 是否处于悬停状态
-    @State private var isHovering = false
-    
+    @ViewBuilder let content: Content
+
     var body: some View {
-        Link(destination: URL(string: url)!) {
-            HStack {
-                Image(systemName: icon)
-                    .frame(width: 20)
-                
-                Text(title)
-                    .font(.body.weight(.medium))
-                
-                Spacer()
-                
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10))
-                    .opacity(0.5)
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 14)
-            .foregroundColor(.primary)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isHovering ? Color.primary.opacity(0.08) : Color.primary.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.primary.opacity(isHovering ? 0.10 : 0.04), lineWidth: 1)
-            )
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+            content
         }
-        .buttonStyle(.plain)
-        .onHover { hover in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovering = hover
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct AboutLinkRow: View {
+    let label: String
+    let title: String
+    let url: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(label).foregroundStyle(.secondary).frame(width: 92, alignment: .leading)
+            Link(destination: URL(string: url)!) { Text(verbatim: title) }
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct AboutUpdateSection: View {
+    @State private var isChecking = false
+    @State private var result: UpdateCheckResult?
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        AboutSection(title: "更新".localized) {
+            HStack(spacing: 12) {
+                Button("检查更新".localized) { isChecking = true }
+                    .disabled(isChecking)
+                if isChecking {
+                    ProgressView().controlSize(.small)
+                        .accessibilityLabel("正在检查更新…".localized)
+                }
             }
+            Text(isChecking ? "正在检查更新…".localized : statusText)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if case let .available(update) = result, !isChecking {
+                HStack(spacing: 16) {
+                    if let url = update.githubURL {
+                        Link("GitHub".localized, destination: url)
+                    }
+                    Link("国内下载".localized, destination: update.chinaDownloadURL)
+                }
+            }
+        }
+        .task(id: isChecking) {
+            guard isChecking else { return }
+            let checked = await UpdateChecker.shared.checkForUpdatesResult()
+            guard !Task.isCancelled else { return }
+            result = checked
+            isChecking = false
+        }
+        .onDisappear { isChecking = false }
+    }
+
+    private var statusText: String {
+        switch result {
+        case .none: return "更新来源：GitHub Releases 与官方网站。".localized
+        case .available(let update): return "发现新版本".localized + " · " + update.version
+        case .upToDate: return "当前已是最新版本。".localized
+        case .failed: return "无法检查更新，请稍后重试。".localized
         }
     }
 }
 
 struct AboutView_Previews: PreviewProvider {
     static var previews: some View {
-        AboutView()
+        AboutView().frame(width: 640, height: 760)
     }
 }

@@ -19,6 +19,7 @@ struct AppRowView: View {
     let onResign: ((AppItem) -> Void)?
     let onRestoreSignature: ((AppItem) -> Void)?
     var onMoveOutWholeSymlink: ((AppItem) -> Void)? = nil
+    var onRepairDock: ((AppItem) -> Void)? = nil
     
     @State private var isHovered = false
     
@@ -49,18 +50,25 @@ struct AppRowView: View {
                     }
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                Text(app.displayName) + Text(", ") +
+                Text(AppStatus.localized(app.status)) +
+                (app.size.map { Text(", \($0)") } ?? Text(verbatim: ""))
+            )
             
             Spacer()
             
             if showDeleteLinkButton && (app.status == AppStatus.linked || app.status == AppStatus.orphanedLink) {
                 Button(action: { onDeleteLink(app) }) {
-                    Image(systemName: "link.badge.plus")
+                    Image(systemName: "trash")
                         .foregroundColor(.red)
                 }
                 .buttonStyle(.plain)
                 .padding(6)
                 .background(Color.red.opacity(0.1))
                 .clipShape(Circle())
+                .accessibilityLabel("断开此链接并删除文件".localized)
                 .help("断开此链接并删除文件".localized)
             }
             
@@ -73,6 +81,7 @@ struct AppRowView: View {
                 .padding(6)
                 .background(Color.blue.opacity(0.1))
                 .clipShape(Circle())
+                .accessibilityLabel("将应用迁移回本地".localized)
                 .help("将应用迁移回本地".localized)
             }
         }
@@ -88,16 +97,19 @@ struct AppRowView: View {
                 self.isHovered = hovering
             }
         }
-        // Accessibility: Combine row into single element
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            Text(app.displayName) + Text(", ") +
-            Text(AppStatus.localized(app.status)) +
-            (app.size.map { Text(", \($0)") } ?? Text(""))
-        )
+        // 保留行内按钮，VoiceOver 可以分别选择应用信息和操作。
+        .accessibilityElement(children: .contain)
         .contextMenu {
             Button("在 Finder 中显示".localized) {
                 NSWorkspace.shared.activateFileViewerSelecting([app.path])
+            }
+
+            if app.status == AppStatus.linked || app.status == AppStatus.partialLinked,
+               let onRepairDock {
+                Divider()
+                Button("修复 Dock 图标".localized) {
+                    onRepairDock(app)
+                }
             }
 
             if (app.status == AppStatus.local || app.status == AppStatus.pendingMoveOut) && !app.isSystemApp, let onMoveOutWholeSymlink {
@@ -114,14 +126,17 @@ struct AppRowView: View {
                 }
             }
 
-            if app.status == AppStatus.linked {
+            // 数据目录迁移后，即使应用仍在本地，也需要能够重试签名。
+            if !app.isFolder,
+               !app.isSystemApp,
+               app.status != AppStatus.orphanedLink,
+               app.displayURL.pathExtension.lowercased() == "app",
+               let onResign {
                 Divider()
-
-                if let onResign {
-                    Button("重签名此应用".localized) {
-                        onResign(app)
-                    }
+                Button("重签名此应用".localized) {
+                    onResign(app)
                 }
+                .disabled(app.isRunning)
             }
 
             if let onRestoreSignature, app.isResigned {

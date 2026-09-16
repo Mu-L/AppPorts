@@ -173,6 +173,43 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(update?.releaseNotesMarkdown, "中文说明")
     }
 
+    func testManualCheckReportsLatestWhenOneSourceSucceeds() async {
+        let checker = makeChecker(github: .status(503), official: .json(officialRelease(version: "1.6.0", notes: [:])))
+        let result = await checker.checkForUpdatesResult()
+        XCTAssertEqual(result, .upToDate)
+    }
+
+    func testManualCheckReportsFailureWhenBothSourcesFail() async {
+        let checker = makeChecker(github: .status(503), official: .error(URLError(.notConnectedToInternet)))
+        let result = await checker.checkForUpdatesResult()
+        XCTAssertEqual(result, .failed)
+    }
+
+    func testDisabledGitHubDoesNotCountAsSuccessfulCheck() async {
+        let checker = makeChecker(github: .status(200), official: .status(503), githubUpdatesDisabled: true)
+        let result = await checker.checkForUpdatesResult()
+        XCTAssertEqual(result, .failed)
+    }
+
+    func testMalformedVersionsAreNotReportedAsLatest() async {
+        let checker = makeChecker(github: .json(gitHubRelease(tag: "invalid", body: "")), official: .json(officialRelease(version: "invalid", notes: [:])))
+        let result = await checker.checkForUpdatesResult()
+        XCTAssertEqual(result, .failed)
+    }
+
+    func testManualCheckReportsAvailableVersion() async {
+        let checker = makeChecker(github: .json(gitHubRelease(tag: "1.7.0", body: "Notes")), official: .status(503))
+        let result = await checker.checkForUpdatesResult()
+        guard case let .available(update) = result else { return XCTFail("Expected available update") }
+        XCTAssertEqual(update.version, "1.7.0")
+    }
+
+    func testInvalidInstalledVersionReportsFailure() async {
+        let checker = makeChecker(github: .status(503), official: .status(503), currentVersion: "")
+        let result = await checker.checkForUpdatesResult()
+        XCTAssertEqual(result, .failed)
+    }
+
     private func makeChecker(
         github: MockUpdateURLProtocol.MockResponse,
         official: MockUpdateURLProtocol.MockResponse,

@@ -227,6 +227,7 @@ struct WelcomeView: View {
 
 struct LanguageSwitcher: View {
     @ObservedObject var languageManager: LanguageManager
+    @ObservedObject private var operationState = AppOperationState.shared
     
     var body: some View {
         Menu {
@@ -265,7 +266,7 @@ struct LanguageSwitcher: View {
             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         }
         .menuStyle(.borderlessButton)
-        .focusable(false)
+        .disabled(operationState.isBusy)
     }
     
     var currentLanguageOption: AppLanguageOption? {

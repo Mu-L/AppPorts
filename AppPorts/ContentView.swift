@@ -193,6 +193,17 @@ private struct MarkdownTextView: NSViewRepresentable {
 // MARK: - 主视图
 struct ContentView: View {
 
+    @ObservedObject private var operationState = AppOperationState.shared
+    private struct ScanRequest: Equatable, Sendable {
+        let id = UUID()
+        let externalDirectory: URL?
+        let customPaths: [String]
+    }
+    @State private var localScanRequest: ScanRequest?
+    @State private var externalScanRequest: ScanRequest?
+    @State private var isVisible = false
+    @State private var needsAppRescan = false
+
     @State private var localApps: [AppItem] = []
     @State private var externalApps: [AppItem] = []
     /// 会话级应用体积缓存（key = AppItem.id，即标准化路径）。
@@ -238,6 +249,7 @@ struct ContentView: View {
     
     // 进度弹窗状态
     @State private var showProgress = false
+    @State private var progressTitle = "正在迁移应用...".localized
     @State private var progressCurrent = 0
     @State private var progressTotal = 0
     @State private var progressAppName = ""
@@ -252,6 +264,7 @@ struct ContentView: View {
     // 单应用复制进度
     @State private var progressBytes: Int64 = 0
     @State private var progressTotalBytes: Int64 = 0
+    @State private var progressFileName = ""
 
     private let fileManager = FileManager.default
 
@@ -401,11 +414,11 @@ struct ContentView: View {
                     onRestoreSignature: performRestoreSignature,
                     onBackupSignature: performBackupSignature,
                     resolveRealAppURL: resolveRealAppURL(for:),
-                    onResignAppAtURL: { url, silent in
-                        performResign(at: url, bundleID: getBundleIdentifier(from: url), silent: silent)
+                    onResignAppAtURL: { url in
+                        try await performResign(at: url, bundleID: getBundleIdentifier(from: url))
                     },
                     onBackupSignatureForURL: { url in
-                        performBackupSignature(at: url, bundleID: getBundleIdentifier(from: url))
+                        try await performBackupSignature(at: url, bundleID: getBundleIdentifier(from: url))
                     }
                 )
             } else if mainTab == .customDirs {
@@ -446,7 +459,8 @@ struct ContentView: View {
                                     onMoveBack: performMoveBack,
                                     onResign: { performSingleResign(app: $0) },
                                     onRestoreSignature: performRestoreSignature,
-                                    onMoveOutWholeSymlink: performMoveOutWholeSymlink
+                                    onMoveOutWholeSymlink: performMoveOutWholeSymlink,
+                                    onRepairDock: performRepairDockShortcuts
                                 )
                                 .tag(app.id)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)) // Add spacing around rows
@@ -563,8 +577,10 @@ struct ContentView: View {
             } // end HSplitView for mainTab == .apps
             } // end else for mainTab == .apps
         }
-        .frame(minWidth: 900, minHeight: 600) // Increased window size
+        .disabled(operationState.isBusy)
+        .frame(minWidth: 900, minHeight: 600)
         .onAppear {
+            isVisible = true
             // Restore persistence
             if let savedPath = UserDefaults.standard.string(forKey: "ExternalDrivePath") {
                 let url = URL(fileURLWithPath: savedPath)
@@ -586,7 +602,7 @@ struct ContentView: View {
             }
             
             AppLogger.shared.log("主界面已出现，开始初始化扫描与监控")
-            scanLocalApps()
+            scanBothAppsAtomic()
             
             // Start local monitoring
             startMonitoringLocal()
@@ -612,6 +628,20 @@ struct ContentView: View {
                 }
             }
         }
+        .onDisappear {
+            isVisible = false
+            localScanRequest = nil
+            externalScanRequest = nil
+            localMonitor?.stopMonitoring()
+            customLocalMonitors.forEach { $0.stopMonitoring() }
+            stopMonitoringExternal()
+        }
+        .onChange(of: operationState.isBusy) { isBusy in
+            // 补上操作期间延后的监控刷新，也初始化操作期间新打开的窗口。
+            if !isBusy, needsAppRescan || localScanRequest == nil || externalScanRequest == nil {
+                scanBothAppsAtomic()
+            }
+        }
         .onChange(of: externalDriveURL) { newValue in
             AppLogger.shared.logContext(
                 "外部路径变更",
@@ -629,7 +659,7 @@ struct ContentView: View {
                 UserDefaults.standard.removeObject(forKey: "ExternalDrivePath")
                 stopMonitoringExternal()
             }
-            scanExternalApps()
+            scanBothAppsAtomic()
 
             // macOS >= 15.1: 检查外部磁盘的 Applications 目录
             if let url = newValue, AppMigrationService.isMASExternalInstallSupported {
@@ -778,11 +808,13 @@ struct ContentView: View {
                         .ignoresSafeArea()
                     
                     ProgressOverlay(
+                        title: progressTitle,
                         current: progressCurrent,
                         total: progressTotal,
                         appName: progressAppName,
                         copiedBytes: progressBytes,
-                        totalBytes: progressTotalBytes
+                        totalBytes: progressTotalBytes,
+                        currentFile: progressFileName
                     )
                 }
             }
@@ -1131,7 +1163,11 @@ struct ContentView: View {
         return nil
     }
     
+    @MainActor
     func scanLocalApps() {
+        guard isVisible else { return }
+        let request = ScanRequest(externalDirectory: externalDriveURL, customPaths: customLocalScanPaths)
+        localScanRequest = request
         let scanID = AppLogger.shared.makeOperationID(prefix: "scan-local-apps")
         AppLogger.shared.logContext(
             "开始扫描本地应用",
@@ -1141,8 +1177,8 @@ struct ContentView: View {
         Task.detached(priority: .userInitiated) {
             // Gather data needed for scanning
             let runningAppURLs = await MainActor.run { self.getRunningAppURLs() }
-            let externalAppsDir = await MainActor.run { self.externalDriveURL }
-            let customPaths = await MainActor.run { self.customLocalScanPaths }
+            let externalAppsDir = request.externalDirectory
+            let customPaths = request.customPaths
 
             // Use Actor
             let scanner = AppScanner()
@@ -1167,11 +1203,16 @@ struct ContentView: View {
 
             let finalApps = allApps
 
+            guard await MainActor.run(body: { self.isCurrentScan(request, isLocal: true) }) else { return }
+
             // 检测外置 app 版本变化，刷新本地 Stub Portal
             if let externalDir = externalAppsDir {
                 let externalApps = await scanner.scanExternalApps(at: externalDir, localAppsDir: URL(fileURLWithPath: "/Applications"))
                 let service = AppMigrationService()
                 for localApp in finalApps where localApp.status == AppStatus.linked {
+                    guard await MainActor.run(body: {
+                        self.isCurrentScan(request, isLocal: true) && !self.operationState.isBusy
+                    }) else { break }
                     guard let externalApp = externalApps.first(where: { $0.name == localApp.name }) else { continue }
                     if localApp.usesFolderOperation {
                         // 文件夹镜像：重新同步内部 Stub 与符号链接（旧版整体 symlink 文件夹会被安全跳过）
@@ -1193,7 +1234,7 @@ struct ContentView: View {
             )
 
             // 会话缓存填充 + 后台计算缺失项（命中项瞬时显示，无“计算中”闪烁）
-            await self.applySizes(for: finalApps, isLocal: true, scanner: scanner)
+            await self.applySizes(for: finalApps, isLocal: true, scanner: scanner, request: request)
         }
     }
 
@@ -1202,10 +1243,15 @@ struct ContentView: View {
         return (plist?["CFBundleShortVersionString"] as? String) ?? ""
     }
 
+    @MainActor
     func scanExternalApps() {
+        guard isVisible else { return }
+        let request = ScanRequest(externalDirectory: externalDriveURL, customPaths: customLocalScanPaths)
+        externalScanRequest = request
         guard let dir = externalDriveURL else {
             AppLogger.shared.log("未选择外部路径，清空外部应用列表", level: "TRACE")
             self.externalApps = []
+            self.selectedExternalApps.removeAll()
             return
         }
         
@@ -1221,7 +1267,7 @@ struct ContentView: View {
         
         Task.detached(priority: .userInitiated) {
             let scanDir = dir
-            let customPaths = await MainActor.run { self.customLocalScanPaths }
+            let customPaths = request.customPaths
             let localDirs = [URL(fileURLWithPath: "/Applications")]
                 + customPaths.map { URL(fileURLWithPath: $0) }
             
@@ -1241,7 +1287,7 @@ struct ContentView: View {
                 ]
             )
             // 会话缓存填充 + 后台计算缺失项（命中项瞬时显示，无“计算中”闪烁）
-            await self.applySizes(for: newApps, isLocal: false, scanner: scanner)
+            await self.applySizes(for: newApps, isLocal: false, scanner: scanner, request: request)
         }
     }
 
@@ -1312,12 +1358,14 @@ struct ContentView: View {
 
     /// 后台并行计算缓存未命中项的体积，结果写回会话缓存与对应列表（按 id 精确匹配）。
     /// - Note: 即使某项已不在列表中（扫描间隙发生变化），结果仍写入缓存，下次扫描即可瞬时命中。
-    func computeAndStoreSizes(
+    private func computeAndStoreSizes(
         misses: [(app: AppItem, mtime: Date?)],
         isLocal: Bool,
-        scanner: AppScanner
+        scanner: AppScanner,
+        request: ScanRequest
     ) async {
         guard !misses.isEmpty else { return }
+        guard await MainActor.run(body: { self.isCurrentScan(request, isLocal: isLocal) }) else { return }
 
         let results = await withTaskGroup(of: (String, Int64, Date?).self) { group -> [(String, Int64, Date?)] in
             var out: [(String, Int64, Date?)] = []
@@ -1347,6 +1395,7 @@ struct ContentView: View {
         }
 
         await MainActor.run {
+            guard self.isCurrentScan(request, isLocal: isLocal) else { return }
             for (id, bytes, mtime) in results {
                 let sizeString = LocalizedByteCountFormatter.string(fromByteCount: bytes)
                 self.sizeCache[id] = CachedAppSize(size: sizeString, bytes: bytes, mtime: mtime)
@@ -1371,17 +1420,31 @@ struct ContentView: View {
 
     /// 统一的体积应用入口：先用会话缓存填充列表后赋值（命中项瞬时显示、无“计算中”闪烁），
     /// 再在后台计算缺失/失效项并写回缓存。所有扫描路径都走这里。
-    func applySizes(for apps: [AppItem], isLocal: Bool, scanner: AppScanner) async {
+    @MainActor
+    private func isCurrentScan(_ request: ScanRequest, isLocal: Bool) -> Bool {
+        isVisible
+            && (isLocal ? localScanRequest : externalScanRequest) == request
+            && externalDriveURL == request.externalDirectory
+            && customLocalScanPaths == request.customPaths
+    }
+
+    private func applySizes(for apps: [AppItem], isLocal: Bool, scanner: AppScanner, request: ScanRequest) async {
+        guard await MainActor.run(body: { self.isCurrentScan(request, isLocal: isLocal) }) else { return }
         let cache = await MainActor.run { self.sizeCache }
         let (filled, misses) = fillCachedSizes(into: apps, cache: cache)
-        await MainActor.run {
+        let committed = await MainActor.run {
+            guard self.isCurrentScan(request, isLocal: isLocal) else { return false }
             if isLocal {
                 self.localApps = filled
+                self.selectedLocalApps.formIntersection(Set(filled.map(\.id)))
             } else {
                 self.externalApps = filled
+                self.selectedExternalApps.formIntersection(Set(filled.map(\.id)))
             }
+            return true
         }
-        await computeAndStoreSizes(misses: misses, isLocal: isLocal, scanner: scanner)
+        guard committed else { return }
+        await computeAndStoreSizes(misses: misses, isLocal: isLocal, scanner: scanner, request: request)
     }
 
     func openPanelForExternalDrive() {
@@ -1458,14 +1521,14 @@ struct ContentView: View {
         customLocalScanPaths.append(path)
         UserDefaults.standard.set(customLocalScanPaths, forKey: "customLocalScanPaths")
         startMonitoringLocal()
-        scanLocalApps()
+        scanBothAppsAtomic()
     }
 
     func removeCustomLocalScanPath(_ path: String) {
         customLocalScanPaths.removeAll { $0 == path }
         UserDefaults.standard.set(customLocalScanPaths, forKey: "customLocalScanPaths")
         startMonitoringLocal()
-        scanLocalApps()
+        scanBothAppsAtomic()
     }
 
     func showError(title: String, message: String) {
@@ -1480,11 +1543,12 @@ struct ContentView: View {
     }
     
     func isAppRunning(url: URL) -> Bool {
-        let workspace = NSWorkspace.shared
-        let runningApps = workspace.runningApplications
-        return runningApps.contains { app in
-            return app.bundleURL == url
-        }
+        AppRunningState.isRunning(
+            appURL: url,
+            applications: NSWorkspace.shared.runningApplications.map {
+                AppRunningState.RunningApplication(bundleURL: $0.bundleURL, bundleIdentifier: $0.bundleIdentifier)
+            }
+        )
     }
     
     /// 检测应用是否来自 App Store（包括 iOS 应用）
@@ -1549,15 +1613,19 @@ struct ContentView: View {
             "用户请求传统链接迁移",
             details: [("app_name", app.displayName), ("destination", destURL.path)]
         )
+        guard let activityToken = operationState.begin() else { return }
         isMigrating = true
         progressTotal = 1
         progressCurrent = 1
         progressAppName = app.name
         progressBytes = 0
         progressTotalBytes = 0
+        progressFileName = ""
+        progressTitle = "正在迁移应用...".localized
         showProgress = true
 
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             do {
                 let service = AppMigrationService(portalCreationOverride: { appItem, externalURL in
                     try FileManager.default.createSymbolicLink(at: appItem.path, withDestinationURL: externalURL)
@@ -1571,6 +1639,7 @@ struct ContentView: View {
                         await MainActor.run {
                             self.progressBytes = progress.copiedBytes
                             self.progressTotalBytes = progress.totalBytes
+                            self.progressFileName = progress.currentFile
                         }
                     }
                 )
@@ -1775,20 +1844,24 @@ struct ContentView: View {
             ]
         )
         
+        guard let activityToken = operationState.begin() else { return }
         isMigrating = true
         progressTotal = apps.count
         progressCurrent = 0
+        progressTitle = "正在迁移应用...".localized
         showProgress = true
         
         var errors: [String] = []
         
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             for app in apps {
                 await MainActor.run {
                     progressAppName = app.name
                     progressCurrent += 1
                     progressBytes = 0
                     progressTotalBytes = 0
+                    progressFileName = ""
                 }
                 
                 // App Store 应用 + macOS >= 15.1 → 迁移到外部磁盘的 Applications 目录
@@ -1811,6 +1884,7 @@ struct ContentView: View {
                         await MainActor.run {
                             self.progressBytes = progress.copiedBytes
                             self.progressTotalBytes = progress.totalBytes
+                            self.progressFileName = progress.currentFile
                         }
                     }
                     AppLogger.shared.logContext(
@@ -1874,7 +1948,9 @@ struct ContentView: View {
     private func executeBatchLinkIn(apps: [AppItem], lockExternal: Bool) {
         guard !apps.isEmpty else { return }
 
+        guard let activityToken = operationState.begin() else { return }
         isMigrating = true
+        progressTitle = "链接回本地".localized
         showProgress = true
         
         var errors: [String] = []
@@ -1895,7 +1971,8 @@ struct ContentView: View {
         progressTotal = appsToLink.count
         progressCurrent = 0
         
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             for item in appsToLink {
                 let appName = item.sourcePath.lastPathComponent
                 await MainActor.run {
@@ -1965,6 +2042,8 @@ struct ContentView: View {
     }
     
     func performDeleteLink(app: AppItem) {
+        guard let activityToken = operationState.begin() else { return }
+        defer { operationState.finish(activityToken) }
         AppLogger.shared.logContext(
             "用户请求删除本地入口",
             details: [("app_name", app.displayName), ("path", app.path.path), ("status", app.status)]
@@ -1983,81 +2062,56 @@ struct ContentView: View {
         }
     }
 
+    func performRepairDockShortcuts(app: AppItem) {
+        guard let activityToken = operationState.begin() else { return }
+        progressTitle = "修复 Dock 图标".localized
+        progressAppName = app.displayName
+        progressCurrent = 1
+        progressTotal = 1
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = ""
+        showProgress = true
+
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                operationState.finish(activityToken)
+            }
+            do {
+                let updatedCount = try await Task.detached(priority: .userInitiated) {
+                    try AppMigrationService().repairDockShortcuts(for: app)
+                }.value
+                AppLogger.shared.logContext(
+                    "用户修复 Dock 固定项完成",
+                    details: [("app_name", app.displayName), ("updated_count", String(updatedCount))]
+                )
+                alertTitle = updatedCount > 0 ? "Dock 图标已修复".localized : "Dock 图标无需修复".localized
+                alertMessage = updatedCount > 0
+                    ? "已更新现有 Dock 固定项，位置保持不变。Dock 将短暂刷新；从 Dock 打开此应用需要连接外部存储。".localized
+                    : "没有需要更新的 Dock 固定项。如果还未固定此应用，请打开应用后选择“在程序坞中保留”。".localized
+                showAlert = true
+            } catch {
+                AppLogger.shared.logError(
+                    "修复 Dock 固定项失败", error: error, errorCode: "APP-DOCK-REPAIR-FAILED",
+                    context: [("app_name", app.displayName)], relatedURLs: [("local", app.path)]
+                )
+                showError(
+                    title: "Dock 图标修复失败".localized,
+                    message: "无法更新 Dock 固定项。请确认外部存储已连接后重试；也可以移除旧图标，再将运行中的应用保留在程序坞中。".localized
+                )
+            }
+        }
+    }
+
     private func localDestinationForMoveBack(app: AppItem) -> URL {
-        let localDirs = [localAppsURL] + customLocalScanPaths.map { URL(fileURLWithPath: $0) }
-        for dir in localDirs {
-            let candidate = dir.appendingPathComponent(app.name)
-            if isLocalPortal(candidate, linkedTo: app.path) {
-                return candidate
-            }
-
-            if let bundleURL = app.bundleURL, bundleURL.lastPathComponent != app.name {
-                let bundleCandidate = dir.appendingPathComponent(bundleURL.lastPathComponent)
-                if isLocalPortal(bundleCandidate, linkedTo: bundleURL) {
-                    return bundleCandidate
-                }
-            }
-        }
-
-        return localAppsURL.appendingPathComponent(app.name)
+        AppMigrationService().localDestinationForRestore(
+            of: app,
+            defaultDirectory: localAppsURL,
+            additionalDirectories: customLocalScanPaths.map { URL(fileURLWithPath: $0) }
+        )
     }
 
-    private func isLocalPortal(_ localURL: URL, linkedTo externalURL: URL) -> Bool {
-        guard fileManager.fileExists(atPath: localURL.path) else { return false }
-
-        if let destination = symlinkDestination(at: localURL),
-           sameFilePath(destination, externalURL) {
-            return true
-        }
-
-        let contentsURL = localURL.appendingPathComponent("Contents")
-        for relativePath in ["Contents", "Contents/MacOS", "Contents/Resources", "Contents/Frameworks"] {
-            let candidate = localURL.appendingPathComponent(relativePath)
-            if let destination = symlinkDestination(at: candidate),
-               sameFilePath(destination, externalURL) || sameFilePath(destination, externalURL.appendingPathComponent(relativePath)) {
-                return true
-            }
-        }
-
-        let realAppPathFile = contentsURL.appendingPathComponent("Resources/real_app_path.txt")
-        if let rawPath = try? String(contentsOf: realAppPathFile, encoding: .utf8),
-           sameFilePath(URL(fileURLWithPath: rawPath.trimmingCharacters(in: .whitespacesAndNewlines)), externalURL) {
-            return true
-        }
-
-        let folderMarkerURL = localURL.appendingPathComponent(AppMigrationService.folderPortalMarkerName)
-        if marker(at: folderMarkerURL, pointsTo: externalURL) {
-            return true
-        }
-
-        let hybridMarkerURL = contentsURL.appendingPathComponent(AppMigrationService.hybridPortalMarkerName)
-        return marker(at: hybridMarkerURL, pointsTo: externalURL)
-    }
-
-    private func symlinkDestination(at url: URL) -> URL? {
-        guard let rawPath = try? fileManager.destinationOfSymbolicLink(atPath: url.path) else {
-            return nil
-        }
-        if rawPath.hasPrefix("/") {
-            return URL(fileURLWithPath: rawPath).standardizedFileURL
-        }
-        return url.deletingLastPathComponent().appendingPathComponent(rawPath).standardizedFileURL
-    }
-
-    private func marker(at markerURL: URL, pointsTo externalURL: URL) -> Bool {
-        guard let data = try? Data(contentsOf: markerURL),
-              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
-              let externalPath = plist["externalPath"] as? String else {
-            return false
-        }
-        return sameFilePath(URL(fileURLWithPath: externalPath), externalURL)
-    }
-
-    private func sameFilePath(_ lhs: URL, _ rhs: URL) -> Bool {
-        lhs.standardizedFileURL.path == rhs.standardizedFileURL.path
-    }
-    
-    
     func performMoveBack(app: AppItem) {
         let operationID = AppLogger.shared.makeOperationID(prefix: "single-move-back")
         let destination = localDestinationForMoveBack(app: app)
@@ -2070,20 +2124,25 @@ struct ContentView: View {
                 ("destination", destination.path)
             ]
         )
+        guard let activityToken = operationState.begin() else { return }
         isMigrating = true
         progressTotal = 1
         progressCurrent = 1
         progressAppName = app.displayName
         progressBytes = 0
         progressTotalBytes = 0
+        progressFileName = ""
+        progressTitle = "还原".localized
         showProgress = true
         
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             do {
                 try await moveBack(app: app, localDestinationURL: destination) { progress in
                     await MainActor.run {
                         self.progressBytes = progress.copiedBytes
                         self.progressTotalBytes = progress.totalBytes
+                        self.progressFileName = progress.currentFile
                     }
                 }
                 AppLogger.shared.logContext(
@@ -2129,20 +2188,24 @@ struct ContentView: View {
             ]
         )
         
+        guard let activityToken = operationState.begin() else { return }
         isMigrating = true
         progressTotal = validApps.count
         progressCurrent = 0
+        progressTitle = "还原".localized
         showProgress = true
         
         var errors: [String] = []
         
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             for app in validApps {
                 await MainActor.run {
                     progressAppName = app.displayName
                     progressCurrent += 1
                     progressBytes = 0
                     progressTotalBytes = 0
+                    progressFileName = ""
                 }
                 
                 let destination = localDestinationForMoveBack(app: app)
@@ -2157,6 +2220,7 @@ struct ContentView: View {
                         await MainActor.run {
                             self.progressBytes = progress.copiedBytes
                             self.progressTotalBytes = progress.totalBytes
+                            self.progressFileName = progress.currentFile
                         }
                     }
                     AppLogger.shared.logContext(
@@ -2212,21 +2276,18 @@ struct ContentView: View {
 
     /// 迁移前备份原始签名身份（不执行签名），确保迁移后恢复按钮立即可用
     func performBackupSignature(app: AppItem) {
-        guard let bundleID = getBundleIdentifier(for: app) else { return }
-        Task {
-            let signer = CodeSigner()
+        guard let activityToken = operationState.begin() else { return }
+        Task { @MainActor in
+            defer { operationState.finish(activityToken) }
             do {
-                try await signer.backupOriginalSignature(appURL: app.displayURL, bundleIdentifier: bundleID)
-                AppLogger.shared.logContext(
-                    "迁移前备份签名身份",
-                    details: [("app_name", app.displayName), ("bundle_id", bundleID)]
-                )
+                let realURL = try resolveRealAppURL(for: app)
+                try await performBackupSignature(at: realURL, bundleID: getBundleIdentifier(from: realURL))
             } catch {
                 AppLogger.shared.logError(
                     "备份签名身份失败",
                     error: error,
                     errorCode: "BACKUP-SIGNATURE-FAILED",
-                    context: [("app_name", app.displayName), ("bundle_id", bundleID)],
+                    context: [("app_name", app.displayName)],
                     relatedURLs: [("target_app", app.displayURL)]
                 )
             }
@@ -2234,24 +2295,32 @@ struct ContentView: View {
     }
 
     func performSingleResign(app: AppItem, silent: Bool = false) {
+        guard !isAppRunning(url: app.displayURL) else {
+            showError(title: "签名失败".localized, message: AppMoverError.appIsRunning.localizedDescription)
+            return
+        }
         AppLogger.shared.logContext(
             "用户请求重签名单个应用",
             details: [("app_name", app.displayName), ("path", app.path.path), ("silent", silent ? "true" : "false")]
         )
 
-        Task {
-            let signer = CodeSigner()
+        guard let activityToken = operationState.begin() else { return }
+        progressTitle = "重签名此应用".localized
+        progressAppName = app.displayName
+        progressCurrent = 1
+        progressTotal = 1
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = ""
+        showProgress = true
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                operationState.finish(activityToken)
+            }
             do {
-                try await signer.sign(appURL: app.displayURL, bundleIdentifier: getBundleIdentifier(for: app))
-                AppLogger.shared.logContext(
-                    "重签名成功",
-                    details: [("app_name", app.displayName), ("path", app.path.path)],
-                    level: "INFO"
-                )
-                await MainActor.run {
-                    scanLocalApps()
-                    scanExternalApps()
-                }
+                let realURL = try resolveRealAppURL(for: app)
+                try await performResign(at: realURL, bundleID: getBundleIdentifier(from: realURL))
             } catch {
                 AppLogger.shared.logError(
                     "重签名失败（应用可能无法通过 macOS 签名校验）",
@@ -2270,20 +2339,34 @@ struct ContentView: View {
     }
 
     func performRestoreSignature(app: AppItem) {
-        let realURL = resolveRealAppURL(for: app)
-        guard let bundleID = getBundleIdentifier(from: realURL) else {
-            showError(title: "恢复签名失败".localized, message: "无法读取应用 Bundle Identifier".localized)
+        guard !isAppRunning(url: app.displayURL) else {
+            showError(title: "签名失败".localized, message: AppMoverError.appIsRunning.localizedDescription)
             return
         }
-
-        AppLogger.shared.logContext(
-            "用户请求恢复原始签名",
-            details: [("app_name", app.displayName), ("real_path", realURL.path), ("bundle_id", bundleID)]
-        )
-
-        Task {
+        guard let activityToken = operationState.begin() else { return }
+        progressTitle = "恢复原始签名".localized
+        progressAppName = app.displayName
+        progressCurrent = 1
+        progressTotal = 1
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = ""
+        showProgress = true
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                operationState.finish(activityToken)
+            }
             let signer = CodeSigner()
             do {
+                let realURL = try resolveRealAppURL(for: app)
+                guard let bundleID = getBundleIdentifier(from: realURL) else {
+                    throw CodeSigner.SigningError.restoreFailed("无法读取应用 Bundle Identifier".localized)
+                }
+                AppLogger.shared.logContext(
+                    "用户请求恢复原始签名",
+                    details: [("app_name", app.displayName), ("real_path", realURL.path), ("bundle_id", bundleID)]
+                )
                 try await signer.restoreSignature(appURL: realURL, bundleIdentifier: bundleID)
                 await MainActor.run {
                     scanLocalApps()
@@ -2297,70 +2380,15 @@ struct ContentView: View {
         }
     }
 
-    nonisolated func getBundleIdentifier(for app: AppItem) -> String? {
-        let infoPlistURL = app.displayURL.appendingPathComponent("Contents/Info.plist")
-        guard let plistData = try? Data(contentsOf: infoPlistURL),
-              let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any] else {
-            return nil
-        }
-        return plist["CFBundleIdentifier"] as? String
-    }
-
     /// 从指定 URL 读取 Bundle Identifier
     nonisolated func getBundleIdentifier(from url: URL) -> String? {
-        let infoPlistURL = url.appendingPathComponent("Contents/Info.plist")
-        guard let plistData = try? Data(contentsOf: infoPlistURL),
-              let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any] else {
-            return nil
-        }
-        return plist["CFBundleIdentifier"] as? String
+        CodeSigner.bundleIdentifier(at: url)
     }
 
     /// 解析应用的真实路径（外部真实应用或本地真实应用），而非假壳
-    /// - 已链接应用：返回外部真实 .app 路径
-    /// - 未链接应用：返回本地真实 .app 路径
-    nonisolated func resolveRealAppURL(for app: AppItem) -> URL {
-        // 未链接：返回本地路径
-        guard app.status == AppStatus.linked else {
-            return app.displayURL
-        }
-
-        // Folder Mirror：从标记文件解析外部真实文件夹
-        if let externalURL = AppMigrationService.folderMirrorExternalURL(at: app.path) {
-            return externalURL
-        }
-
-        // Whole-app symlink：解析符号链接目标
-        if let rawPath = try? FileManager.default.destinationOfSymbolicLink(atPath: app.path.path) {
-            return URL(fileURLWithPath: rawPath, relativeTo: app.path.deletingLastPathComponent()).standardizedFileURL
-        }
-
-        // Stub Portal：从原生 launcher 的 real_app_path.txt 解析外部路径
-        let realAppPathFile = app.path.appendingPathComponent("Contents/Resources/real_app_path.txt")
-        if let realPath = try? String(contentsOf: realAppPathFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-           !realPath.isEmpty,
-           FileManager.default.fileExists(atPath: realPath) {
-            return URL(fileURLWithPath: realPath)
-        }
-
-        // Stub Portal（旧版 bash launcher）：从 launcher 脚本解析外部路径
-        let launcherPath = app.path.appendingPathComponent("Contents/MacOS/launcher")
-        if let script = try? String(contentsOf: launcherPath, encoding: .utf8) {
-            // 匹配 REAL_APP='...' 中的路径
-            let pattern = "REAL_APP='([^']+)'"
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               let match = regex.firstMatch(in: script, range: NSRange(script.startIndex..., in: script)),
-               let range = Range(match.range(at: 1), in: script) {
-                let path = String(script[range])
-                let url = URL(fileURLWithPath: path)
-                if FileManager.default.fileExists(atPath: url.path) {
-                    return url
-                }
-            }
-        }
-
-        // 兜底：返回本地路径
-        return app.displayURL
+    /// 单应用文件夹从 displayURL 解析其内部 .app；找不到目标时终止签名。
+    nonisolated func resolveRealAppURL(for app: AppItem) throws -> URL {
+        try CodeSigner.resolveAppURL(at: app.displayURL)
     }
 
     /// 解析符号链接目标
@@ -2370,62 +2398,56 @@ struct ContentView: View {
     }
 
     /// 对指定 URL 执行重签名（用于数据目录迁移后签名真实应用）
-    func performResign(at url: URL, bundleID: String?, silent: Bool = false) {
+    func performResign(at url: URL, bundleID: String?) async throws {
         AppLogger.shared.logContext(
-            "数据迁移后重签名真实应用",
-            details: [("path", url.path), ("bundle_id", bundleID ?? "nil"), ("silent", silent ? "true" : "false")]
+            "重签名真实应用",
+            details: [("path", url.path), ("bundle_id", bundleID ?? "nil")]
         )
 
-        Task {
-            let signer = CodeSigner()
-            do {
-                try await signer.sign(appURL: url, bundleIdentifier: bundleID)
-                AppLogger.shared.logContext(
-                    "数据迁移后重签名成功",
-                    details: [("path", url.path), ("bundle_id", bundleID ?? "nil")],
-                    level: "INFO"
-                )
-                await MainActor.run {
-                    scanLocalApps()
-                    scanExternalApps()
-                }
-            } catch {
-                AppLogger.shared.logError(
-                    "数据迁移后重签名失败（应用可能无法通过 macOS 签名校验）",
-                    error: error,
-                    errorCode: "DATA-RESIGN-FAILED",
-                    context: [("path", url.path), ("bundle_id", bundleID ?? "nil"), ("silent", silent ? "true" : "false")],
-                    relatedURLs: [("target_app", url)]
-                )
-                if !silent {
-                    await MainActor.run {
-                        showError(title: "签名失败".localized, message: error.localizedDescription)
-                    }
-                }
+        let signer = CodeSigner()
+        do {
+            try await signer.sign(appURL: url, bundleIdentifier: bundleID)
+            AppLogger.shared.logContext(
+                "重签名成功",
+                details: [("path", url.path), ("bundle_id", bundleID ?? "nil")]
+            )
+            await MainActor.run {
+                scanLocalApps()
+                scanExternalApps()
             }
+        } catch {
+            AppLogger.shared.logError(
+                "重签名失败（应用可能无法通过 macOS 签名校验）",
+                error: error,
+                errorCode: "RESIGN-FAILED",
+                context: [("path", url.path), ("bundle_id", bundleID ?? "nil")],
+                relatedURLs: [("target_app", url)]
+            )
+            throw error
         }
     }
 
     /// 对指定 URL 备份原始签名（用于数据目录迁移前）
-    func performBackupSignature(at url: URL, bundleID: String?) {
-        guard let bundleID = bundleID else { return }
-        Task {
-            let signer = CodeSigner()
-            do {
-                try await signer.backupOriginalSignature(appURL: url, bundleIdentifier: bundleID)
-                AppLogger.shared.logContext(
-                    "数据迁移前备份签名身份",
-                    details: [("path", url.path), ("bundle_id", bundleID)]
-                )
-            } catch {
-                AppLogger.shared.logError(
-                    "数据迁移前备份签名身份失败（后续恢复签名将无法使用原始身份）",
-                    error: error,
-                    errorCode: "DATA-BACKUP-SIGNATURE-FAILED",
-                    context: [("path", url.path), ("bundle_id", bundleID)],
-                    relatedURLs: [("target_app", url)]
-                )
-            }
+    func performBackupSignature(at url: URL, bundleID: String?) async throws {
+        guard let bundleID else {
+            throw CodeSigner.SigningError.backupFailed("无法读取应用 Bundle Identifier".localized)
+        }
+        let signer = CodeSigner()
+        do {
+            try await signer.backupOriginalSignature(appURL: url, bundleIdentifier: bundleID)
+            AppLogger.shared.logContext(
+                "数据迁移前备份签名身份",
+                details: [("path", url.path), ("bundle_id", bundleID)]
+            )
+        } catch {
+            AppLogger.shared.logError(
+                "数据迁移前备份签名身份失败（后续恢复签名将无法使用原始身份）",
+                error: error,
+                errorCode: "DATA-BACKUP-SIGNATURE-FAILED",
+                context: [("path", url.path), ("bundle_id", bundleID)],
+                relatedURLs: [("target_app", url)]
+            )
+            throw error
         }
     }
 
@@ -2469,22 +2491,33 @@ struct ContentView: View {
     /// 统一防抖：合并两个 monitor 的扫描请求，避免列表连续跳两下
     private func scheduleMonitorRescan(local: Bool) {
         Self.monitorRescanDebouncer.schedule { [self] in
-            AppLogger.shared.logContext("Monitor 防抖触发扫描", details: [("trigger", local ? "local" : "external")], level: "TRACE")
-            self.scanBothAppsAtomic()
+            Task { @MainActor in
+                AppLogger.shared.logContext("Monitor 防抖触发扫描", details: [("trigger", local ? "local" : "external")], level: "TRACE")
+                self.scanBothAppsAtomic()
+            }
         }
     }
 
-    /// 原子扫描：并行扫描本地和外部应用，一次性更新 UI，避免列表跳两下
+    /// 同轮扫描本地和外部应用，一次性更新仍有效的结果，避免列表跳两下。
+    @MainActor
     private func scanBothAppsAtomic() {
-        let externalDir = externalDriveURL
+        guard isVisible else { return }
+        guard !operationState.isBusy else {
+            needsAppRescan = true
+            return
+        }
+        needsAppRescan = false
+        let request = ScanRequest(externalDirectory: externalDriveURL, customPaths: customLocalScanPaths)
+        localScanRequest = request
+        externalScanRequest = request
+        let externalDir = request.externalDirectory
         Task.detached(priority: .userInitiated) {
             let scanner = AppScanner()
             let runningAppURLs = await MainActor.run { self.getRunningAppURLs() }
             let localDir = self.localAppsURL
-            let externalLocalDir = URL(fileURLWithPath: "/Applications")
-            let customPaths = await MainActor.run { self.customLocalScanPaths }
+            let customPaths = request.customPaths
 
-            // 并行扫描
+            // 扫描默认目录和自定义目录
             var newLocalApps = await scanner.scanLocalApps(
                 at: localDir,
                 runningAppURLs: runningAppURLs,
@@ -2504,18 +2537,26 @@ struct ContentView: View {
                 }
             }
 
-            let externalResult: [AppItem]
+            var newExternalApps: [AppItem] = []
             if let externalDir {
-                externalResult = await scanner.scanExternalApps(at: externalDir, localAppsDir: externalLocalDir)
-            } else {
-                externalResult = []
+                let localDirs = [localDir] + customPaths.map { URL(fileURLWithPath: $0) }
+                for directory in localDirs {
+                    let scannedApps = await scanner.scanExternalApps(at: externalDir, localAppsDir: directory)
+                    newExternalApps = self.mergeExternalApps(newExternalApps, with: scannedApps)
+                }
             }
 
-            let newExternalApps = externalResult
+            guard await MainActor.run(body: {
+                self.isCurrentScan(request, isLocal: true) || self.isCurrentScan(request, isLocal: false)
+            }) else { return }
 
             // 检测外置 app 版本变化，刷新本地 Stub Portal
             let service = AppMigrationService()
             for localApp in newLocalApps where localApp.status == AppStatus.linked {
+                guard await MainActor.run(body: {
+                    self.isCurrentScan(request, isLocal: true)
+                        && !self.operationState.isBusy
+                }) else { break }
                 guard let externalApp = newExternalApps.first(where: { $0.name == localApp.name }) else { continue }
                 if localApp.usesFolderOperation {
                     // 文件夹镜像：重新同步内部 Stub 与符号链接（旧版整体 symlink 文件夹会被安全跳过）
@@ -2529,12 +2570,23 @@ struct ContentView: View {
             let cache = await MainActor.run { self.sizeCache }
             let (filledLocal, missesLocal) = self.fillCachedSizes(into: newLocalApps, cache: cache)
             let (filledExternal, missesExternal) = self.fillCachedSizes(into: newExternalApps, cache: cache)
-            await MainActor.run {
-                self.localApps = filledLocal
-                self.externalApps = filledExternal
+            let committed = await MainActor.run {
+                let localIsCurrent = self.isCurrentScan(request, isLocal: true)
+                let externalIsCurrent = self.isCurrentScan(request, isLocal: false)
+                // 单侧手动刷新可能已取代本轮请求，另一侧仍应完成更新。
+                if localIsCurrent {
+                    self.localApps = filledLocal
+                    self.selectedLocalApps.formIntersection(Set(filledLocal.map(\.id)))
+                }
+                if externalIsCurrent {
+                    self.externalApps = filledExternal
+                    self.selectedExternalApps.formIntersection(Set(filledExternal.map(\.id)))
+                }
+                return localIsCurrent || externalIsCurrent
             }
-            await self.computeAndStoreSizes(misses: missesLocal, isLocal: true, scanner: scanner)
-            await self.computeAndStoreSizes(misses: missesExternal, isLocal: false, scanner: scanner)
+            guard committed else { return }
+            await self.computeAndStoreSizes(misses: missesLocal, isLocal: true, scanner: scanner, request: request)
+            await self.computeAndStoreSizes(misses: missesExternal, isLocal: false, scanner: scanner, request: request)
         }
     }
     
@@ -2551,9 +2603,11 @@ private class RescanDebouncer {
     private let queue = DispatchQueue(label: "com.shimoko.AppPorts.rescanDebounce")
 
     func schedule(action: @escaping () -> Void) {
-        work?.cancel()
-        let item = DispatchWorkItem { action() }
-        work = item
-        queue.asyncAfter(deadline: .now() + 1.0, execute: item)
+        queue.async {
+            self.work?.cancel()
+            let item = DispatchWorkItem { action() }
+            self.work = item
+            self.queue.asyncAfter(deadline: .now() + 1.0, execute: item)
+        }
     }
 }

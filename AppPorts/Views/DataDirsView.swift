@@ -29,6 +29,7 @@ struct DataDirGroup {
 /// - 本地应用在 ~/Library/ 下的关联数据（需用户选择应用）
 struct DataDirsView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
+    @ObservedObject private var operationState = AppOperationState.shared
 
     // MARK: - 外部依赖
     /// 外部存储路径（共用 ContentView 中的选择）
@@ -54,11 +55,11 @@ struct DataDirsView: View {
     /// 迁移前备份原始签名的回调
     let onBackupSignature: ((AppItem) -> Void)?
     /// 解析应用真实路径（已链接→外部，未链接→本地），不返回假壳路径
-    let resolveRealAppURL: ((AppItem) -> URL)?
+    let resolveRealAppURL: (AppItem) throws -> URL
     /// 对指定 URL 重签名（autoResignEnabled 专用，签真实应用）
-    let onResignAppAtURL: ((URL, Bool) -> Void)?
+    let onResignAppAtURL: (URL) async throws -> Void
     /// 对指定 URL 备份签名（autoResignEnabled 专用）
-    let onBackupSignatureForURL: ((URL) -> Void)?
+    let onBackupSignatureForURL: (URL) async throws -> Void
 
     // MARK: - 内部状态
     @State private var dotFolderItems: [DataDirItem] = []
@@ -163,6 +164,7 @@ struct DataDirsView: View {
                 appDirsContent
             }
         }
+        .disabled(operationState.isBusy)
         .onAppear {
             reloadCurrentTab()
         }
@@ -404,8 +406,14 @@ struct DataDirsView: View {
                     ScrollView {
                         LazyVStack(spacing: 2) {
                             ForEach(sortedApps, id: \.id) { app in
-                                AppListRow(app: app, isSelected: selectedApp?.id == app.id)
-                                    .onTapGesture { selectedApp = app }
+                                Button {
+                                    selectedApp = app
+                                } label: {
+                                    AppListRow(app: app, isSelected: selectedApp?.id == app.id)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(app.displayName)
+                                .accessibilityAddTraits(selectedApp?.id == app.id ? .isSelected : [])
                             }
                         }
                         .padding(.vertical, 6)
@@ -436,7 +444,7 @@ struct DataDirsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
                         if let app = selectedApp {
-                            Text(String(format: "%@ 的数据目录".localized, app.name.replacingOccurrences(of: ".app", with: "")))
+                            Text(String(format: "%@ 的数据目录".localized, app.displayName))
                         } else {
                             Text("请从左侧选择应用".localized)
                         }
@@ -685,7 +693,7 @@ struct DataDirsView: View {
                     .foregroundColor(.mint)
             }
             if existingSymlinks > 0 {
-                Label(String(format: "%lld 个现有软链".localized, Int64(existingSymlinks)), systemImage: "link.badge.questionmark")
+                Label(String(format: "%lld 个现有软链".localized, Int64(existingSymlinks)), systemImage: "questionmark.circle")
                     .foregroundColor(.teal)
             }
             if relinkable > 0 {
@@ -1232,7 +1240,16 @@ struct DataDirsView: View {
         shouldResignAssociatedApp: Bool? = nil,
         associatedApp: AppItem? = nil
     ) {
+        if let runningAppName = runningAssociatedAppName(for: item, associatedApp: associatedApp) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再迁移其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+        guard let operationToken = AppOperationState.shared.begin() else { return }
         progressTitle = String(format: "正在迁移「%@」".localized, item.name)
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = ""
         showProgress = true
         let operationID = AppLogger.shared.makeOperationID(prefix: "view-data-migrate")
         let shouldResign = shouldResignAssociatedApp ?? autoResignEnabled
@@ -1249,50 +1266,58 @@ struct DataDirsView: View {
             ] + appContextFields(for: capturedApp)
         )
 
-        Task {
-            // 解析真实应用路径（外部真实应用或本地真实应用，而非假壳）
-            let realAppURL: URL? = {
-                guard shouldResign, let app = capturedApp else { return nil }
-                return self.resolveRealAppURL?(app) ?? app.displayURL
-            }()
-
-            // 迁移前备份真实应用原始签名
-            if let url = realAppURL {
-                self.onBackupSignatureForURL?(url)
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                AppOperationState.shared.finish(operationToken)
             }
-
             let mover = DataDirMover()
             do {
-                try await mover.migrate(item: item, to: dest) { progress in
-                    await MainActor.run {
-                        self.progressBytes = progress.copiedBytes
-                        self.progressTotalBytes = progress.totalBytes
-                        self.progressFileName = progress.currentFile
-                    }
+                let realAppURL: URL?
+                if shouldResign, let app = capturedApp {
+                    realAppURL = try self.resolveRealAppURL(app)
+                } else {
+                    realAppURL = nil
                 }
+
+                try await DataMigrationWorkflow.run(
+                    signingAppURL: realAppURL,
+                    backupSignature: onBackupSignatureForURL,
+                    migrate: {
+                        try await mover.migrate(item: item, to: dest) { progress in
+                            await MainActor.run {
+                                self.progressBytes = progress.copiedBytes
+                                self.progressTotalBytes = progress.totalBytes
+                                self.progressFileName = progress.currentFile
+                            }
+                        }
+                    },
+                    resignApp: { url in
+                        await MainActor.run {
+                            self.progressTitle = "重签名此应用".localized
+                            self.progressFileName = url.lastPathComponent
+                            self.progressBytes = 0
+                            self.progressTotalBytes = 0
+                        }
+                        try await self.onResignAppAtURL(url)
+                    }
+                )
                 AppLogger.shared.logContext(
                     "数据目录迁移成功",
                     details: [("operation_id", operationID), ("item_name", item.name)]
                 )
                 await MainActor.run {
-                    self.showProgress = false
                     self.reloadCurrentTab()
-
-                    // 数据迁移完成后自动重签名真实应用
-                    if let url = realAppURL {
-                        self.onResignAppAtURL?(url, true)  // 静默重签名，失败不弹窗
-                    }
                 }
             } catch {
                 AppLogger.shared.logError(
-                    "数据目录迁移失败",
+                    error is DataMigrationWorkflow.Failure ? "数据迁移后重签名失败（应用可能无法通过 macOS 签名校验）" : "数据目录迁移失败",
                     error: error,
                     context: [("operation_id", operationID), ("item_name", item.name)],
                     relatedURLs: [("source", item.path)]
                 )
                 await MainActor.run {
-                    self.showProgress = false
-                    self.refreshSelectedApp()
+                    self.reloadCurrentTab()
                     self.errorMessage = error.localizedDescription
                     self.showError = true
                 }
@@ -1389,7 +1414,16 @@ struct DataDirsView: View {
     }
 
     private func performRestore(_ item: DataDirItem) {
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再还原其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+        guard let operationToken = AppOperationState.shared.begin() else { return }
         progressTitle = String(format: "正在还原「%@」".localized, item.name)
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = ""
         showProgress = true
         let operationID = AppLogger.shared.makeOperationID(prefix: "view-data-restore")
         AppLogger.shared.logContext(
@@ -1403,7 +1437,11 @@ struct DataDirsView: View {
             ] + appContextFields()
         )
 
-        Task {
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                AppOperationState.shared.finish(operationToken)
+            }
             let mover = DataDirMover()
             do {
                 try await mover.restore(item: item) { progress in
@@ -1418,7 +1456,6 @@ struct DataDirsView: View {
                     details: [("operation_id", operationID), ("item_name", item.name)]
                 )
                 await MainActor.run {
-                    self.showProgress = false
                     self.reloadCurrentTab()
                 }
             } catch {
@@ -1429,7 +1466,6 @@ struct DataDirsView: View {
                     relatedURLs: [("local", item.path)]
                 )
                 await MainActor.run {
-                    self.showProgress = false
                     self.errorMessage = error.localizedDescription
                     self.showError = true
                 }
@@ -1438,6 +1474,17 @@ struct DataDirsView: View {
     }
 
     private func performManageExistingLink(_ item: DataDirItem, target: URL) {
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再整理其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+        guard let operationToken = AppOperationState.shared.begin() else { return }
+        progressTitle = "整理已链接目录".localized
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = item.name
+        showProgress = true
         let operationID = AppLogger.shared.makeOperationID(prefix: "view-data-manage-link")
         AppLogger.shared.logContext(
             "用户确认接管现有软链",
@@ -1448,7 +1495,11 @@ struct DataDirsView: View {
                 ("target", target.path)
             ] + appContextFields()
         )
-        Task {
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                AppOperationState.shared.finish(operationToken)
+            }
             let mover = DataDirMover()
             let normalizedTarget = normalizedManagementDestination(for: item, currentTarget: target)
             do {
@@ -1476,6 +1527,17 @@ struct DataDirsView: View {
     }
 
     private func performRelinkExternalData(_ item: DataDirItem, target: URL) {
+        if let runningAppName = runningAssociatedAppName(for: item) {
+            errorMessage = String(format: "「%@」正在运行中，请先关闭该应用后再接回其数据目录。".localized, runningAppName)
+            showError = true
+            return
+        }
+        guard let operationToken = AppOperationState.shared.begin() else { return }
+        progressTitle = "接回外部数据".localized
+        progressBytes = 0
+        progressTotalBytes = 0
+        progressFileName = item.name
+        showProgress = true
         let operationID = AppLogger.shared.makeOperationID(prefix: "view-data-relink")
         AppLogger.shared.logContext(
             "用户确认接回外部数据",
@@ -1486,7 +1548,11 @@ struct DataDirsView: View {
                 ("target", target.path)
             ] + appContextFields()
         )
-        Task {
+        Task { @MainActor in
+            defer {
+                showProgress = false
+                AppOperationState.shared.finish(operationToken)
+            }
             let mover = DataDirMover()
             do {
                 try await mover.createLink(localPath: item.path, externalPath: target)
@@ -1571,20 +1637,17 @@ struct DataDirsView: View {
     /// - 工具目录 Tab：尝试从目录路径中匹配正在运行的进程（基于 bundle ID 或路径名）
     ///
     /// - Returns: 正在运行的应用显示名称，未运行则返回 nil
-    private func runningAssociatedAppName(for item: DataDirItem) -> String? {
-        let runningApps = NSWorkspace.shared.runningApplications
+    private func runningAssociatedAppName(for item: DataDirItem, associatedApp: AppItem? = nil) -> String? {
+        let runningApps = NSWorkspace.shared.runningApplications.map {
+            AppRunningState.RunningApplication(bundleURL: $0.bundleURL, bundleIdentifier: $0.bundleIdentifier)
+        }
 
-        // 应用数据 Tab：精确匹配当前选中的应用
-        if selectedTab == .appDirs, let app = selectedApp {
-            let appPath = app.path
-            let isRunning = runningApps.contains { runningApp in
-                return runningApp.bundleURL?.standardizedFileURL == appPath.standardizedFileURL
-                    || runningApp.bundleIdentifier == bundleIdentifier(for: app)
-            }
-            if isRunning {
+        // 已迁移应用的本地路径可能是 Stub，运行进程使用真实外部路径和原始 Bundle ID。
+        if let app = associatedApp ?? (selectedTab == .appDirs ? selectedApp : nil) {
+            if AppRunningState.isRunning(appURL: app.displayURL, applications: runningApps) {
                 AppLogger.shared.logContext(
                     "拒绝操作：关联应用正在运行",
-                    details: [("app_name", app.displayName), ("app_path", appPath.path), ("item_name", item.name)],
+                    details: [("app_name", app.displayName), ("app_path", app.displayURL.path), ("item_name", item.name)],
                     level: "WARN"
                 )
                 return app.displayName
@@ -1598,19 +1661,12 @@ struct DataDirsView: View {
         return nil
     }
 
-    /// 读取应用的 Bundle Identifier
-    private func bundleIdentifier(for app: AppItem) -> String? {
-        let plistURL = app.path.appendingPathComponent("Contents/Info.plist")
-        guard let dict = NSDictionary(contentsOf: plistURL) as? [String: Any] else { return nil }
-        return dict["CFBundleIdentifier"] as? String
-    }
-
     // MARK: - 日志辅助
 
     /// 构建关联应用的背景信息字段，供各操作日志复用
     private func appContextFields(for explicitApp: AppItem? = nil) -> [(String, String?)] {
         guard let app = explicitApp ?? selectedApp else { return [] }
-        let realURL = resolveRealAppURL?(app) ?? app.displayURL
+        let realURL = (try? resolveRealAppURL(app)) ?? app.displayURL
         let bundleID: String? = {
             let plistURL = realURL.appendingPathComponent("Contents/Info.plist")
             guard let data = try? Data(contentsOf: plistURL),
@@ -1667,11 +1723,9 @@ private struct AppListRow: View {
                 .fill(isSelected ? Color.accentColor : .clear)
                 .frame(width: 3, height: 24)
 
-            AppIconView(url: app.path)
-                .frame(width: 32, height: 32)
-                .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+            AppIconView(url: app.displayURL, size: 32)
 
-            Text(app.name.replacingOccurrences(of: ".app", with: ""))
+            Text(app.displayName)
                 .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                 .foregroundColor(isSelected ? .primary : .primary.opacity(0.85))
                 .lineLimit(1)
@@ -1730,7 +1784,7 @@ struct DataDirProgressOverlay: View {
     let currentFile: String
 
     private var progress: Double {
-        totalBytes > 0 ? Double(copiedBytes) / Double(totalBytes) : 0
+        totalBytes > 0 ? min(Double(copiedBytes) / Double(totalBytes), 1) : 0
     }
 
     var body: some View {
@@ -1739,17 +1793,19 @@ struct DataDirProgressOverlay: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
 
-            ProgressView(value: progress)
+            ProgressView(value: totalBytes > 0 ? progress : nil)
                 .progressViewStyle(.linear)
                 .frame(width: 280)
 
             HStack {
                 Text(formatBytes(copiedBytes))
-                Spacer()
-                Text("\(Int(progress * 100))%")
-                    .monospacedDigit()
-                Spacer()
-                Text(formatBytes(totalBytes))
+                if totalBytes > 0 {
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .monospacedDigit()
+                    Spacer()
+                    Text(formatBytes(totalBytes))
+                }
             }
             .font(.system(size: 12))
             .foregroundColor(.secondary)

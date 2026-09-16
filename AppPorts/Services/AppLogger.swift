@@ -7,6 +7,7 @@
 
 import Foundation
 import AppKit
+import Darwin
 import UniformTypeIdentifiers
 
 // MARK: - 应用日志管理器
@@ -56,7 +57,7 @@ final class AppLogger: @unchecked Sendable {
     }
 
     /// 单例实例
-    static let shared = AppLogger()
+    static let shared = AppLogger(userDefaults: .standard)
     
     // MARK: - 私有属性
     
@@ -68,6 +69,11 @@ final class AppLogger: @unchecked Sendable {
 
     /// 串行日志队列，避免多线程写文件交错
     private let writeQueue = DispatchQueue(label: "com.shimoko.AppPorts.logger")
+
+    /// 磁盘查询可能等待设备响应，不占用调用者（尤其是主线程）。
+    private let diagnosticQueue = DispatchQueue(label: "com.shimoko.AppPorts.logger.diagnostics", qos: .utility)
+
+    nonisolated(unsafe) private let userDefaults: UserDefaults
 
     /// 当前启动会话 ID，便于用户粘贴日志后快速关联一次运行
     nonisolated private let sessionID: String
@@ -101,10 +107,10 @@ final class AppLogger: @unchecked Sendable {
     nonisolated var isLoggingEnabled: Bool {
         get {
             // 默认为开启 (true)
-            UserDefaults.standard.object(forKey: logEnabledKey) == nil ? true : UserDefaults.standard.bool(forKey: logEnabledKey)
+            userDefaults.object(forKey: logEnabledKey) == nil ? true : userDefaults.bool(forKey: logEnabledKey)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: logEnabledKey)
+            userDefaults.set(newValue, forKey: logEnabledKey)
             if newValue {
                 log("日志记录已启用".localized)
             } else {
@@ -121,7 +127,7 @@ final class AppLogger: @unchecked Sendable {
     ///
     /// - Note: 如果目录不存在会自动创建
     nonisolated var logFileURL: URL {
-        if let savedPath = UserDefaults.standard.string(forKey: logPathKey) {
+        if let savedPath = userDefaults.string(forKey: logPathKey) {
             return URL(fileURLWithPath: savedPath)
         }
         // 默认位置: 应用支持目录
@@ -143,20 +149,19 @@ final class AppLogger: @unchecked Sendable {
     /// - Note: 默认为 2 MB
     nonisolated var maxLogSize: Int64 {
         get {
-            let saved = UserDefaults.standard.integer(forKey: maxLogSizeKey)
+            let saved = userDefaults.integer(forKey: maxLogSizeKey)
             return saved > 0 ? Int64(saved) : defaultMaxSize
         }
         set {
-            UserDefaults.standard.set(Int(newValue), forKey: maxLogSizeKey)
+            userDefaults.set(Int(newValue), forKey: maxLogSizeKey)
         }
     }
     
     // MARK: - 初始化
     
-    /// 私有初始化（单例模式）
-    ///
-    /// 配置日期格式化器用于日志时间戳
-    nonisolated private init() {
+    /// 应用使用标准设置；独立设置可用于隔离诊断测试。
+    nonisolated init(userDefaults: UserDefaults) {
+        self.userDefaults = userDefaults
         dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         sessionID = String(UUID().uuidString.prefix(8))
@@ -193,7 +198,7 @@ final class AppLogger: @unchecked Sendable {
     
     /// 设置日志文件路径
     nonisolated func setLogPath(_ url: URL) {
-        UserDefaults.standard.set(url.path, forKey: logPathKey)
+        userDefaults.set(url.path, forKey: logPathKey)
         logContext("日志路径已更改", details: [("path", url.path)])
     }
     
@@ -211,8 +216,17 @@ final class AppLogger: @unchecked Sendable {
     
     /// 清空日志
     nonisolated func clearLog() {
-        try? fileManager.removeItem(at: logFileURL)
-        log("日志已清空".localized)
+        writeQueue.sync {
+            let url = logFileURL
+            do {
+                if fileManager.fileExists(atPath: url.path) {
+                    try fileManager.removeItem(at: url)
+                }
+                writeLogMessages(["日志已清空".localized], level: "INFO")
+            } catch {
+                reportLogWriteFailure(error)
+            }
+        }
     }
 
     @MainActor
@@ -256,25 +270,29 @@ final class AppLogger: @unchecked Sendable {
     }
 
     nonisolated func log(_ message: String, level: String = "INFO") {
-        let logLine = buildLogLine(message: message, level: level)
-
         writeQueue.sync {
-            print(logLine, terminator: "")
-
-            guard isLoggingEnabled else { return }
-
-            rotateLogIfNeeded()
-            writeLogLine(logLine)
+            writeLogMessages([message], level: level)
         }
     }
 
     nonisolated func logContext(_ title: String, details: [(String, String?)], level: String = "INFO") {
-        log(title, level: level)
-
+        var messages = [title]
         for (key, value) in details.sorted(by: { $0.0 < $1.0 }) {
             guard let value, !value.isEmpty else { continue }
-            log("  \(key): \(value)", level: level)
+            messages.append("  \(key): \(value)")
         }
+        writeQueue.sync {
+            writeLogMessages(messages, level: level)
+        }
+    }
+
+    /// 仅在 writeQueue 内调用，使轮转和整组上下文写入保持在同一事务中。
+    nonisolated private func writeLogMessages(_ messages: [String], level: String) {
+        let logLines = messages.map { buildLogLine(message: $0, level: level) }.joined()
+        print(logLines, terminator: "")
+        guard isLoggingEnabled else { return }
+        rotateLogIfNeeded()
+        writeLogLine(logLines)
     }
 
     nonisolated func logPathState(_ label: String, url: URL, level: String = "TRACE") {
@@ -405,21 +423,14 @@ final class AppLogger: @unchecked Sendable {
     
     /// 记录外接硬盘信息
     nonisolated func logExternalDriveInfo(at url: URL) {
-        log("========== 外接硬盘信息 ==========".localized, level: "DISK")
-        
-        // 获取卷信息
-        let volumeInfo = getVolumeInfo(at: url)
-        for (key, value) in volumeInfo {
-            log("\(key): \(value)", level: "DISK")
+        diagnosticQueue.async { [self] in
+            let details = getVolumeInfo(at: url) + getDiskInterfaceInfo(at: url)
+            logContext(
+                "========== 外接硬盘信息 ==========".localized,
+                details: [("path", url.path)] + details.map { ($0.0, Optional($0.1)) },
+                level: "DISK"
+            )
         }
-        
-        // 获取磁盘接口和速率
-        let diskInterface = getDiskInterfaceInfo(at: url)
-        for (key, value) in diskInterface {
-            log("\(key): \(value)", level: "DISK")
-        }
-        
-        log("====================================", level: "DISK")
     }
     
     /// 记录迁移性能信息
@@ -581,22 +592,14 @@ final class AppLogger: @unchecked Sendable {
         var info: [(String, String)] = []
         
         // 1. 使用 diskutil info -plist 获取基础信息
-        let task = Process()
-        task.launchPath = "/usr/sbin/diskutil"
-        task.arguments = ["info", "-plist", url.path]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
-        
         var diskName = ""
         var physicalStore = ""
         
         do {
-            try task.run()
-            task.waitUntilExit()
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let data = try Self.runDiagnosticCommand(
+                executableURL: URL(fileURLWithPath: "/usr/sbin/diskutil"),
+                arguments: ["info", "-plist", url.path]
+            )
             if let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
                 
                 // 提取基本信息
@@ -688,22 +691,99 @@ final class AppLogger: @unchecked Sendable {
     }
     
     nonisolated private func runSystemProfiler(dataType: String) -> [String: Any]? {
-        let task = Process()
-        task.launchPath = "/usr/sbin/system_profiler"
-        task.arguments = [dataType, "-json"]
-        
+        guard let data = try? Self.runDiagnosticCommand(
+            executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
+            arguments: [dataType, "-json"]
+        ) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    enum DiagnosticCommandError: Error, Equatable {
+        case timedOut
+        case outputLimitExceeded
+        case unsuccessfulExit(Int32)
+    }
+
+    /// 持续排空 stdout；即使子进程不退出或不关闭管道，也会在期限内返回。
+    nonisolated static func runDiagnosticCommand(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval = 5,
+        maximumOutputBytes: Int = 16 * 1024 * 1024
+    ) throws -> Data {
+        guard timeout.isFinite, timeout > 0 else { throw DiagnosticCommandError.timedOut }
+        guard maximumOutputBytes >= 0 else { throw DiagnosticCommandError.outputLimitExceeded }
+
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
         let pipe = Pipe()
-         task.standardOutput = pipe
-         task.standardError = FileHandle.nullDevice // Suppress stderr
-         
-         do {
-             try task.run()
-             task.waitUntilExit()
-             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-             return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-         } catch {
-             return nil
-         }
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        let terminated = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in terminated.signal() }
+
+        defer {
+            if process.isRunning {
+                process.terminate()
+                if terminated.wait(timeout: .now() + .milliseconds(200)) == .timedOut,
+                   process.isRunning {
+                    // 某些设备工具可能忽略 SIGTERM；只终止本次启动的进程。
+                    _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                    _ = terminated.wait(timeout: .now() + .milliseconds(200))
+                }
+            }
+            try? pipe.fileHandleForReading.close()
+            try? pipe.fileHandleForWriting.close()
+        }
+
+        let descriptor = pipe.fileHandleForReading.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+
+        let deadline = DispatchTime.now() + timeout
+        try process.run()
+        try? pipe.fileHandleForWriting.close()
+
+        var output = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline.uptimeNanoseconds else { throw DiagnosticCommandError.timedOut }
+
+            let count = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+            }
+            if count > 0 {
+                guard output.count <= maximumOutputBytes - count else {
+                    throw DiagnosticCommandError.outputLimitExceeded
+                }
+                output.append(contentsOf: buffer.prefix(count))
+                continue
+            }
+            if count == 0 { break }
+
+            let readError = errno
+            if readError == EINTR { continue }
+            guard readError == EAGAIN else {
+                throw POSIXError(POSIXErrorCode(rawValue: readError) ?? .EIO)
+            }
+
+            // 非阻塞读取保证 read 不会越过期限；poll 避免无输出时忙等。
+            var pollDescriptor = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+            let remainingMilliseconds = (deadline.uptimeNanoseconds - now + 999_999) / 1_000_000
+            if poll(&pollDescriptor, 1, Int32(min(remainingMilliseconds, 50))) < 0, errno != EINTR {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        }
+
+        guard terminated.wait(timeout: deadline) == .success else { throw DiagnosticCommandError.timedOut }
+        guard process.terminationStatus == 0 else {
+            throw DiagnosticCommandError.unsuccessfulExit(process.terminationStatus)
+        }
+        return output
     }
     
     // 通用递归搜索
@@ -790,7 +870,7 @@ final class AppLogger: @unchecked Sendable {
     }
 
     nonisolated private func selectedAppLanguageCode() -> String {
-        UserDefaults.standard.string(forKey: "selectedLanguage") ?? "system"
+        userDefaults.string(forKey: "selectedLanguage") ?? "system"
     }
 
     nonisolated private func selectedAppLocaleIdentifier() -> String {
@@ -838,9 +918,13 @@ final class AppLogger: @unchecked Sendable {
         let packageURL = rootURL.appendingPathComponent("AppPorts-Diagnostic-\(formatter.string(from: Date()))", isDirectory: true)
         try fileManager.createDirectory(at: packageURL, withIntermediateDirectories: true)
 
-        let currentLogContent = (try? String(contentsOf: logFileURL, encoding: .utf8)) ?? "日志文件不存在或暂时不可读取".localized
+        let (currentLogContent, operationSummaries) = writeQueue.sync {
+            (
+                (try? String(contentsOf: logFileURL, encoding: .utf8)) ?? "日志文件不存在或暂时不可读取".localized,
+                recentOperationSummaries
+            )
+        }
         let redactedLogContent = redactedDiagnosticText(from: currentLogContent)
-        let operationSummaries = recentOperationSummariesSnapshot()
         let recentFailures = operationSummaries.filter { ["failed", "rolled_back", "success_with_warning"].contains($0.result) }
 
         let metadata: [String: String] = [
@@ -864,11 +948,11 @@ final class AppLogger: @unchecked Sendable {
         try writeJSON(operationSummaries, to: packageURL.appendingPathComponent("recent-operations.json"))
         try writeJSON(recentFailures.suffix(20), to: packageURL.appendingPathComponent("recent-failures.json"))
 
-        let summaryText = buildDiagnosticSummaryText(
+        let summaryText = redactedDiagnosticText(from: buildDiagnosticSummaryText(
             metadata: metadata,
             lastFailure: recentFailures.last,
             operationCount: operationSummaries.count
-        )
+        ))
         try summaryText.write(
             to: packageURL.appendingPathComponent("diagnostic-summary.txt"),
             atomically: true,
@@ -888,12 +972,17 @@ final class AppLogger: @unchecked Sendable {
         let homeDirectory = NSHomeDirectory()
 
         if !homeDirectory.isEmpty {
-            sanitized = sanitized.replacingOccurrences(of: homeDirectory, with: "~")
+            sanitized = sanitized.replacingOccurrences(of: homeDirectory + "/", with: "~/")
+            if sanitized == homeDirectory { sanitized = "~" }
         }
 
+        // 路径组件允许空格；不能在第一个空格处结束，否则仍会泄露卷名称后半段。
+        // 先对字符串值脱敏，再编码 JSON，避免破坏 JSON 转义和类型。
+        let volumeLabels = Self.volumeNameLabels.sorted().map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|")
         let redactionRules: [(pattern: String, replacement: String)] = [
-            (#"/Users/[^/\s]+"#, "/Users/<redacted-user>"),
-            (#"/Volumes/[^/\s]+"#, "/Volumes/<redacted-volume>")
+            (#"/Users/[^/\r\n]+"#, "/Users/<redacted-user>"),
+            (#"/Volumes/[^/\r\n]+"#, "/Volumes/<redacted-volume>"),
+            (#"(?m)^((?:\[[^\]\r\n]*\][ \t]*)*[ \t]*(?:"# + volumeLabels + #"):[ \t]*)[^\r\n]+"#, "$1<redacted-volume>")
         ]
 
         for rule in redactionRules {
@@ -904,6 +993,18 @@ final class AppLogger: @unchecked Sendable {
 
         return sanitized
     }
+
+    /// 包含旧日志可能使用的语言，切换应用语言后导出仍能识别独立卷名称字段。
+    nonisolated private static let volumeNameLabels: Set<String> = {
+        var labels: Set<String> = ["volume", "volume_name", "卷名称", "Volume Name"]
+        for localization in Bundle.main.localizations {
+            if let path = Bundle.main.path(forResource: localization, ofType: "lproj"),
+               let bundle = Bundle(path: path) {
+                labels.insert(bundle.localizedString(forKey: "卷名称", value: nil, table: nil))
+            }
+        }
+        return labels
+    }()
 
     nonisolated func recentOperationSummariesSnapshot() -> [OperationSummaryRecord] {
         writeQueue.sync { recentOperationSummaries }
@@ -924,16 +1025,28 @@ final class AppLogger: @unchecked Sendable {
         guard let data = logLine.data(using: .utf8) else { return }
 
         let url = logFileURL
-        if fileManager.fileExists(atPath: url.path) {
-            if let fileHandle = try? FileHandle(forWritingTo: url) {
-                fileHandle.seekToEndOfFile()
-                fileHandle.write(data)
-                try? fileHandle.close()
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                let fileHandle = try FileHandle(forWritingTo: url)
+                defer { try? fileHandle.close() }
+                try Self.appendLogData(data, to: fileHandle)
+            } else {
+                try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: url)
             }
-        } else {
-            try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: url)
+        } catch {
+            reportLogWriteFailure(error)
         }
+    }
+
+    nonisolated static func appendLogData(_ data: Data, to fileHandle: FileHandle) throws {
+        try fileHandle.seekToEnd()
+        try fileHandle.write(contentsOf: data)
+    }
+
+    nonisolated private func reportLogWriteFailure(_ error: Error) {
+        // 不再次调用 log，以免日志磁盘写满或被卸载时递归失败。
+        print(buildLogLine(message: "日志文件写入失败: \(error)", level: "WARN"), terminator: "")
     }
 
     nonisolated private func pathStateDetails(for url: URL) -> [(String, String?)] {
@@ -1075,9 +1188,25 @@ final class AppLogger: @unchecked Sendable {
 
     nonisolated private func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(value)
+        let jsonValue = try JSONSerialization.jsonObject(with: encoder.encode(value))
+        let data = try JSONSerialization.data(
+            withJSONObject: redactedDiagnosticValue(jsonValue),
+            options: [.prettyPrinted, .sortedKeys]
+        )
         try data.write(to: url, options: .atomic)
+    }
+
+    nonisolated private func redactedDiagnosticValue(_ value: Any) -> Any {
+        if let text = value as? String { return redactedDiagnosticText(from: text) }
+        if let values = value as? [Any] { return values.map(redactedDiagnosticValue) }
+        if let fields = value as? [String: Any] {
+            return fields.reduce(into: [String: Any]()) { result, field in
+                result[field.key] = Self.volumeNameLabels.contains(field.key) && field.value is String
+                    ? "<redacted-volume>"
+                    : redactedDiagnosticValue(field.value)
+            }
+        }
+        return value
     }
 
     nonisolated private func buildDiagnosticSummaryText(

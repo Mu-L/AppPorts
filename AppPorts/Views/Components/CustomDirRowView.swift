@@ -56,18 +56,21 @@ struct CustomDirRowView: View {
                     }
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(entry.name) + Text(", ") + Text(CustomDirStatus.localized(entry.status)))
 
             Spacer()
 
             if showsDeleteLinkButton {
                 Button(action: { onDeleteLink(entry) }) {
-                    Image(systemName: "link.badge.plus")
+                    Image(systemName: "trash")
                         .foregroundColor(.red)
                 }
                 .buttonStyle(.plain)
                 .padding(6)
                 .background(Color.red.opacity(0.1))
                 .clipShape(Circle())
+                .accessibilityLabel("断开此链接并保留外部文件夹".localized)
                 .help("断开此链接并保留外部文件夹".localized)
             }
         }
@@ -83,8 +86,7 @@ struct CustomDirRowView: View {
                 isHovered = hovering
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(entry.name) + Text(", ") + Text(CustomDirStatus.localized(entry.status)))
+        .accessibilityElement(children: .contain)
         .contextMenu {
             Button("在 Finder 中显示".localized) {
                 NSWorkspace.shared.activateFileViewerSelecting([entry.url])

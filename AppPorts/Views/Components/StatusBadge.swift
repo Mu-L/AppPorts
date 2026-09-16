@@ -85,7 +85,7 @@ struct StatusBadge: View {
         } else if app.status == AppStatus.partialLinked {
             result.append(BadgeConfig(text: AppStatus.partialLinked, icon: "link.badge.plus", color: .yellow, isTappable: false))
         } else if app.status == AppStatus.orphanedLink {
-            result.append(BadgeConfig(text: AppStatus.orphanedLink, icon: "link.badge.exclamationmark", color: .red, isTappable: false))
+            result.append(BadgeConfig(text: AppStatus.orphanedLink, icon: "exclamationmark.triangle", color: .red, isTappable: false))
         } else if app.status == AppStatus.unlinked {
             result.append(BadgeConfig(text: AppStatus.unlinked, icon: "externaldrive.badge.xmark", color: .orange, isTappable: false))
         } else if app.status == AppStatus.external {

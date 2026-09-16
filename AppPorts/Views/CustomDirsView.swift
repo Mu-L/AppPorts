@@ -8,12 +8,16 @@
 import SwiftUI
 import AppKit
 
+@MainActor
 struct CustomDirsView: View {
+    @ObservedObject private var operationState = AppOperationState.shared
     @State private var configs: [CustomDirConfig] = CustomDirConfigStore.load()
     @State private var pairs: [CustomDirPair] = []
     @State private var selectedLocalIDs: Set<String> = []
     @State private var selectedExternalIDs: Set<String> = []
     @State private var isScanning = false
+    @State private var refreshRequestID: UUID?
+    @State private var isVisible = false
     @State private var showAddSheet = false
     @State private var showError = false
     @State private var errorMessage = ""
@@ -61,6 +65,7 @@ struct CustomDirsView: View {
                 externalPane
                     .frame(minWidth: 320, maxWidth: .infinity)
             }
+            .disabled(operationState.isBusy)
 
             if showProgress {
                 Color.black.opacity(0.2)
@@ -75,7 +80,12 @@ struct CustomDirsView: View {
             }
         }
         .onAppear {
+            isVisible = true
             refresh()
+        }
+        .onDisappear {
+            isVisible = false
+            invalidateRefresh()
         }
         .sheet(isPresented: $showAddSheet) {
             AddCustomDirSheet(existingConfigs: configs) { config in
@@ -238,11 +248,15 @@ struct CustomDirsView: View {
     }
 
     private func addAndMigrateConfig(_ config: CustomDirConfig) -> String? {
+        guard let operationID = beginOperation() else { return "操作失败".localized }
         if let errorMessage = addConfig(config) {
+            operationState.finish(operationID)
+            refresh()
             return errorMessage
         }
 
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(operationID) }
             await runBatch(
                 title: "正在迁移目录".localized,
                 pairs: [CustomDirPair.pendingMigration(for: config)],
@@ -253,7 +267,9 @@ struct CustomDirsView: View {
     }
 
     private func removeConfig(_ config: CustomDirConfig) {
+        guard !operationState.isBusy else { return }
         configs.removeAll { $0.id == config.id }
+        pairs.removeAll { $0.config.id == config.id }
         selectedLocalIDs.remove("\(config.id.uuidString)-\(CustomDirEntryKind.local.rawValue)")
         selectedExternalIDs.remove("\(config.id.uuidString)-\(CustomDirEntryKind.external.rawValue)")
         saveConfigs()
@@ -265,24 +281,42 @@ struct CustomDirsView: View {
     }
 
     private func refresh() {
+        guard isVisible else { return }
+        let requestID = UUID()
+        let requestedConfigs = configs
+        refreshRequestID = requestID
         isScanning = true
-        Task {
+        Task { @MainActor in
             let scanner = CustomDirScanner()
-            let result = await scanner.scan(configs: configs, calculateSizes: true)
-            await MainActor.run {
-                pairs = result
-                selectedLocalIDs.formIntersection(Set(result.map(\.local.id)))
-                selectedExternalIDs.formIntersection(Set(result.map(\.external.id)))
-                isScanning = false
-            }
+            let result = await scanner.scan(configs: requestedConfigs, calculateSizes: true)
+            guard isVisible, refreshRequestID == requestID, configs == requestedConfigs else { return }
+            pairs = result
+            selectedLocalIDs.formIntersection(Set(result.map(\.local.id)))
+            selectedExternalIDs.formIntersection(Set(result.map(\.external.id)))
+            isScanning = false
+            refreshRequestID = nil
         }
     }
 
+    private func invalidateRefresh() {
+        refreshRequestID = nil
+        isScanning = false
+    }
+
+    private func beginOperation() -> UUID? {
+        guard let operationID = operationState.begin() else { return nil }
+        invalidateRefresh()
+        return operationID
+    }
+
     private func migrateSelected() {
-        Task {
+        let selectedPairs = migratablePairs
+        guard !selectedPairs.isEmpty, let operationID = beginOperation() else { return }
+        Task { @MainActor in
+            defer { operationState.finish(operationID) }
             await runBatch(
                 title: "正在迁移目录".localized,
-                pairs: migratablePairs,
+                pairs: selectedPairs,
                 operation: migratePair
             )
         }
@@ -298,10 +332,13 @@ struct CustomDirsView: View {
     }
 
     private func relinkSelected() {
-        Task {
+        let selectedPairs = relinkablePairs
+        guard !selectedPairs.isEmpty, let operationID = beginOperation() else { return }
+        Task { @MainActor in
+            defer { operationState.finish(operationID) }
             await runBatch(
                 title: "正在接回目录".localized,
-                pairs: relinkablePairs,
+                pairs: selectedPairs,
                 operation: { pair, _ in
                     try await DataDirMover().createLink(
                         localPath: pair.config.localURL,
@@ -313,10 +350,13 @@ struct CustomDirsView: View {
     }
 
     private func restoreSelected() {
-        Task {
+        let selectedPairs = restorablePairs
+        guard !selectedPairs.isEmpty, let operationID = beginOperation() else { return }
+        Task { @MainActor in
+            defer { operationState.finish(operationID) }
             await runBatch(
                 title: "正在还原目录".localized,
-                pairs: restorablePairs,
+                pairs: selectedPairs,
                 operation: { pair, progressHandler in
                     let item = pair.local.dataDirItem
                     try await DataDirMover().restore(item: item, progressHandler: progressHandler)
@@ -326,7 +366,7 @@ struct CustomDirsView: View {
     }
 
     private func deleteLocalLink(_ entry: CustomDirEntry) {
-        guard entry.kind == .local else { return }
+        guard entry.kind == .local, let operationID = beginOperation() else { return }
 
         AppLogger.shared.logContext(
             "用户请求断开目录迁移链接",
@@ -338,7 +378,8 @@ struct CustomDirsView: View {
             ]
         )
 
-        Task {
+        Task { @MainActor in
+            defer { operationState.finish(operationID) }
             do {
                 try await DataDirMover().deleteLink(localPath: entry.url)
                 await MainActor.run {
@@ -358,7 +399,7 @@ struct CustomDirsView: View {
     private func runBatch(
         title: String,
         pairs selectedPairs: [CustomDirPair],
-        operation: @escaping (CustomDirPair, FileCopier.ProgressHandler?) async throws -> Void
+        operation: @escaping @MainActor (CustomDirPair, FileCopier.ProgressHandler?) async throws -> Void
     ) async {
         guard !selectedPairs.isEmpty else { return }
 
@@ -435,10 +476,12 @@ private enum CustomDirConfigStore {
     }
 }
 
+@MainActor
 private struct AddCustomDirSheet: View {
     let existingConfigs: [CustomDirConfig]
     let onMigrate: (CustomDirConfig) -> String?
 
+    @ObservedObject private var operationState = AppOperationState.shared
     @Environment(\.dismiss) private var dismiss
     @State private var localURL: URL?
     @State private var externalBaseURL: URL?
@@ -509,7 +552,7 @@ private struct AddCustomDirSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
-                .disabled(localURL == nil || externalBaseURL == nil)
+                .disabled(operationState.isBusy || localURL == nil || externalBaseURL == nil)
             }
         }
         .padding(24)
@@ -652,6 +695,7 @@ private struct AddCustomDirSheet: View {
     }
 
     private func add() {
+        guard !operationState.isBusy else { return }
         guard let localURL, let externalBaseURL else {
             errorMessage = "请选择本地目录和外部目标文件夹".localized
             return

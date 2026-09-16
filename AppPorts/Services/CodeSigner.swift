@@ -12,6 +12,7 @@ actor CodeSigner {
         case backupFailed(String)
         case restoreFailed(String)
         case noBackupFound
+        case applicationUnavailable(URL)
 
         var errorDescription: String? {
             switch self {
@@ -23,134 +24,135 @@ actor CodeSigner {
                 return String(format: "恢复签名失败: %@".localized, msg)
             case .noBackupFound:
                 return "未找到原始签名备份".localized
+            case .applicationUnavailable(let url):
+                return String(format: "无法找到真实应用，无法重签名：%@".localized, url.path)
             }
         }
     }
 
     private static let backupDirectoryName = "signature-backups"
 
-    private static var backupDirectoryURL: URL {
+    private static var defaultBackupDirectoryURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("AppPorts/\(backupDirectoryName)")
     }
 
     private let fileManager = FileManager.default
+    private let backupDirectoryURL: URL
+    private let allowAdministratorPrompt: Bool
+
+    init(backupDirectoryURL: URL? = nil, allowAdministratorPrompt: Bool = true) {
+        self.backupDirectoryURL = backupDirectoryURL ?? Self.defaultBackupDirectoryURL
+        self.allowAdministratorPrompt = allowAdministratorPrompt
+    }
 
     static func ownershipRepairAppleScript(username: String, appPath: String) -> String {
         """
         set targetPath to \(AppMigrationService.appleScriptStringLiteral(appPath))
         set userName to \(AppMigrationService.appleScriptStringLiteral(username))
-        do shell script "/usr/sbin/chown -R " & quoted form of userName & " " & quoted form of targetPath with administrator privileges
+        do shell script "/usr/sbin/chown -R -P " & quoted form of userName & " " & quoted form of targetPath with administrator privileges
         """
     }
 
     // MARK: - Public API
 
-    /// Ad-hoc 重签名
-    ///
-    /// 临时解锁（如需）、签名、再重新锁定。
-    /// 如果 app 已迁移（Contents 为符号链接），会临时替换为真实目录副本以通过 codesign 检查。
-    /// 仅备份原始签名身份（不执行签名），用于迁移前预备份
-    func backupOriginalSignature(appURL: URL, bundleIdentifier: String) throws {
-        try ensureBackupDirectory()
-        try saveOriginalSignature(appURL: appURL, bundleIdentifier: bundleIdentifier)
+    /// 解析真实应用包，不依赖可能已经过期的扫描状态，也不在目标缺失时退回签名本地入口。
+    static func resolveAppURL(at appURL: URL) throws -> URL {
+        let fileManager = FileManager.default
+        var candidate = appURL.standardizedFileURL
+        var visited = Set<String>()
+
+        while visited.insert(candidate.path).inserted {
+            candidate = candidate.resolvingSymlinksInPath().standardizedFileURL
+            var isDirectory: ObjCBool = false
+            guard candidate.pathExtension.lowercased() == "app",
+                  fileManager.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue else {
+                throw SigningError.applicationUnavailable(candidate)
+            }
+
+            let pathFile = candidate.appendingPathComponent("Contents/Resources/real_app_path.txt")
+            if (try? fileManager.attributesOfItem(atPath: pathFile.path)) != nil {
+                guard let path = try? String(contentsOf: pathFile, encoding: .utf8)
+                    .trimmingCharacters(in: .whitespacesAndNewlines), path.hasPrefix("/") else {
+                    throw SigningError.applicationUnavailable(candidate)
+                }
+                candidate = URL(fileURLWithPath: path).standardizedFileURL
+                continue
+            }
+
+            // 兼容旧 bash Stub；只解析字面量，绝不执行脚本。
+            let launcher = candidate.appendingPathComponent("Contents/MacOS/launcher")
+            if let script = try? String(contentsOf: launcher, encoding: .utf8),
+               let assignment = script.components(separatedBy: .newlines)
+                .map({ $0.trimmingCharacters(in: .whitespaces) })
+                .first(where: { $0.hasPrefix("REAL_APP=") }) {
+                guard assignment.hasPrefix("REAL_APP='"), assignment.hasSuffix("'") else {
+                    throw SigningError.applicationUnavailable(candidate)
+                }
+                let path = String(assignment.dropFirst("REAL_APP='".count).dropLast())
+                    .replacingOccurrences(of: "'\\''", with: "'")
+                guard path.hasPrefix("/") else {
+                    throw SigningError.applicationUnavailable(candidate)
+                }
+                candidate = URL(fileURLWithPath: path).standardizedFileURL
+                continue
+            }
+
+            // 旧 Deep Contents Wrapper 必须直接签外部包，不能签完临时 Contents 副本后丢弃。
+            let contents = candidate.appendingPathComponent("Contents")
+            if let target = try? fileManager.destinationOfSymbolicLink(atPath: contents.path) {
+                candidate = URL(fileURLWithPath: target, relativeTo: candidate)
+                    .standardizedFileURL.deletingLastPathComponent()
+                continue
+            }
+
+            if bundleIdentifier(at: candidate)?.hasSuffix(".appports.stub") == true {
+                throw SigningError.applicationUnavailable(candidate)
+            }
+            return candidate
+        }
+
+        throw SigningError.applicationUnavailable(candidate)
     }
 
+    static func bundleIdentifier(at appURL: URL) -> String? {
+        let plistURL = appURL.appendingPathComponent("Contents/Info.plist")
+        guard let data = try? Data(contentsOf: plistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
+            return nil
+        }
+        return plist["CFBundleIdentifier"] as? String
+    }
+
+    /// 仅备份原始签名身份（不执行签名），用于迁移前预备份
+    func backupOriginalSignature(appURL: URL, bundleIdentifier: String) throws {
+        let appURL = try Self.resolveAppURL(at: appURL)
+        try ensureBackupDirectory()
+        try saveOriginalSignature(appURL: appURL, bundleIdentifier: Self.bundleIdentifier(at: appURL) ?? bundleIdentifier)
+    }
+
+    /// 临时解锁真实应用及其子项，完成深度重签和校验后恢复原有锁定状态。
     func sign(appURL: URL, bundleIdentifier: String?) async throws {
+        let appURL = try Self.resolveAppURL(at: appURL)
         try ensureBackupDirectory()
 
-        if let bundleID = bundleIdentifier {
+        if let bundleID = Self.bundleIdentifier(at: appURL) ?? bundleIdentifier {
             try saveOriginalSignature(appURL: appURL, bundleIdentifier: bundleID)
         }
 
-        let wasLocked = unlockIfImmutable(at: appURL)
-        defer {
-            if wasLocked {
-                lockItem(at: appURL)
-            }
-        }
-
-        // 检查 app bundle 是否可写（root 安装 / MAS 应用无法重签名）
-        if !isBundleWritable(at: appURL) {
-            AppLogger.shared.logContext(
-                "应用由 root 安装，尝试请求管理员权限修复",
-                details: [("path", appURL.path)],
-                level: "WARN"
-            )
-            try elevateAndFixOwnership(at: appURL)
-            // 修复后再次检查
-            if !isBundleWritable(at: appURL) {
-                // MAS 应用受 SIP 保护，即使 sudo chown 也无法修改
-                if isMASApp(at: appURL) {
-                    AppLogger.shared.logContext(
-                        "MAS 应用受 SIP 保护，无法重签名，跳过",
-                        details: [("path", appURL.path)],
-                        level: "WARN"
-                    )
-                    return
-                }
-                throw SigningError.codesignFailed(
-                    "权限修复失败，无法重签名。请手动执行: sudo chown -R $(whoami) \"\(appURL.path)\""
-                )
-            }
-        }
-
-        // 检查 Contents 是否为符号链接（已迁移的 Deep Contents Wrapper app）
-        let contentsURL = appURL.appendingPathComponent("Contents")
-        var symlinkTarget: URL? = nil
-        if let attrs = try? fileManager.attributesOfItem(atPath: contentsURL.path),
-           let fileType = attrs[.type] as? FileAttributeType,
-           fileType == .typeSymbolicLink,
-           let target = try? fileManager.destinationOfSymbolicLink(atPath: contentsURL.path) {
-            symlinkTarget = URL(fileURLWithPath: target)
-        }
-
-        if let realContents = symlinkTarget {
-            // 临时将 Contents 符号链接替换为真实目录副本，否则 codesign 会报
-            // "unsealed contents present in the bundle root"
-            try fileManager.removeItem(at: contentsURL)
-            try fileManager.copyItem(at: realContents, to: contentsURL)
-            // 对替换后的 Contents 也剥离扩展属性
-            stripExtendedAttributes(at: contentsURL)
-        }
-
-        defer {
-            // 恢复符号链接
-            if let realContents = symlinkTarget {
-                try? fileManager.removeItem(at: contentsURL)
-                try? fileManager.createSymbolicLink(at: contentsURL, withDestinationURL: realContents)
-            }
-        }
-
-        // 清理扩展属性和杂散文件（必须在确认可签名后执行，避免剥离签名后无法重签导致应用变未签名）
-        stripExtendedAttributes(at: appURL)
-        cleanBundleRoot(at: appURL)
-
-        let deepArgs = ["--force", "--deep", "--sign", "-", appURL.path]
-        let shallowArgs = ["--force", "--sign", "-", appURL.path]
-
-        do {
-            try runCodesign(arguments: deepArgs)
-        } catch {
-            let errorMsg = (error as? SigningError)?.errorDescription ?? error.localizedDescription
-            // 权限错误或 detritus 错误 → 回退到不加 --deep 的表层签名
-            if errorMsg.contains("Permission denied")
-                || errorMsg.contains("detritus")
-                || errorMsg.contains("resource fork") {
-                AppLogger.shared.logContext(
-                    "--deep 签名失败，回退到表层签名",
-                    details: [("path", appURL.path), ("error", errorMsg)],
-                    level: "WARN"
-                )
-                try runCodesign(arguments: shallowArgs)
-            } else {
-                throw error
+        try withUnlockedBundle(at: appURL) { items in
+            try withOwnershipRepair(at: appURL) {
+                try stripSigningDetritus(from: items)
+                cleanBundleRoot(at: appURL)
+                try runCodesign(arguments: ["--force", "--deep", "--sign", "-", appURL.path])
+                try runCodesign(arguments: ["--verify", "--deep", "--strict", appURL.path], retries: 0)
             }
         }
 
         AppLogger.shared.logContext(
             "Ad-hoc 重签名完成",
-            details: [("path", appURL.path), ("symlink_resolved", symlinkTarget != nil ? "true" : "false")]
+            details: [("path", appURL.path)]
         )
     }
 
@@ -222,100 +224,35 @@ actor CodeSigner {
     ///
     /// 读取备份 plist，用原始签名身份重新签名。
     func restoreSignature(appURL: URL, bundleIdentifier: String) async throws {
+        let appURL = try Self.resolveAppURL(at: appURL)
+        let bundleIdentifier = Self.bundleIdentifier(at: appURL) ?? bundleIdentifier
         guard let backup = loadBackup(bundleIdentifier: bundleIdentifier) else {
             throw SigningError.noBackupFound
         }
 
-        let wasLocked = unlockIfImmutable(at: appURL)
-        defer {
-            if wasLocked {
-                lockItem(at: appURL)
-            }
-        }
-
-        // 检查 Contents 是否为符号链接（已迁移的 app）
-        let contentsURL = appURL.appendingPathComponent("Contents")
-        var symlinkTarget: URL? = nil
-        if let attrs = try? fileManager.attributesOfItem(atPath: contentsURL.path),
-           let fileType = attrs[.type] as? FileAttributeType,
-           fileType == .typeSymbolicLink,
-           let target = try? fileManager.destinationOfSymbolicLink(atPath: contentsURL.path) {
-            symlinkTarget = URL(fileURLWithPath: target)
-        }
-
-        if let realContents = symlinkTarget {
-            try fileManager.removeItem(at: contentsURL)
-            try fileManager.copyItem(at: realContents, to: contentsURL)
-            stripExtendedAttributes(at: contentsURL)
-        }
-
-        defer {
-            if let realContents = symlinkTarget {
-                try? fileManager.removeItem(at: contentsURL)
-                try? fileManager.createSymbolicLink(at: contentsURL, withDestinationURL: realContents)
-            }
-        }
-
-        // 检查 app bundle 可写性（root 安装的应用需要修复权限）
-        if !isBundleWritable(at: appURL) {
-            AppLogger.shared.logContext(
-                "恢复签名前检测到 root 安装，尝试修复权限",
-                details: [("path", appURL.path)],
-                level: "WARN"
-            )
-            try elevateAndFixOwnership(at: appURL)
-            if !isBundleWritable(at: appURL) {
-                if isMASApp(at: appURL) {
-                    AppLogger.shared.logContext(
-                        "MAS 应用受 SIP 保护，无法恢复签名，跳过",
-                        details: [("path", appURL.path)],
-                        level: "WARN"
-                    )
+        let identity = backup.signingIdentity
+        try withUnlockedBundle(at: appURL) { items in
+            try withOwnershipRepair(at: appURL) {
+                try stripSigningDetritus(from: items)
+                cleanBundleRoot(at: appURL)
+                if identity.isEmpty || identity == "ad-hoc" {
+                    try runCodesign(arguments: ["--remove-signature", appURL.path])
                     return
                 }
-            }
-        }
 
-        let identity = backup.signingIdentity
-        // 清理扩展属性和杂散文件（必须在确认可签名后执行，避免剥离签名后无法重签导致应用变未签名）
-        stripExtendedAttributes(at: appURL)
-        cleanBundleRoot(at: appURL)
-        let deepArgs: [String]
-        let shallowArgs: [String]
-        if identity.isEmpty || identity == "ad-hoc" {
-            _ = try runCodesign(arguments: ["--remove-signature", appURL.path])
-            // 已移除签名，不需要后续重签
-            removeBackup(bundleIdentifier: bundleIdentifier)
-            AppLogger.shared.logContext("恢复原始签名完成（已移除签名）", details: [("path", appURL.path), ("bundle_id", bundleIdentifier)])
-            return
-        } else if isIdentityAvailable(identity) {
-            deepArgs = ["--force", "--deep", "--sign", identity, appURL.path]
-            shallowArgs = ["--force", "--sign", identity, appURL.path]
-        } else {
-            AppLogger.shared.logContext(
-                "原始签名身份不在钥匙串中，回退到 ad-hoc 签名",
-                details: [("identity", identity), ("path", appURL.path)],
-                level: "WARN"
-            )
-            deepArgs = ["--force", "--deep", "--sign", "-", appURL.path]
-            shallowArgs = ["--force", "--sign", "-", appURL.path]
-        }
-
-        do {
-            _ = try runCodesign(arguments: deepArgs)
-        } catch {
-            let errorMsg = (error as? SigningError)?.errorDescription ?? error.localizedDescription
-            if errorMsg.contains("Permission denied")
-                || errorMsg.contains("detritus")
-                || errorMsg.contains("resource fork") {
-                AppLogger.shared.logContext(
-                    "--deep 签名失败，回退到表层签名",
-                    details: [("path", appURL.path), ("error", errorMsg)],
-                    level: "WARN"
-                )
-                _ = try runCodesign(arguments: shallowArgs)
-            } else {
-                throw error
+                let signingIdentity: String
+                if isIdentityAvailable(identity) {
+                    signingIdentity = identity
+                } else {
+                    AppLogger.shared.logContext(
+                        "原始签名身份不在钥匙串中，回退到 ad-hoc 签名",
+                        details: [("identity", identity), ("path", appURL.path)],
+                        level: "WARN"
+                    )
+                    signingIdentity = "-"
+                }
+                try runCodesign(arguments: ["--force", "--deep", "--sign", signingIdentity, appURL.path])
+                try runCodesign(arguments: ["--verify", "--deep", "--strict", appURL.path], retries: 0)
             }
         }
 
@@ -338,7 +275,7 @@ actor CodeSigner {
 
     // MARK: - Signature Status
 
-    enum SignatureStatus {
+    enum SignatureStatus: Equatable {
         case valid
         case adHoc
         case unsigned
@@ -393,11 +330,11 @@ actor CodeSigner {
     }
 
     private func backupFileURL(for bundleIdentifier: String) -> URL {
-        Self.backupDirectoryURL.appendingPathComponent("\(bundleIdentifier).plist")
+        backupDirectoryURL.appendingPathComponent("\(bundleIdentifier).plist")
     }
 
     private func ensureBackupDirectory() throws {
-        let dir = Self.backupDirectoryURL
+        let dir = backupDirectoryURL
         if !fileManager.fileExists(atPath: dir.path) {
             try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }
@@ -405,18 +342,86 @@ actor CodeSigner {
 
     // MARK: - Immutable Handling
 
-    /// 解锁文件（如被 AppMigrationService 锁定），返回之前是否锁定
-    private func unlockIfImmutable(at url: URL) -> Bool {
-        guard let attrs = try? fileManager.attributesOfItem(atPath: url.path),
-              let immutable = attrs[.immutable] as? Bool, immutable else {
-            return false
+    /// 枚举包内所有子项（包括隐藏文件和嵌套 .app），不跟随符号链接。
+    private func bundleItems(at appURL: URL) throws -> [URL] {
+        var enumerationError: Error?
+        guard let enumerator = fileManager.enumerator(
+            at: appURL,
+            includingPropertiesForKeys: nil,
+            errorHandler: { _, error in
+                enumerationError = error
+                return false
+            }
+        ) else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: appURL.path])
         }
-        try? fileManager.setAttributes([.immutable: false], ofItemAtPath: url.path)
-        return true
+        var items = [appURL]
+        // DirectoryEnumerator 默认不跟随链接；对链接调用 skipDescendants()
+        // 反而会跳过下一个真实目录（如框架的 Versions/A），漏掉其锁定文件。
+        for case let url as URL in enumerator {
+            items.append(url)
+        }
+        if let enumerationError { throw enumerationError }
+        return items
     }
 
-    private func lockItem(at url: URL) {
-        try? fileManager.setAttributes([.immutable: true], ofItemAtPath: url.path)
+    private func fileInfo(at url: URL) throws -> stat {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+        }
+        return info
+    }
+
+    /// 仅修改 uchg 位，并用 lchflags 避免改到链接目标。
+    private func setImmutable(_ immutable: Bool, at url: URL) throws {
+        let info = try fileInfo(at: url)
+        let flags = immutable ? info.st_flags | UInt32(UF_IMMUTABLE) : info.st_flags & ~UInt32(UF_IMMUTABLE)
+        guard lchflags(url.path, flags) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+        }
+    }
+
+    private func restoreImmutableItems(_ items: [URL]) throws {
+        var firstError: Error?
+        for url in items.reversed() {
+            do {
+                // codesign 可以替换文件；按原路径恢复锁，保留新的其它 flags。
+                // 清理掉的 .DS_Store 等项目无需重建。
+                if (try? fileManager.attributesOfItem(atPath: url.path)) != nil {
+                    try setImmutable(true, at: url)
+                }
+            } catch {
+                firstError = firstError ?? error
+            }
+        }
+        if let firstError { throw firstError }
+    }
+
+    private func withUnlockedBundle(at appURL: URL, operation: ([URL]) throws -> Void) throws {
+        let items = try bundleItems(at: appURL)
+        var unlocked: [URL] = []
+        do {
+            for url in items {
+                if try fileInfo(at: url).st_flags & UInt32(UF_IMMUTABLE) != 0 {
+                    try setImmutable(false, at: url)
+                    unlocked.append(url)
+                }
+            }
+            try operation(items)
+            try restoreImmutableItems(unlocked)
+        } catch {
+            do {
+                try restoreImmutableItems(unlocked)
+            } catch let restoreError {
+                AppLogger.shared.logError(
+                    "恢复应用锁定状态失败",
+                    error: restoreError,
+                    relatedURLs: [("app", appURL)]
+                )
+            }
+            throw error
+        }
     }
 
     // MARK: - Identity Check
@@ -474,25 +479,23 @@ actor CodeSigner {
             process.arguments = arguments
 
             let outputPipe = Pipe()
-            let errorPipe = Pipe()
             process.standardOutput = outputPipe
-            process.standardError = errorPipe
+            process.standardError = outputPipe
 
             try process.run()
+            // 持续读取，避免深度签名产生大量输出时填满 pipe 而无法退出。
+            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            let output = String(data: outputData, encoding: .utf8) ?? ""
 
             if process.terminationStatus == 0 {
-                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                return String(data: outputData, encoding: .utf8) ?? ""
+                return output
             }
 
-            lastError = errorOutput.isEmpty ? "exit code \(process.terminationStatus)" : errorOutput
+            lastError = output.isEmpty ? "exit code \(process.terminationStatus)" : output
 
             // 只对瞬态错误重试（internal error、SIGKILL 等）
-            let isTransient = errorOutput.contains("internal error")
+            let isTransient = output.contains("internal error")
                 || process.terminationStatus == 9
                 || process.terminationStatus == 137
             if !isTransient { break }
@@ -501,34 +504,62 @@ actor CodeSigner {
         throw SigningError.codesignFailed(lastError)
     }
 
-    /// 递归剥离所有扩展属性（resource fork、Finder 信息等），避免 codesign 报 "detritus not allowed"
-    private func stripExtendedAttributes(at url: URL) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
-        process.arguments = ["-cr", url.path]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
+    /// 仅清理 codesign 禁止的 resource fork/Finder 信息，保留其它元数据及脚本签名属性。
+    private func stripSigningDetritus(from items: [URL]) throws {
+        for url in items {
+            for name in ["com.apple.ResourceFork", "com.apple.FinderInfo"] {
+                let size = getxattr(url.path, name, nil, 0, 0, XATTR_NOFOLLOW)
+                if size < 0 {
+                    // 重试时，首次尝试可能已清理 .DS_Store 等杂散文件。
+                    if errno == ENOATTR || errno == ENOTSUP || errno == ENOENT { continue }
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+                }
+                if removexattr(url.path, name, XATTR_NOFOLLOW) != 0, errno != ENOATTR {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+                }
+            }
+        }
     }
 
-    /// 检查是否为 Mac App Store 应用（Contents 中存在 _MASReceipt 目录）
-    private func isMASApp(at appURL: URL) -> Bool {
-        let masReceiptURL = appURL.appendingPathComponent("Contents/_MASReceipt")
-        return fileManager.fileExists(atPath: masReceiptURL.path)
+    /// codesign 可以替换只读可执行文件；只在实际操作报告权限错误时请求修复。
+    private func withOwnershipRepair(at appURL: URL, operation: () throws -> Void) throws {
+        do {
+            try operation()
+        } catch {
+            guard allowAdministratorPrompt, isPermissionFailure(error) else { throw error }
+            AppLogger.shared.logContext(
+                "应用由 root 安装，尝试请求管理员权限修复",
+                details: [("path", appURL.path)],
+                level: "WARN"
+            )
+            try elevateAndFixOwnership(at: appURL)
+            do {
+                try operation()
+            } catch {
+                guard isPermissionFailure(error) else { throw error }
+                throw SigningError.codesignFailed(
+                    String(format: "应用不可写，无法完成重签名：%@".localized, appURL.path)
+                        + "\n" + error.localizedDescription
+                )
+            }
+        }
     }
 
-    /// 检查 app bundle 是否可写（排除 root 安装的情况）
-    private func isBundleWritable(at appURL: URL) -> Bool {
-        guard let attrs = try? fileManager.attributesOfItem(atPath: appURL.path),
-              let owner = attrs[.ownerAccountName] as? String else {
-            return false
+    private func isPermissionFailure(_ error: Error) -> Bool {
+        if case SigningError.codesignFailed(let message) = error {
+            return message.localizedCaseInsensitiveContains("permission denied")
+                || message.localizedCaseInsensitiveContains("operation not permitted")
         }
-        // 如果 owner 是 root，当前用户可能无法写入
-        if owner == "root" {
-            return fileManager.isWritableFile(atPath: appURL.path)
+        let nsError = error as NSError
+        if nsError.domain == NSPOSIXErrorDomain {
+            return nsError.code == Int(EACCES) || nsError.code == Int(EPERM)
         }
-        return true
+        if nsError.domain == NSCocoaErrorDomain,
+           nsError.code == CocoaError.fileReadNoPermission.rawValue
+            || nsError.code == CocoaError.fileWriteNoPermission.rawValue {
+            return true
+        }
+        return nsError.underlyingErrors.contains(where: isPermissionFailure)
     }
 
     /// 请求管理员权限，将 app bundle 的 owner 修改为当前用户

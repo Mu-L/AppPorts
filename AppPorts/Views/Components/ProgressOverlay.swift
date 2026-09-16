@@ -28,6 +28,7 @@ import SwiftUI
 ///
 /// - Note: 进度条宽度固定为 300 点，适合大部分情况
 struct ProgressOverlay: View {
+    let title: String
     /// 当前迁移的应用索引（从 1 开始）
     let current: Int
     
@@ -42,10 +43,13 @@ struct ProgressOverlay: View {
     
     /// 总字节数
     let totalBytes: Int64
+
+    /// 当前处理的文件，未知总大小时也可持续显示复制活动。
+    let currentFile: String
     
     var body: some View {
         VStack(spacing: 16) {
-            Text("正在迁移应用...".localized)
+            Text(title)
                 .font(.headline)
             
             // 批量迁移时显示应用进度
@@ -60,7 +64,7 @@ struct ProgressOverlay: View {
                 .foregroundColor(.primary)
             
             // 单应用字节级进度条
-            ProgressView(value: Double(copiedBytes), total: Double(max(totalBytes, 1)))
+            ProgressView(value: totalBytes > 0 ? min(Double(copiedBytes) / Double(totalBytes), 1) : nil)
                 .progressViewStyle(.linear)
                 .frame(width: 300)
             
@@ -69,6 +73,15 @@ struct ProgressOverlay: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .monospacedDigit()
+
+            if !currentFile.isEmpty {
+                Text(verbatim: currentFile)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(width: 300)
+            }
         }
         .padding(32)
         .background(.regularMaterial)
@@ -86,7 +99,7 @@ struct ProgressOverlay: View {
     /// - Returns: 格式化后的字符串，如 "1.2 GB / 3.5 GB"
     private func formatProgress(copiedBytes: Int64, totalBytes: Int64) -> String {
         if totalBytes == 0 {
-            return "计算中...".localized
+            return LocalizedByteCountFormatter.string(fromByteCount: copiedBytes)
         }
         return "\(LocalizedByteCountFormatter.string(fromByteCount: copiedBytes, allowedUnits: [.mb, .gb])) / \(LocalizedByteCountFormatter.string(fromByteCount: totalBytes, allowedUnits: [.mb, .gb]))"
     }

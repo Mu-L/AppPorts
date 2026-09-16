@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
-    "" : {
-
-    },
     " 可释放" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2194,142 +2191,6 @@
         }
       }
     },
-    "@%@" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "@%@"
-          }
-        }
-      }
-    },
     "**什么是重签名？**\n\n数据目录迁移到外部存储后，macOS 可能认为应用已被修改，在 Finder 中提示「已损坏」或「无法打开」。\n\n开启此选项后，AppPorts 会在数据迁移完成后自动对关联应用执行 **Ad-hoc 自签名**，绕过此限制。\n\n**可能的影响：**\n• 应用原有的 Developer ID 签名将被替换\n• 部分依赖签名验证的功能（如 Keychain 访问）可能受限\n• 应用更新后可能需要重新迁移数据\n\n如需恢复原始签名，可在应用列表中右键选择「恢复原始签名」。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4379,686 +4240,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "========== 遷迻性螚報吿 ========== ♫"
-          }
-        }
-      }
-    },
-    "✅ 1 MB" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ ⠼⠁ ⠠⠍⠠⠃"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 1 MB"
-          }
-        }
-      }
-    },
-    "✅ 5 MB" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ ⠼⠑ ⠠⠍⠠⠃"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 5 MB"
-          }
-        }
-      }
-    },
-    "✅ 10 MB" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ ⠼⠁⠼⠚ ⠠⠍⠠⠃"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 10 MB"
-          }
-        }
-      }
-    },
-    "✅ 50 MB" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ ⠼⠑⠼⠚ ⠠⠍⠠⠃"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 50 MB"
-          }
-        }
-      }
-    },
-    "✅ 100 MB" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "br" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ ⠼⠁⠼⠚⠼⠚ ⠠⠍⠠⠃"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "eo" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "id" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
-          }
-        },
-        "zh-martian" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✅ 100 MB"
           }
         }
       }
@@ -13278,6 +12459,417 @@
         }
       }
     },
+    "Dock 图标修复失败" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر إصلاح أيقونة Dock"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠙⠕⠉⠅ ⠠⠊⠉⠕⠝ ⠠⠗⠑⠏⠁⠊⠗ ⠠⠋⠁⠊⠇⠑⠙"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparatur des Dock-Symbols fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Icon Repair Failed"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riparo de la Dock-ikono malsukcesis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo reparar el icono del Dock"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec de la réparation de l’icône du Dock"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock आइकॉन सुधारा नहीं जा सका"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gagal Memperbaiki Ikon Dock"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riparazione dell’icona del Dock non riuscita"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockアイコンを修復できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 아이콘 복구 실패"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herstellen van Dock-symbool mislukt"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się naprawić ikony w Docku"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao reparar o ícone da Dock"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось исправить значок Dock"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อมแซมไอคอน Dock ไม่สำเร็จ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Simgesi Onarılamadı"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể sửa biểu tượng Dock"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 图标修复失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖示修復失敗"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖標修復夨敗"
+          }
+        }
+      }
+    },
+    "Dock 图标已修复" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إصلاح أيقونة Dock"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠙⠕⠉⠅ ⠠⠊⠉⠕⠝ ⠠⠗⠑⠏⠁⠊⠗⠑⠙"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-Symbol repariert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Icon Repaired"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-ikono riparita"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icono del Dock reparado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icône du Dock réparée"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock आइकॉन सुधारा गया"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ikon Dock Diperbaiki"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icona del Dock riparata"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockアイコンを修復しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 아이콘이 복구됨"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-symbool hersteld"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ikona w Docku naprawiona"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ícone da Dock reparado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Значок Dock исправлен"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อมแซมไอคอน Dock แล้ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Simgesi Onarıldı"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã sửa biểu tượng Dock"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 图标已修复"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖示已修復"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖標巳修復"
+          }
+        }
+      }
+    },
+    "Dock 图标无需修复" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا حاجة لإصلاح أيقونة Dock"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠝⠕ ⠠⠙⠕⠉⠅ ⠠⠊⠉⠕⠝ ⠠⠗⠑⠏⠁⠊⠗ ⠠⠝⠑⠑⠙⠑⠙"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Reparatur des Dock-Symbols nötig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Dock Icon Repair Needed"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Dock-ikono ne bezonas riparon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No es necesario reparar el icono del Dock"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’icône du Dock ne nécessite aucune réparation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock आइकॉन में सुधार की ज़रूरत नहीं है"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ikon Dock Tidak Perlu Diperbaiki"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’icona del Dock non richiede riparazioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockアイコンの修復は不要です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 아이콘을 복구할 필요가 없습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-symbool hoeft niet te worden hersteld"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ikona w Docku nie wymaga naprawy"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ícone da Dock não precisa de reparação"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Значок Dock не требует исправления"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่จำเป็นต้องซ่อมแซมไอคอน Dock"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Simgesinin Onarılması Gerekmiyor"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biểu tượng Dock không cần sửa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 图标无需修复"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖示無需修復"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 圖標無需修復"
+          }
+        }
+      }
+    },
     "Docker CLI 配置" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17795,6 +17387,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "macOS 15.1+ 支持将 App Store 应用安装到外部磁盘。\n\n请在 App Store → 设置中勾选「将大型 App 下载并安装到独立磁盘」，并选择当前外部驱动器。\n\n设置完成后点击「我已设置」，AppPorts 会自动创建 Applications 目录并检测管理这些应用。"
+          }
+        }
+      }
+    },
+    "macOS 应用迁移工具" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أداة نقل تطبيقات macOS"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠍⠁⠉⠠⠕⠠⠎ ⠁⠏⠏ ⠍⠊⠛⠗⠁⠞⠊⠕⠝ ⠞⠕⠕⠇"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migrationstool für macOS-Apps"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS app migration tool"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migra ilo por macOS-aplikaĵoj"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de migración de apps para macOS"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil de migration d’apps macOS"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS ऐप माइग्रेशन टूल"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alat migrasi aplikasi macOS"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento di migrazione delle app macOS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOSアプリ移行ツール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 앱 마이그레이션 도구"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Migratietool voor macOS-apps"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Narzędzie do przenoszenia aplikacji macOS"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ferramenta de migração de apps para macOS"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Инструмент переноса приложений macOS"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เครื่องมือย้ายแอป macOS"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS uygulama taşıma aracı"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Công cụ di chuyển ứng dụng macOS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 应用迁移工具"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 應用程式遷移工具"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 應詠遷移工具"
           }
         }
       }
@@ -24512,6 +24241,143 @@
         }
       }
     },
+    "作者" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المؤلف"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠁⠥⠞⠓⠕⠗"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autor"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Author"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aŭtoro"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auteur"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "लेखक"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pengembang"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autore"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作者"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개발자"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auteur"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autor"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autor"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автор"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ผู้พัฒนา"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geliştirici"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tác giả"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作者"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作者"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "莋者"
+          }
+        }
+      }
+    },
     "使用传统链接迁移" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -24782,6 +24648,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存贡献者缓存失败"
+          }
+        }
+      }
+    },
+    "修复 Dock 图标" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إصلاح أيقونة Dock"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠗⠑⠏⠁⠊⠗ ⠠⠙⠕⠉⠅ ⠠⠊⠉⠕⠝"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-Symbol reparieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repair Dock Icon"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripari la Dock-ikonon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparar icono del Dock"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réparer l’icône du Dock"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock आइकॉन सुधारें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perbaiki Ikon Dock"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ripara l’icona del Dock"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockアイコンを修復"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 아이콘 복구"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock-symbool herstellen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napraw ikonę w Docku"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparar ícone da Dock"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исправить значок Dock"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อมแซมไอคอน Dock"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock Simgesini Onar"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa biểu tượng Dock"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修复 Dock 图标"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修復 Dock 圖示"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修復 Dock 圖標"
           }
         }
       }
@@ -29713,6 +29716,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "雙擊打開繫統設寘"
+          }
+        }
+      }
+    },
+    "发布" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصدارات"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠗⠑⠇⠑⠁⠎⠑⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veröffentlichungen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Releases"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eldonoj"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versiones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versions"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "रिलीज़"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rilis"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "릴리스"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uitgaven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wydania"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versões"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выпуски"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "รุ่นที่เผยแพร่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sürümler"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản phát hành"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本發佈"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "發佈"
           }
         }
       }
@@ -38622,6 +38762,143 @@
         }
       }
     },
+    "将应用和数据迁移到外部存储，保留本地入口，释放磁盘空间。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقل التطبيقات والبيانات إلى وحدة تخزين خارجية مع الاحتفاظ بالوصول المحلي وتوفير مساحة على القرص."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠍⠕⠧⠑ ⠁⠏⠏⠎ ⠁⠝⠙ ⠙⠁⠞⠁ ⠞⠕ ⠑⠭⠞⠑⠗⠝⠁⠇ ⠎⠞⠕⠗⠁⠛⠑⠂ ⠅⠑⠑⠏ ⠇⠕⠉⠁⠇ ⠁⠉⠉⠑⠎⠎⠂ ⠁⠝⠙ ⠋⠗⠑⠑ ⠥⠏ ⠙⠊⠎⠅ ⠎⠏⠁⠉⠑⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps und Daten auf externe Speicher verschieben, den lokalen Zugriff behalten und Speicherplatz freigeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move apps and data to external storage, keep local access, and free up disk space."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Movu aplikaĵojn kaj datumojn al ekstera memoro, konservu lokan aliron kaj liberigu diskospacon."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mueve apps y datos a un almacenamiento externo, conserva el acceso local y libera espacio en disco."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacez les apps et les données vers un stockage externe, conservez un accès local et libérez de l’espace disque."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऐप और डेटा को बाहरी स्टोरेज में ले जाएँ, स्थानीय पहुँच बनाए रखें और डिस्क में जगह खाली करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pindahkan aplikasi dan data ke penyimpanan eksternal, pertahankan akses lokal, dan kosongkan ruang disk."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta app e dati su un dispositivo esterno, mantieni l’accesso locale e libera spazio su disco."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリとデータを外部ストレージに移行し、ローカルからのアクセスを維持しながらディスク容量を確保します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱과 데이터를 외부 저장 장치로 옮기고 로컬 접근을 유지하여 디스크 공간을 확보합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verplaats apps en gegevens naar externe opslag, behoud lokale toegang en maak schijfruimte vrij."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przenieś aplikacje i dane na dysk zewnętrzny, zachowaj lokalny dostęp i zwolnij miejsce na dysku."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mova apps e dados para armazenamento externo, mantenha o acesso local e liberte espaço em disco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переносите приложения и данные на внешний накопитель, сохраняя локальный доступ и освобождая место на диске."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ย้ายแอปและข้อมูลไปยังที่จัดเก็บข้อมูลภายนอก โดยยังเปิดจากเครื่องได้และเพิ่มพื้นที่ว่างบนดิสก์"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulamaları ve verileri harici depolamaya taşıyın, yerel erişimi koruyun ve disk alanı açın."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển ứng dụng và dữ liệu sang bộ nhớ ngoài, giữ quyền truy cập cục bộ và giải phóng dung lượng ổ đĩa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将应用和数据迁移到外部存储，保留本地入口，释放磁盘空间。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將應用程式和資料遷移至外接儲存裝置，保留本機入口，釋放磁碟空間。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將應詠啝資料遷移菿外部儲存，保留夲地入口，釋放磁盤空間。"
+          }
+        }
+      }
+    },
     "将应用迁移回本地" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -39855,6 +40132,143 @@
         }
       }
     },
+    "已更新现有 Dock 固定项，位置保持不变。Dock 将短暂刷新；从 Dock 打开此应用需要连接外部存储。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تحديث العناصر المثبّتة في Dock مع الحفاظ على ترتيبها. سيُحدَّث Dock لفترة وجيزة. يجب توصيل وحدة التخزين الخارجية لفتح هذا التطبيق من Dock."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠑⠭⠊⠎⠞⠊⠝⠛ ⠠⠙⠕⠉⠅ ⠊⠞⠑⠍⠎ ⠺⠑⠗⠑ ⠥⠏⠙⠁⠞⠑⠙ ⠺⠊⠞⠓⠕⠥⠞ ⠉⠓⠁⠝⠛⠊⠝⠛ ⠞⠓⠑⠊⠗ ⠕⠗⠙⠑⠗⠲ ⠠⠞⠓⠑ ⠠⠙⠕⠉⠅ ⠺⠊⠇⠇ ⠃⠗⠊⠑⠋⠇⠽ ⠗⠑⠋⠗⠑⠎⠓⠲ ⠠⠑⠭⠞⠑⠗⠝⠁⠇ ⠎⠞⠕⠗⠁⠛⠑ ⠍⠥⠎⠞ ⠃⠑ ⠉⠕⠝⠝⠑⠉⠞⠑⠙ ⠞⠕ ⠕⠏⠑⠝ ⠞⠓⠊⠎ ⠁⠏⠏ ⠋⠗⠕⠍ ⠞⠓⠑ ⠠⠙⠕⠉⠅⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die vorhandenen Dock-Einträge wurden aktualisiert; ihre Reihenfolge bleibt unverändert. Das Dock wird kurz aktualisiert. Zum Öffnen dieser App über das Dock muss der externe Speicher verbunden sein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Existing Dock items were updated without changing their order. The Dock will briefly refresh. External storage must be connected to open this app from the Dock."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La ekzistantaj fiksitaj eroj en Dock estis ĝisdatigitaj sen ŝanĝi ilian ordon. Dock mallonge refreŝiĝos. La ekstera stokilo devas esti konektita por malfermi ĉi tiun aplikaĵon el Dock."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los elementos fijados en el Dock se han actualizado sin cambiar su orden. El Dock se actualizará brevemente. El almacenamiento externo debe estar conectado para abrir esta app desde el Dock."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les éléments épinglés au Dock ont été mis à jour sans changer leur ordre. Le Dock s’actualisera brièvement. Le stockage externe doit être connecté pour ouvrir cette app depuis le Dock."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock में पहले से पिन किए गए आइटम का क्रम बदले बिना उन्हें अपडेट कर दिया गया है। Dock कुछ पल के लिए रीफ़्रेश होगा। इस ऐप को Dock से खोलने के लिए बाहरी स्टोरेज कनेक्ट होना ज़रूरी है।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item yang disematkan di Dock telah diperbarui tanpa mengubah urutannya. Dock akan dimuat ulang sebentar. Penyimpanan eksternal harus tersambung untuk membuka app ini dari Dock."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le icone già presenti nel Dock sono state aggiornate mantenendo lo stesso ordine. Il Dock si aggiornerà brevemente. L’unità esterna deve essere collegata per aprire questa app dal Dock."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockに登録済みの項目を、並び順を変えずに更新しました。Dockが一時的に再読み込みされます。このアプリをDockから開くには、外部ストレージの接続が必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock에 고정된 기존 항목을 순서 변경 없이 업데이트했습니다. Dock이 잠시 새로 고침됩니다. Dock에서 이 앱을 열려면 외장 저장 장치가 연결되어 있어야 합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De bestaande Dock-items zijn bijgewerkt zonder hun volgorde te wijzigen. Het Dock wordt kort vernieuwd. Externe opslag moet zijn aangesloten om deze app vanuit het Dock te openen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Istniejące przypięte pozycje w Docku zostały uaktualnione bez zmiany kolejności. Dock zostanie na chwilę odświeżony. Aby otworzyć tę aplikację z Docka, pamięć zewnętrzna musi być podłączona."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os elementos já fixos na Dock foram atualizados sem alterar a ordem. A Dock será atualizada brevemente. O armazenamento externo tem de estar ligado para abrir esta aplicação a partir da Dock."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые значки Dock обновлены без изменения порядка. Dock ненадолго обновится. Чтобы открыть это приложение из Dock, внешний накопитель должен быть подключён."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อัปเดตรายการที่ปักหมุดไว้ใน Dock แล้ว โดยคงลำดับเดิมไว้ Dock จะรีเฟรชสักครู่ ต้องเชื่อมต่ออุปกรณ์จัดเก็บข้อมูลภายนอกเพื่อเปิดแอปนี้จาก Dock"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock’a sabitlenmiş mevcut öğeler, sıraları değiştirilmeden güncellendi. Dock kısa süreliğine yenilenecek. Bu uygulamayı Dock’tan açmak için harici depolamanın bağlı olması gerekir."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã cập nhật các mục được ghim trong Dock mà không thay đổi thứ tự. Dock sẽ làm mới trong giây lát. Cần kết nối bộ nhớ ngoài để mở ứng dụng này từ Dock."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新现有 Dock 固定项，位置保持不变。Dock 将短暂刷新；从 Dock 打开此应用需要连接外部存储。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新現有 Dock 固定項目，位置保持不變。Dock 將短暫重新整理；從 Dock 開啟此應用程式需要連接外接儲存裝置。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "巳更新現有 Dock 固定項，位置保持卟變。Dock 將短暫刷新；從 Dock 咑開此應詠需要連接外部儲存。"
+          }
+        }
+      }
+    },
     "已清理残留的还原暂存目录" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -40810,6 +41224,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "應詠: %@"
+          }
+        }
+      }
+    },
+    "应用不可写，无法完成重签名：%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التطبيق غير قابل للكتابة، وتعذرت إعادة توقيعه: %@"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠞⠓⠑ ⠁⠏⠏⠇⠊⠉⠁⠞⠊⠕⠝ ⠊⠎ ⠝⠕⠞ ⠺⠗⠊⠞⠁⠃⠇⠑ ⠁⠝⠙ ⠉⠕⠥⠇⠙ ⠝⠕⠞ ⠃⠑ ⠗⠑-⠎⠊⠛⠝⠑⠙: %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Anwendung ist nicht beschreibbar und konnte nicht neu signiert werden: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The application is not writable and could not be re-signed: %@"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La aplikaĵo ne estas skribebla kaj ne povis esti resubskribita: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La aplicación no permite escritura y no se pudo volver a firmar: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’application n’est pas accessible en écriture et n’a pas pu être signée à nouveau : %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऐप में लिखने की अनुमति नहीं है, इसलिए दोबारा हस्ताक्षर नहीं हो सके: %@"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplikasi tidak dapat ditulisi sehingga tidak dapat ditandatangani ulang: %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’applicazione non è scrivibile e non è stato possibile firmarla nuovamente: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリに書き込めないため、再署名を完了できません：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱에 쓸 수 없어 다시 서명하지 못했습니다: %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app is niet beschrijfbaar en kon niet opnieuw worden ondertekend: %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplikacja nie jest dostępna do zapisu i nie można jej ponownie podpisać: %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A aplicação não permite escrita e não foi possível assiná-la novamente: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение недоступно для записи, повторная подпись не выполнена: %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถเขียนข้อมูลลงในแอปได้ จึงลงนามใหม่ไม่สำเร็จ: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulamaya yazılamadığı için yeniden imzalama tamamlanamadı: %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể ghi vào ứng dụng nên không thể ký lại: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用不可写，无法完成重签名：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "應用程式無法寫入，無法完成重新簽署：%@"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "應甪不可寫，無法完成重新簽名：%@"
           }
         }
       }
@@ -44783,6 +45334,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "當湔大曉: %@"
+          }
+        }
+      }
+    },
+    "当前已是最新版本。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أنت تستخدم أحدث إصدار."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠽⠕⠥ ⠁⠗⠑ ⠥⠏ ⠞⠕ ⠙⠁⠞⠑⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie verwenden die neueste Version."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are up to date."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vi uzas la plej novan version."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tienes la versión más reciente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous utilisez la dernière version."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "आप नवीनतम संस्करण का उपयोग कर रहे हैं।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anda menggunakan versi terbaru."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stai usando la versione più recente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新バージョンです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최신 버전을 사용 중입니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je gebruikt de nieuwste versie."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Używasz najnowszej wersji."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Está a utilizar a versão mais recente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлена последняя версия."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คุณใช้เวอร์ชันล่าสุดแล้ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En güncel sürümü kullanıyorsunuz."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn đang dùng phiên bản mới nhất."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前已是最新版本。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前已是最新版本。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當前巳是最新版本。"
           }
         }
       }
@@ -53555,6 +54243,143 @@
         }
       }
     },
+    "数据已迁移，但关联应用重签名失败：%@\n\n请在应用列表中重试重签名，或还原数据目录。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم نقل البيانات، لكن تعذرت إعادة توقيع التطبيق المرتبط: %@\n\nأعد محاولة التوقيع من قائمة التطبيقات، أو استعد مجلد البيانات."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠞⠓⠑ ⠙⠁⠞⠁ ⠺⠁⠎ ⠍⠊⠛⠗⠁⠞⠑⠙, ⠃⠥⠞ ⠗⠑-⠎⠊⠛⠝⠊⠝⠛ ⠞⠓⠑ ⠁⠎⠎⠕⠉⠊⠁⠞⠑⠙ ⠁⠏⠏⠇⠊⠉⠁⠞⠊⠕⠝ ⠋⠁⠊⠇⠑⠙: %@\n\n⠗⠑⠞⠗⠽ ⠗⠑-⠎⠊⠛⠝⠊⠝⠛ ⠋⠗⠕⠍ ⠞⠓⠑ ⠁⠏⠏⠇⠊⠉⠁⠞⠊⠕⠝ ⠇⠊⠎⠞, ⠕⠗ ⠗⠑⠎⠞⠕⠗⠑ ⠞⠓⠑ ⠙⠁⠞⠁ ⠙⠊⠗⠑⠉⠞⠕⠗⠽."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Daten wurden verschoben, aber das erneute Signieren der zugehörigen Anwendung ist fehlgeschlagen: %@\n\nVersuchen Sie es in der Anwendungsliste erneut oder stellen Sie das Datenverzeichnis wieder her."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The data was migrated, but re-signing the associated application failed: %@\n\nRetry re-signing from the application list, or restore the data directory."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La datumoj estis translokitaj, sed resubskribo de la rilata aplikaĵo malsukcesis: %@\n\nReprovu el la listo de aplikaĵoj aŭ restarigu la datumdosierujon."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los datos se migraron, pero no se pudo volver a firmar la aplicación asociada: %@\n\nVuelva a intentarlo desde la lista de aplicaciones o restaure el directorio de datos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les données ont été déplacées, mais la signature de l’application associée a échoué : %@\n\nRéessayez depuis la liste des applications ou restaurez le dossier de données."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "डेटा स्थानांतरित हो गया, लेकिन संबंधित ऐप पर दोबारा हस्ताक्षर नहीं हो सके: %@\n\nऐप सूची से दोबारा हस्ताक्षर करने का प्रयास करें या डेटा फ़ोल्डर को पुनर्स्थापित करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data telah dipindahkan, tetapi penandatanganan ulang aplikasi terkait gagal: %@\n\nCoba lagi dari daftar aplikasi, atau pulihkan folder data."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I dati sono stati migrati, ma la nuova firma dell’applicazione associata non è riuscita: %@\n\nRiprova dall’elenco delle applicazioni oppure ripristina la cartella dei dati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データは移行されましたが、関連アプリの再署名に失敗しました：%@\n\nアプリ一覧から再署名をやり直すか、データフォルダを元に戻してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "데이터는 이전되었지만 연결된 앱을 다시 서명하지 못했습니다: %@\n\n앱 목록에서 다시 서명하거나 데이터 폴더를 복원하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De gegevens zijn verplaatst, maar het opnieuw ondertekenen van de bijbehorende app is mislukt: %@\n\nProbeer het opnieuw vanuit de applijst of herstel de gegevensmap."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dane zostały przeniesione, ale ponowne podpisanie powiązanej aplikacji nie powiodło się: %@\n\nSpróbuj ponownie z listy aplikacji lub przywróć katalog danych."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os dados foram migrados, mas não foi possível assinar novamente a aplicação associada: %@\n\nTente novamente na lista de aplicações ou restaure a pasta de dados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Данные перенесены, но повторная подпись связанного приложения не удалась: %@\n\nПовторите подпись в списке приложений или восстановите папку данных."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ย้ายข้อมูลแล้ว แต่ลงนามแอปที่เกี่ยวข้องใหม่ไม่สำเร็จ: %@\n\nโปรดลองลงนามใหม่จากรายการแอป หรือคืนค่าโฟลเดอร์ข้อมูล"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veriler taşındı, ancak ilişkili uygulama yeniden imzalanamadı: %@\n\nUygulama listesinden yeniden imzalamayı deneyin veya veri klasörünü geri yükleyin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dữ liệu đã được di chuyển nhưng không thể ký lại ứng dụng liên quan: %@\n\nHãy thử ký lại từ danh sách ứng dụng hoặc khôi phục thư mục dữ liệu."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据已迁移，但关联应用重签名失败：%@\n\n请在应用列表中重试重签名，或还原数据目录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料已遷移，但關聯應用程式重新簽署失敗：%@\n\n請在應用程式清單中重試重新簽署，或還原資料目錄。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "數據已遷移，但關聯應甪重新簽名失敗：%@\n\n請在應甪列表中重試重新簽名，或還原數據目錄。"
+          }
+        }
+      }
+    },
     "数据目录" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -57391,6 +58216,417 @@
         }
       }
     },
+    "无法找到真实应用，无法重签名：%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر العثور على التطبيق الفعلي، ولا يمكن إعادة توقيعه: %@"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠞⠓⠑ ⠗⠑⠁⠇ ⠁⠏⠏⠇⠊⠉⠁⠞⠊⠕⠝ ⠉⠕⠥⠇⠙ ⠝⠕⠞ ⠃⠑ ⠋⠕⠥⠝⠙ ⠁⠝⠙ ⠉⠁⠝⠝⠕⠞ ⠃⠑ ⠗⠑-⠎⠊⠛⠝⠑⠙: %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die tatsächliche Anwendung wurde nicht gefunden und kann nicht neu signiert werden: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The real application could not be found and cannot be re-signed: %@"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La vera aplikaĵo ne estis trovita kaj ne povas esti resubskribita: %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontró la aplicación real y no se puede volver a firmar: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’application réelle est introuvable et ne peut pas être signée à nouveau : %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वास्तविक ऐप नहीं मिला, इसलिए उस पर दोबारा हस्ताक्षर नहीं किए जा सकते: %@"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplikasi asli tidak ditemukan sehingga tidak dapat ditandatangani ulang: %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’applicazione reale non è stata trovata e non può essere firmata nuovamente: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実際のアプリが見つからないため、再署名できません：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실제 앱을 찾을 수 없어 다시 서명할 수 없습니다: %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De werkelijke app is niet gevonden en kan niet opnieuw worden ondertekend: %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie znaleziono właściwej aplikacji, więc nie można jej ponownie podpisać: %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível encontrar a aplicação real para a assinar novamente: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Исходное приложение не найдено, повторная подпись невозможна: %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่พบแอปจริง จึงไม่สามารถลงนามใหม่ได้: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asıl uygulama bulunamadığı için yeniden imzalanamıyor: %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không tìm thấy ứng dụng thực nên không thể ký lại: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法找到真实应用，无法重签名：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法找到實際應用程式，無法重新簽署：%@"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法找到眞實應甪，無法重新簽名：%@"
+          }
+        }
+      }
+    },
+    "无法更新 Dock 固定项。请确认外部存储已连接后重试；也可以移除旧图标，再将运行中的应用保留在程序坞中。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تحديث العناصر المثبّتة في Dock. تأكد من توصيل وحدة التخزين الخارجية ثم أعد المحاولة، أو أزل الأيقونة القديمة واختر «احتفاظ في شريط الأيقونات» للتطبيق أثناء تشغيله."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠕⠥⠇⠙ ⠝⠕⠞ ⠥⠏⠙⠁⠞⠑ ⠞⠓⠑ ⠠⠙⠕⠉⠅ ⠊⠞⠑⠍⠎⠲ ⠠⠉⠕⠝⠝⠑⠉⠞ ⠑⠭⠞⠑⠗⠝⠁⠇ ⠎⠞⠕⠗⠁⠛⠑ ⠁⠝⠙ ⠞⠗⠽ ⠁⠛⠁⠊⠝⠂ ⠕⠗ ⠗⠑⠍⠕⠧⠑ ⠞⠓⠑ ⠕⠇⠙ ⠊⠉⠕⠝ ⠁⠝⠙ ⠉⠓⠕⠕⠎⠑ ⠦⠠⠅⠑⠑⠏ ⠊⠝ ⠠⠙⠕⠉⠅⠴ ⠋⠕⠗ ⠞⠓⠑ ⠗⠥⠝⠝⠊⠝⠛ ⠁⠏⠏⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Dock-Einträge konnten nicht aktualisiert werden. Verbinden Sie den externen Speicher und versuchen Sie es erneut. Alternativ entfernen Sie das alte Symbol und wählen für die laufende App „Im Dock behalten“."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not update the Dock items. Connect external storage and try again, or remove the old icon and choose “Keep in Dock” for the running app."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne eblis ĝisdatigi la erojn en Dock. Konektu la eksteran stokilon kaj reprovu, aŭ forigu la malnovan ikonon kaj elektu “Konservi en Dock” por la funkcianta aplikaĵo."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron actualizar los elementos del Dock. Conecta el almacenamiento externo e inténtalo de nuevo, o elimina el icono antiguo y selecciona «Mantener en el Dock» para la app en ejecución."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de mettre à jour les éléments du Dock. Connectez le stockage externe et réessayez, ou retirez l’ancienne icône puis choisissez « Garder dans le Dock » pour l’app en cours d’exécution."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock के आइटम अपडेट नहीं किए जा सके। बाहरी स्टोरेज कनेक्ट करके फिर कोशिश करें, या पुराना आइकॉन हटाएँ और खुले हुए ऐप के लिए “Dock में रखें” चुनें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item Dock tidak dapat diperbarui. Sambungkan penyimpanan eksternal dan coba lagi, atau hapus ikon lama lalu pilih “Simpan di Dock” untuk app yang sedang berjalan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile aggiornare gli elementi del Dock. Collega l’unità esterna e riprova, oppure rimuovi la vecchia icona e scegli “Mantieni nel Dock” per l’app in esecuzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockの項目を更新できませんでした。外部ストレージを接続してからもう一度お試しください。または、古いアイコンを削除し、起動中のアプリで「Dockに残す」を選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock 항목을 업데이트할 수 없습니다. 외장 저장 장치를 연결한 후 다시 시도하거나, 이전 아이콘을 제거하고 실행 중인 앱에서 ‘Dock에 유지’를 선택하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De Dock-items konden niet worden bijgewerkt. Sluit de externe opslag aan en probeer het opnieuw, of verwijder het oude symbool en kies ‘Permanent in Dock’ voor de geopende app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się uaktualnić pozycji w Docku. Podłącz pamięć zewnętrzną i spróbuj ponownie albo usuń starą ikonę i wybierz „Zatrzymaj w Docku” dla uruchomionej aplikacji."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível atualizar os elementos da Dock. Ligue o armazenamento externo e tente novamente, ou remova o ícone antigo e escolha “Manter na Dock” para a aplicação em execução."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось обновить значки Dock. Подключите внешний накопитель и повторите попытку либо удалите старый значок и выберите «Оставить в Dock» для запущенного приложения."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถอัปเดตรายการใน Dock ได้ โปรดเชื่อมต่ออุปกรณ์จัดเก็บข้อมูลภายนอกแล้วลองอีกครั้ง หรือเอาไอคอนเก่าออกแล้วเลือก “เก็บไว้บน Dock” สำหรับแอปที่กำลังทำงานอยู่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock öğeleri güncellenemedi. Harici depolamayı bağlayıp yeniden deneyin veya eski simgeyi kaldırıp çalışan uygulama için “Dock’ta Tut” seçeneğini seçin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể cập nhật các mục trong Dock. Hãy kết nối bộ nhớ ngoài rồi thử lại, hoặc xóa biểu tượng cũ và chọn “Giữ lại trong Dock” cho ứng dụng đang chạy."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更新 Dock 固定项。请确认外部存储已连接后重试；也可以移除旧图标，再将运行中的应用保留在程序坞中。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法更新 Dock 固定項目。請確認外接儲存裝置已連接後再試；或移除舊圖示，再為執行中的應用程式選擇「保留在Dock上」。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法更新 Dock 固定項。請確認外部儲存巳連接後重試；乜可以移除舊圖標，再將運行中の應詠保留茬程序塢中。"
+          }
+        }
+      }
+    },
+    "无法检查更新，请稍后重试。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر التحقق من التحديثات. حاول مرة أخرى لاحقًا."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠝⠁⠃⠇⠑ ⠞⠕ ⠉⠓⠑⠉⠅ ⠋⠕⠗ ⠥⠏⠙⠁⠞⠑⠎⠲ ⠠⠏⠇⠑⠁⠎⠑ ⠞⠗⠽ ⠁⠛⠁⠊⠝ ⠇⠁⠞⠑⠗⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates konnten nicht geprüft werden. Bitte später erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to check for updates. Please try again later."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne eblas kontroli ĝisdatigojn. Bonvolu reprovi poste."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron buscar actualizaciones. Inténtalo más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de rechercher les mises à jour. Réessayez plus tard."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट की जाँच नहीं हो सकी। कृपया बाद में फिर कोशिश करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat memeriksa pembaruan. Coba lagi nanti."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cercare aggiornamenti. Riprova più tardi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートを確認できません。後でもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kan niet op updates controleren. Probeer het later opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można sprawdzić aktualizacji. Spróbuj ponownie później."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível procurar atualizações. Tente novamente mais tarde."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось проверить обновления. Повторите попытку позже."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถตรวจสอบการอัปเดตได้ โปรดลองอีกครั้งภายหลัง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeler denetlenemedi. Lütfen daha sonra yeniden deneyin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể kiểm tra cập nhật. Vui lòng thử lại sau."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法检查更新，请稍后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法檢查更新，請稍後重試。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法檢查更新，請稍後重試。"
+          }
+        }
+      }
+    },
     "无法读取外部目录路径" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -59990,6 +61226,280 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "哽改設寘後，請刷噺應詠列錶鉯查看效果"
+          }
+        }
+      }
+    },
+    "更新" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التحديثات"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠏⠙⠁⠞⠑⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ĝisdatigoj"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizaciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mises à jour"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pembaruan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamenti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualizacje"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновления"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การอัปเดต"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeler"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cập nhật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
+    "更新来源：GitHub Releases 与官方网站。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مصادر التحديث: GitHub Releases والموقع الرسمي."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠏⠙⠁⠞⠑ ⠎⠕⠥⠗⠉⠑⠎⠒ ⠠⠛⠊⠞⠠⠓⠥⠃ ⠠⠗⠑⠇⠑⠁⠎⠑⠎ ⠁⠝⠙ ⠞⠓⠑ ⠕⠋⠋⠊⠉⠊⠁⠇ ⠺⠑⠃⠎⠊⠞⠑⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update-Quellen: GitHub Releases und die offizielle Website."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update sources: GitHub Releases and the official website."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fontoj: GitHub Releases kaj la oficiala retejo."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuentes: GitHub Releases y el sitio web oficial."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources : GitHub Releases et le site officiel."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट स्रोत: GitHub Releases और आधिकारिक वेबसाइट।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sumber pembaruan: GitHub Releases dan situs web resmi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonti: GitHub Releases e il sito ufficiale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新元：GitHub Releasesと公式サイト。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 출처: GitHub Releases 및 공식 웹사이트."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updatebronnen: GitHub Releases en de officiële website."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Źródła: GitHub Releases i oficjalna strona internetowa."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fontes: GitHub Releases e o site oficial."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Источники: GitHub Releases и официальный сайт."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แหล่งอัปเดต: GitHub Releases และเว็บไซต์ทางการ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme kaynakları: GitHub Releases ve resmî web sitesi."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nguồn cập nhật: GitHub Releases và trang web chính thức."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新来源：GitHub Releases 与官方网站。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新來源：GitHub Releases 與官方網站。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新來源：GitHub Releases 與官方網站。"
           }
         }
       }
@@ -64378,6 +65888,143 @@
         }
       }
     },
+    "检查更新" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التحقق من التحديثات"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠓⠑⠉⠅ ⠋⠕⠗ ⠠⠥⠏⠙⠁⠞⠑⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nach Updates suchen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check for Updates"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontroli ĝisdatigojn"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar actualizaciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher des mises à jour"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट की जाँच करें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periksa Pembaruan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca aggiornamenti"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートを確認"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 확인"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoek naar updates"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprawdź aktualizacje"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Procurar atualizações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить обновления"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตรวจสอบการอัปเดต"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeleri Denetle"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra cập nhật"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查更新"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查更新"
+          }
+        }
+      }
+    },
     "检测到「%@」已经是一个现有软链。\n\n软链路径：%@\n目标路径：%@\n\n选择「规范化管理」后，AppPorts 会将这条软链接纳入受管状态，后续可直接还原。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -65881,6 +67528,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在接回目录"
+          }
+        }
+      }
+    },
+    "正在检查更新…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التحقق من التحديثات…"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠓⠑⠉⠅⠊⠝⠛ ⠋⠕⠗ ⠥⠏⠙⠁⠞⠑⠎…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates werden gesucht…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking for updates…"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontrolante ĝisdatigojn…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando actualizaciones…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche de mises à jour…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट की जाँच हो रही है…"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memeriksa pembaruan…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricerca aggiornamenti…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートを確認中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 확인 중…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoeken naar updates…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprawdzanie aktualizacji…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A procurar atualizações…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка обновлений…"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "กำลังตรวจสอบการอัปเดต…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeler denetleniyor…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang kiểm tra cập nhật…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在檢查更新…"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在檢查更新…"
           }
         }
       }
@@ -69995,6 +71779,143 @@
         }
       }
     },
+    "没有需要更新的 Dock 固定项。如果还未固定此应用，请打开应用后选择“在程序坞中保留”。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد عناصر في Dock تحتاج إلى تحديث. إذا لم يكن هذا التطبيق مثبّتًا بعد، فافتحه واختر «احتفاظ في شريط الأيقونات»."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠝⠕ ⠠⠙⠕⠉⠅ ⠊⠞⠑⠍⠎ ⠝⠑⠑⠙ ⠥⠏⠙⠁⠞⠊⠝⠛⠲ ⠠⠊⠋ ⠞⠓⠊⠎ ⠁⠏⠏ ⠊⠎ ⠝⠕⠞ ⠏⠊⠝⠝⠑⠙ ⠽⠑⠞⠂ ⠕⠏⠑⠝ ⠊⠞ ⠁⠝⠙ ⠉⠓⠕⠕⠎⠑ ⠦⠠⠅⠑⠑⠏ ⠊⠝ ⠠⠙⠕⠉⠅⠴⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Dock-Einträge müssen aktualisiert werden. Falls diese App noch nicht im Dock ist, öffnen Sie sie und wählen Sie „Im Dock behalten“."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Dock items need updating. If this app is not pinned yet, open it and choose “Keep in Dock”."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neniu ero en Dock bezonas ĝisdatigon. Se ĉi tiu aplikaĵo ankoraŭ ne estas fiksita, malfermu ĝin kaj elektu “Konservi en Dock”."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay elementos del Dock que necesiten actualizarse. Si esta app aún no está fijada, ábrela y selecciona «Mantener en el Dock»."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun élément du Dock ne nécessite de mise à jour. Si cette app n’est pas encore épinglée, ouvrez-la puis choisissez « Garder dans le Dock »."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock में कोई आइटम अपडेट करने की ज़रूरत नहीं है। अगर यह ऐप अभी तक पिन नहीं है, तो इसे खोलें और “Dock में रखें” चुनें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak ada item Dock yang perlu diperbarui. Jika app ini belum disematkan, buka app lalu pilih “Simpan di Dock”."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ci sono elementi del Dock da aggiornare. Se l’app non è ancora nel Dock, aprila e scegli “Mantieni nel Dock”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新が必要なDock項目はありません。このアプリをまだ登録していない場合は、アプリを開いて「Dockに残す」を選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트할 Dock 항목이 없습니다. 이 앱이 아직 고정되어 있지 않다면 앱을 연 다음 ‘Dock에 유지’를 선택하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er zijn geen Dock-items die moeten worden bijgewerkt. Als de app nog niet permanent in het Dock staat, open je deze en kies je ‘Permanent in Dock’."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Żadne pozycje w Docku nie wymagają uaktualnienia. Jeśli aplikacja nie jest jeszcze przypięta, otwórz ją i wybierz „Zatrzymaj w Docku”."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum elemento da Dock precisa de ser atualizado. Se esta aplicação ainda não estiver fixa, abra-a e escolha “Manter na Dock”."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет значков Dock, требующих обновления. Если это приложение ещё не закреплено, откройте его и выберите «Оставить в Dock»."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่มีรายการใน Dock ที่ต้องอัปเดต หากยังไม่ได้ปักหมุดแอปนี้ ให้เปิดแอปแล้วเลือก “เก็บไว้บน Dock”"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellenmesi gereken Dock öğesi yok. Bu uygulama henüz sabitlenmediyse uygulamayı açıp “Dock’ta Tut” seçeneğini seçin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có mục nào trong Dock cần cập nhật. Nếu chưa ghim ứng dụng này, hãy mở ứng dụng rồi chọn “Giữ lại trong Dock”."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有需要更新的 Dock 固定项。如果还未固定此应用，请打开应用后选择“在程序坞中保留”。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有需要更新的 Dock 固定項目。若尚未固定此應用程式，請開啟它並選擇「保留在Dock上」。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "莈有需要更新の Dock 固定項。如果還未固定此應詠，請咑開應詠後選擇“在程序坞中保留”。"
+          }
+        }
+      }
+    },
     "添加目录迁移" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -70950,6 +72871,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "煋仌呅"
+          }
+        }
+      }
+    },
+    "版权与许可" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حقوق النشر والترخيص"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠕⠏⠽⠗⠊⠛⠓⠞ ⠁⠝⠙ ⠠⠇⠊⠉⠑⠝⠎⠑"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Urheberrecht und Lizenz"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copyright and License"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopirajto kaj permesilo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Derechos de autor y licencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Droits d’auteur et licence"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कॉपीराइट और लाइसेंस"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hak Cipta dan Lisensi"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copyright e licenza"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "著作権とライセンス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저작권 및 라이선스"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auteursrecht en licentie"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prawa autorskie i licencja"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direitos de autor e licença"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Авторские права и лицензия"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลิขสิทธิ์และสัญญาอนุญาต"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telif Hakkı ve Lisans"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản quyền và giấy phép"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版权与许可"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版權與授權"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版權與許可"
           }
         }
       }
@@ -92185,6 +94243,143 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "非鎖定遷移"
+          }
+        }
+      }
+    },
+    "项目" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المشروع"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠏⠗⠕⠚⠑⠉⠞"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekto"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "परियोजना"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyek"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progetto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projeto"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проект"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "โครงการ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proje"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dự án"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "專案"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "項目"
           }
         }
       }

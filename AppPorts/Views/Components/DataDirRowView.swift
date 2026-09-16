@@ -181,7 +181,7 @@ struct DataDirRowView: View {
                 .buttonStyle(.plain)
                 .help("查看现有软链路径，并可将其纳入 AppPorts 管理".localized)
             } else {
-                Image(systemName: "link.badge.questionmark")
+                Image(systemName: "questionmark.circle")
                     .font(.system(size: 13))
                     .foregroundColor(.teal.opacity(0.85))
                     .help("检测到已有符号链接，非 AppPorts 迁移结果".localized)
@@ -285,7 +285,7 @@ struct DataDirStatusBadge: View {
         switch status {
         case "已链接": return "link"
         case "待规范": return "arrow.triangle.2.circlepath"
-        case "现有软链": return "link.badge.questionmark"
+        case "现有软链": return "questionmark.circle"
         case "待接回": return "arrow.triangle.branch"
         case "本地":   return "internaldrive"
         default:       return "questionmark"

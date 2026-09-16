@@ -142,75 +142,10 @@ actor DataDirMover {
                 operationErrorCode = "DATA-MIGRATE-ALREADY-MIGRATED"
                 throw DataDirError.destinationExists(destPath)
             } else {
-                // 源是真实目录 + 目标也是真实目录：只有严格匹配的 AppPorts metadata 才能自动恢复。
-                AppLogger.shared.log("目标已存在真实目录，检查 AppPorts 管理标记是否严格匹配...", level: "WARN")
-
-                if hasMatchingManagedLinkMetadata(at: destPath, sourcePath: sourcePath, destinationPath: destPath, type: item.type) {
-                    AppLogger.shared.log("目标目录包含匹配的 AppPorts 链接标记，视为上次迁移完成但未清理源，自动恢复...", level: "WARN")
-                    do {
-                        try writeManagedLinkMetadata(sourcePath: sourcePath, destinationPath: destPath, type: item.type)
-                    } catch {
-                        AppLogger.shared.logError(
-                            "标记恢复模式：写入 AppPorts 链接标记失败",
-                            error: error,
-                            errorCode: "DATA-MIGRATE-RECOVERY-METADATA-WRITE-FAILED",
-                            context: [("operation_id", operationID)],
-                            relatedURLs: [("source", sourcePath), ("destination", destPath)]
-                        )
-                        operationErrorCode = "DATA-MIGRATE-RECOVERY-METADATA-WRITE-FAILED"
-                        throw DataDirError.metadataWriteFailed(error)
-                    }
-                    let sourceBackupPath: URL
-                    do {
-                        sourceBackupPath = try moveSourceToMigrationBackup(sourcePath, operationID: operationID)
-                    } catch {
-                        AppLogger.shared.logError(
-                            "标记恢复模式：移动源目录到安全备份失败，保留外部副本",
-                            error: error,
-                            errorCode: "DATA-MIGRATE-RECOVERY-BACKUP-MOVE-FAILED",
-                            context: [("operation_id", operationID)],
-                            relatedURLs: [("source", sourcePath), ("destination", destPath)]
-                        )
-                        operationErrorCode = "DATA-MIGRATE-RECOVERY-BACKUP-MOVE-FAILED"
-                        throw DataDirError.deletionFailed(error)
-                    }
-                    do {
-                        try createSymbolicLink(at: sourcePath, withDestinationURL: destPath)
-                        AppLogger.shared.log("标记恢复模式：符号链接创建成功")
-                        AppLogger.shared.logPathState("标记恢复完成-本地链接[\(operationID)]", url: sourcePath)
-                        AppLogger.shared.logPathState("标记恢复完成-外部目标[\(operationID)]", url: destPath)
-                    } catch {
-                        AppLogger.shared.logError(
-                            "标记恢复模式：创建符号链接失败，恢复本地安全备份，保留外部副本",
-                            error: error,
-                            errorCode: "DATA-MIGRATE-RECOVERY-LINK-FAILED",
-                            context: [("operation_id", operationID)],
-                            relatedURLs: [("source", sourcePath), ("destination", destPath), ("backup", sourceBackupPath)]
-                        )
-                        restoreMigrationBackup(sourceBackupPath, to: sourcePath, operationID: operationID)
-                        try? removeManagedLinkMetadata(in: sourcePath)
-                        operationErrorCode = "DATA-MIGRATE-RECOVERY-LINK-FAILED"
-                        throw DataDirError.symlinkFailed(error)
-                    }
-                    do {
-                        try cleanupMigrationBackup(sourceBackupPath, operationID: operationID)
-                        operationResult = "success"
-                    } catch {
-                        AppLogger.shared.logError(
-                            "标记恢复模式：迁移已完成，但本地安全备份清理失败，外部副本保持不变",
-                            error: error,
-                            errorCode: "DATA-MIGRATE-RECOVERY-BACKUP-CLEANUP-FAILED",
-                            context: [("operation_id", operationID)],
-                            relatedURLs: [("backup", sourceBackupPath), ("destination", destPath)]
-                        )
-                        operationResult = "success_with_warning"
-                        operationErrorCode = "DATA-MIGRATE-RECOVERY-BACKUP-CLEANUP-FAILED"
-                    }
-                    return
-                }
-
+                // 管理标记只能证明副本归属。上次失败后本地数据可能已更新，
+                // 不能仅凭标记复用旧副本并删除当前源；保留两端供用户处理冲突。
                 AppLogger.shared.logError(
-                    "目标位置存在真实目录且没有匹配的 AppPorts 管理标记，拒绝自动覆盖",
+                    "源和目标均存在真实目录，保留两端并拒绝自动覆盖",
                     errorCode: "DATA-MIGRATE-DESTINATION-CONFLICT",
                     context: [("operation_id", operationID), ("destination_path", destPath.path)],
                     relatedURLs: [("source", sourcePath), ("destination", destPath)]
@@ -223,9 +158,14 @@ actor DataDirMover {
         // 3. 复制到外部存储（带进度）
         AppLogger.shared.log("步骤1: 开始复制数据目录...")
         let copier = FileCopier()
-        let totalBytes = fastDirectorySize(at: sourcePath, fileManager: fileManager)
+        let totalBytes: Int64
         do {
-            try await copier.copyDirectory(from: sourcePath, to: destPath, progressHandler: progressHandler)
+            totalBytes = try await copier.copyDirectory(
+                from: sourcePath,
+                to: destPath,
+                estimatedTotalBytes: item.sizeBytes,
+                progressHandler: progressHandler
+            )
             AppLogger.shared.log("步骤1: 复制完成")
             AppLogger.shared.logPathState("数据目录步骤1后-外部副本[\(operationID)]", url: destPath)
         } catch {
@@ -402,8 +342,10 @@ actor DataDirMover {
             operationErrorCode = "DATA-RESTORE-INVALID-SYMLINK"
             throw DataDirError.invalidSymlink(localPath)
         }
-        let externalPath = URL(fileURLWithPath: externalPathStr)
-        AppLogger.shared.log("外部路径: \(externalPath.path)")
+        // 从实际入口解析，先遵循父目录和目标中的符号链接，再处理 `..`。
+        // 直接拼接后 standardize 会词法折叠路径，可能选中并删除无关的同名目录。
+        let externalPath = localPath.resolvingSymlinksInPath()
+        AppLogger.shared.log("外部路径: \(externalPath.path)（链接目标: \(externalPathStr)）")
         AppLogger.shared.logPathState("数据目录还原前-外部源[\(operationID)]", url: externalPath)
 
         // 确认外部目录存在
@@ -422,10 +364,15 @@ actor DataDirMover {
         let stagingName = "restore-staging-\(UUID().uuidString)"
         let stagingPath = localPath.deletingLastPathComponent().appendingPathComponent(stagingName)
         AppLogger.shared.log("步骤1: 复制数据到暂存目录 \(stagingPath.lastPathComponent)...")
-        let totalBytes = fastDirectorySize(at: externalPath, fileManager: fileManager)
+        let totalBytes: Int64
         do {
             let copier = FileCopier()
-            try await copier.copyDirectory(from: externalPath, to: stagingPath, progressHandler: progressHandler)
+            totalBytes = try await copier.copyDirectory(
+                from: externalPath,
+                to: stagingPath,
+                estimatedTotalBytes: item.sizeBytes,
+                progressHandler: progressHandler
+            )
             try? removeManagedLinkMetadata(in: stagingPath)
             AppLogger.shared.log("步骤1: 复制完成")
             AppLogger.shared.logPathState("数据目录还原步骤1后-暂存目录[\(operationID)]", url: stagingPath)
@@ -438,7 +385,7 @@ actor DataDirMover {
                 context: [("operation_id", operationID)],
                 relatedURLs: [("local", localPath), ("external", externalPath), ("staging", stagingPath)]
             )
-            try? fileManager.removeItem(at: stagingPath)
+            try? FileCopier.removeCopy(at: stagingPath)
             operationErrorCode = "DATA-RESTORE-COPY-FAILED"
             throw DataDirError.copyFailed(error)
         }
@@ -457,7 +404,7 @@ actor DataDirMover {
                 context: [("operation_id", operationID)],
                 relatedURLs: [("local", localPath), ("staging", stagingPath)]
             )
-            try? fileManager.removeItem(at: stagingPath)
+            try? FileCopier.removeCopy(at: stagingPath)
             operationErrorCode = "DATA-RESTORE-SYMLINK-REMOVE-FAILED"
             throw DataDirError.deletionFailed(error)
         }
@@ -485,25 +432,23 @@ actor DataDirMover {
         AppLogger.shared.log("步骤3: 删除外部目录...")
         await progressHandler?(FileCopier.Progress(copiedBytes: totalBytes, totalBytes: totalBytes, currentFile: "正在清理外部存储...".localized))
         try? removeManagedLinkMetadata(in: externalPath)
-        // 先递归删除子目录内容（避免受保护文件阻止删除父目录）
-        try? fileManager.removeItem(at: externalPath)
-        // 如果整体删除失败，尝试逐个删除内容
-        if fileManager.fileExists(atPath: externalPath.path) {
-            AppLogger.shared.log("整体删除外部目录失败，尝试逐项清理...")
-            try? removeAllContents(of: externalPath)
-            try? fileManager.removeItem(at: externalPath)
-        }
-        if fileManager.fileExists(atPath: externalPath.path) {
-            AppLogger.shared.log("步骤3: 删除外部目录失败（本地还原已完成，可手动清理）", level: "WARN")
+        do {
+            // removeCopy 不会穿透目录软链。清理失败时保留剩余内容，
+            // 不再使用可能递归到链接目标的逐项删除回退。
+            try FileCopier.removeCopy(at: externalPath)
+            AppLogger.shared.log("步骤3: 完成")
+        } catch {
+            AppLogger.shared.logError(
+                "步骤3: 删除外部目录失败（本地还原已完成，可手动清理）",
+                error: error,
+                errorCode: "DATA-RESTORE-EXTERNAL-CLEANUP-FAILED",
+                context: [("operation_id", operationID)],
+                relatedURLs: [("local", localPath), ("external", externalPath)]
+            )
             operationResult = "success_with_warning"
             operationErrorCode = "DATA-RESTORE-EXTERNAL-CLEANUP-FAILED"
-        } else {
-            AppLogger.shared.log("步骤3: 完成")
         }
         AppLogger.shared.logPathState("数据目录还原完成-外部路径[\(operationID)]", url: externalPath)
-
-        // 清理本地残留的 partial-recovery 暂存目录
-        cleanStaleRestoreStaging(in: localPath.deletingLastPathComponent())
 
         AppLogger.shared.log("===== 数据目录还原完成 =====")
         AppLogger.shared.logPathState("数据目录还原完成-本地路径[\(operationID)]", url: localPath)
@@ -855,7 +800,7 @@ actor DataDirMover {
             try? removeManagedLinkMetadata(in: standardizedDestination)
 
             if fileManager.fileExists(atPath: standardizedDestination.path) {
-                try fileManager.removeItem(at: standardizedDestination)
+                try FileCopier.removeCopy(at: standardizedDestination)
                 AppLogger.shared.logContext(
                     "迁移回滚：已删除外部半成品目录",
                     details: [
@@ -948,7 +893,7 @@ actor DataDirMover {
         }
 
         guard fileManager.fileExists(atPath: backupURL.path) else { return }
-        try fileManager.removeItem(at: backupURL)
+        try FileCopier.removeCopy(at: backupURL)
         AppLogger.shared.logContext(
             "迁移安全备份：已清理本地备份",
             details: [
@@ -1039,44 +984,6 @@ actor DataDirMover {
     ///
     /// macOS 系统保护 `~/Library/Containers/` 目录，不允许第三方应用创建新条目。
     /// 迁移这些目录会导致原始数据被删除后无法创建符号链接，造成数据丢失。
-    /// 递归删除目录下所有内容（跳过受保护无法删除的文件）
-    private func removeAllContents(of directory: URL) throws {
-        guard let contents = try? fileManager.contentsOfDirectory(atPath: directory.path) else { return }
-        for item in contents {
-            let itemURL = directory.appendingPathComponent(item)
-            do {
-                // 先处理子目录
-                var isDir: ObjCBool = false
-                if fileManager.fileExists(atPath: itemURL.path, isDirectory: &isDir), isDir.boolValue {
-                    try removeAllContents(of: itemURL)
-                }
-                try fileManager.removeItem(at: itemURL)
-            } catch {
-                AppLogger.shared.logContext(
-                    "清理时跳过受保护文件",
-                    details: [("path", itemURL.path), ("error", error.localizedDescription)],
-                    level: "TRACE"
-                )
-            }
-        }
-    }
-
-    /// 清理 restore 操作遗留的 partial-recovery / restore-staging 暂存目录
-    private func cleanStaleRestoreStaging(in parentURL: URL) {
-        guard let contents = try? fileManager.contentsOfDirectory(atPath: parentURL.path) else { return }
-        for item in contents {
-            if item.contains("partial-recovery-") || item.contains("restore-staging-") {
-                let itemURL = parentURL.appendingPathComponent(item)
-                try? fileManager.removeItem(at: itemURL)
-                AppLogger.shared.logContext(
-                    "已清理残留的还原暂存目录",
-                    details: [("path", itemURL.path)],
-                    level: "INFO"
-                )
-            }
-        }
-    }
-
     private func isProtectedContainersPath(_ url: URL) -> Bool {
         // 使用真实 home 目录，而非可覆盖的 homeDir（测试中会注入临时目录）
         let realHome = URL(fileURLWithPath: NSHomeDirectory())
@@ -1133,40 +1040,38 @@ actor DataDirMover {
 
         let markerURL = markerURL(for: destinationPath)
         let data = try encoder.encode(metadata)
-        try data.write(to: markerURL, options: .atomic)
+        try withWritableMetadataParent(for: markerURL) {
+            try data.write(to: markerURL, options: .atomic)
+        }
     }
 
     private func removeManagedLinkMetadata(in directoryURL: URL) throws {
         let markerURL = markerURL(for: directoryURL)
         guard fileManager.fileExists(atPath: markerURL.path) else { return }
-        try fileManager.removeItem(at: markerURL)
+        try withWritableMetadataParent(for: markerURL) {
+            try fileManager.removeItem(at: markerURL)
+        }
     }
 
-    private func readManagedLinkMetadata(at directoryURL: URL) -> ManagedLinkMetadata? {
-        let markerURL = markerURL(for: directoryURL)
-        guard fileManager.fileExists(atPath: markerURL.path),
-              let data = try? Data(contentsOf: markerURL),
-              let metadata = try? PropertyListDecoder().decode(ManagedLinkMetadata.self, from: data) else {
-            return nil
-        }
-        return metadata
-    }
-
-    private func hasMatchingManagedLinkMetadata(
-        at directoryURL: URL,
-        sourcePath: URL,
-        destinationPath: URL,
-        type: DataDirType
-    ) -> Bool {
-        guard let metadata = readManagedLinkMetadata(at: directoryURL) else {
-            return false
+    /// 复制器保留只读目录权限；写入/移除 AppPorts 标记时仅临时开放父目录写权限。
+    private func withWritableMetadataParent(for markerURL: URL, operation: () throws -> Void) throws {
+        let parent = markerURL.deletingLastPathComponent()
+        let attributes = try fileManager.attributesOfItem(atPath: parent.path)
+        guard attributes[.type] as? FileAttributeType == .typeDirectory,
+              let permissions = attributes[.posixPermissions] as? Int,
+              !fileManager.isWritableFile(atPath: parent.path) else {
+            try operation()
+            return
         }
 
-        return metadata.schemaVersion == managedLinkSchemaVersion
-            && metadata.managedBy == managedLinkIdentifier
-            && metadata.sourcePath == sourcePath.standardizedFileURL.path
-            && metadata.destinationPath == destinationPath.standardizedFileURL.path
-            && metadata.dataDirType == type.rawValue
+        try fileManager.setAttributes([.posixPermissions: permissions | 0o200], ofItemAtPath: parent.path)
+        do {
+            try operation()
+        } catch {
+            try? fileManager.setAttributes([.posixPermissions: permissions], ofItemAtPath: parent.path)
+            throw error
+        }
+        try fileManager.setAttributes([.posixPermissions: permissions], ofItemAtPath: parent.path)
     }
 
     private func markerURL(for directoryURL: URL) -> URL {

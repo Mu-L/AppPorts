@@ -11,6 +11,7 @@ import AppKit
 /// 应用图标异步加载视图
 struct AppIconView: View {
     let url: URL
+    var size: CGFloat = 40
 
     @State private var icon: NSImage? = nil
 
@@ -24,7 +25,7 @@ struct AppIconView: View {
                 Color.clear
             }
         }
-        .frame(width: 40, height: 40)
+        .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
         .accessibilityHidden(true)
         .task(id: url) {

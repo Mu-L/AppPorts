@@ -29,7 +29,12 @@ final class AppMigrationServiceTests: XCTestCase {
         let externalAppURL = workspace.externalRootURL.appendingPathComponent("Foo.app")
         try createAppBundle(at: localAppURL)
 
-        let service = AppMigrationService()
+        var dockUpdates: [(source: URL, destination: URL)] = []
+        let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+            try self.assertRealAppBundle(destination)
+            dockUpdates.append((source, destination))
+            return 1
+        })
         let localItem = AppItem(name: "Foo.app", path: localAppURL, status: "本地")
 
         try await service.moveAndLink(
@@ -59,6 +64,8 @@ final class AppMigrationServiceTests: XCTestCase {
 
         try assertRealAppBundle(localAppURL)
         XCTAssertFalse(fileManager.fileExists(atPath: externalAppURL.path))
+        XCTAssertEqual(dockUpdates.map(\.source), [localAppURL, localAppURL, externalAppURL])
+        XCTAssertEqual(dockUpdates.map(\.destination), [externalAppURL, externalAppURL, localAppURL])
     }
 
     func testMoveAndLinkRollsBackWhenPortalCreationFails() async throws {
@@ -69,8 +76,17 @@ final class AppMigrationServiceTests: XCTestCase {
         let externalAppURL = workspace.externalRootURL.appendingPathComponent("Rollback.app")
         try createAppBundle(at: localAppURL)
 
+        var dockUpdateCount = 0
         let service = AppMigrationService(portalCreationOverride: { _, _ in
             throw NSError(domain: "AppPortsTests", code: 99, userInfo: [NSLocalizedDescriptionKey: "forced failure"])
+        }, dockShortcutUpdater: { source, destination in
+            // Failed migration must never pin the external copy; rollback may refresh
+            // the identity only after a complete local application exists again.
+            XCTAssertEqual(source, externalAppURL)
+            XCTAssertEqual(destination, localAppURL)
+            try self.assertRealAppBundle(destination)
+            dockUpdateCount += 1
+            return 1
         })
 
         do {
@@ -85,6 +101,7 @@ final class AppMigrationServiceTests: XCTestCase {
             XCTAssertFalse(fileManager.fileExists(atPath: externalAppURL.path))
             try assertRealAppBundle(localAppURL)
         }
+        XCTAssertEqual(dockUpdateCount, 1)
     }
 
     func testFolderMoveAndRestoreUsesFolderMirror() async throws {
@@ -101,7 +118,13 @@ final class AppMigrationServiceTests: XCTestCase {
         try fileManager.createDirectory(at: localSuiteURL.appendingPathComponent("Documents"), withIntermediateDirectories: true)
         try "license".write(to: localSuiteURL.appendingPathComponent("Documents/License.txt"), atomically: true, encoding: .utf8)
 
-        let service = AppMigrationService()
+        var dockUpdates: [(source: URL, destination: URL)] = []
+        let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+            try self.assertRealAppBundle(destination.appendingPathComponent("Word.app"))
+            try self.assertRealAppBundle(destination.appendingPathComponent("Excel.app"))
+            dockUpdates.append((source, destination))
+            return 2
+        })
         let suiteItem = AppItem(
             name: "Office",
             path: localSuiteURL,
@@ -143,6 +166,8 @@ final class AppMigrationServiceTests: XCTestCase {
         // 还原后本地为真实套件，标记消失，外部已删除
         try assertRealAppBundle(localSuiteURL.appendingPathComponent("Word.app"))
         try assertRealAppBundle(localSuiteURL.appendingPathComponent("Excel.app"))
+        XCTAssertEqual(dockUpdates.map(\.source), [localSuiteURL, externalSuiteURL])
+        XCTAssertEqual(dockUpdates.map(\.destination), [externalSuiteURL, localSuiteURL])
         XCTAssertFalse(fileManager.fileExists(atPath: localSuiteURL.appendingPathComponent(AppMigrationService.folderPortalMarkerName).path))
         XCTAssertEqual(try String(contentsOf: localSuiteURL.appendingPathComponent("Manual.pdf"), encoding: .utf8), "manual")
         XCTAssertFalse(fileManager.fileExists(atPath: externalSuiteURL.path))
@@ -158,7 +183,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: localSuiteURL.appendingPathComponent("Word.app"))
         try createAppBundle(at: localSuiteURL.appendingPathComponent("Excel.app"))
 
-        let service = AppMigrationService()
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in 0 })
         try await service.moveAndLink(
             appToMove: AppItem(name: "Office", path: localSuiteURL, status: "本地", isFolder: true, appCount: 2),
             destinationURL: externalSuiteURL,
@@ -184,7 +209,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: localSuiteURL.appendingPathComponent("Word.app"))
         try createAppBundle(at: localSuiteURL.appendingPathComponent("Excel.app"))
 
-        let service = AppMigrationService()
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in 0 })
         try await service.moveAndLink(
             appToMove: AppItem(name: "Office", path: localSuiteURL, status: "本地", isFolder: true, appCount: 2),
             destinationURL: externalSuiteURL,
@@ -220,7 +245,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try fileManager.createSymbolicLink(at: localSuiteURL, withDestinationURL: externalSuiteURL)
 
         // 应安全跳过：不抛错，不改动符号链接
-        AppMigrationService().refreshFolderMirror(at: localSuiteURL, from: externalSuiteURL)
+        AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).refreshFolderMirror(at: localSuiteURL, from: externalSuiteURL)
         try assertWholeAppSymlink(localSuiteURL, pointsTo: externalSuiteURL)
     }
 
@@ -232,7 +257,7 @@ final class AppMigrationServiceTests: XCTestCase {
         let localAppURL = workspace.localAppsURL.appendingPathComponent("Phone.app")
         try createAppBundle(at: externalAppURL, wrappedBundle: true)
 
-        try AppMigrationService().linkApp(
+        try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).linkApp(
             appToLink: AppItem(name: "Phone.app", path: externalAppURL, status: "未链接"),
             destinationURL: localAppURL
         )
@@ -248,7 +273,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: localAppURL)
 
         XCTAssertThrowsError(
-            try AppMigrationService().deleteLink(
+            try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).deleteLink(
                 app: AppItem(name: "Safe.app", path: localAppURL, status: "已链接")
             )
         )
@@ -264,7 +289,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: externalSuiteURL.appendingPathComponent("Word.app"))
         try createAppBundle(at: externalSuiteURL.appendingPathComponent("Excel.app"))
 
-        try AppMigrationService().linkApp(
+        try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).linkApp(
             appToLink: AppItem(
                 name: "Office",
                 path: externalSuiteURL,
@@ -291,7 +316,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: externalAppURL, payload: "external-real")
 
         do {
-            try await AppMigrationService().moveAndLink(
+            try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
                 appToMove: AppItem(name: "Conflict.app", path: localAppURL, status: AppStatus.local),
                 destinationURL: externalAppURL,
                 isRunning: false,
@@ -315,7 +340,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: localAppURL, payload: "new-local")
         try createAppBundle(at: externalAppURL, payload: "old-external")
 
-        try await AppMigrationService().moveAndLink(
+        try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
             appToMove: AppItem(name: "Replace.app", path: localAppURL, status: AppStatus.pendingMoveOut),
             destinationURL: externalAppURL,
             isRunning: false,
@@ -338,7 +363,7 @@ final class AppMigrationServiceTests: XCTestCase {
         try createAppBundle(at: staleRealAppURL, payload: "stale-real")
         try createStubPortal(at: externalAppURL, pointingTo: staleRealAppURL)
 
-        try await AppMigrationService().moveAndLink(
+        try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
             appToMove: AppItem(name: "StubResidue.app", path: localAppURL, status: AppStatus.local),
             destinationURL: externalAppURL,
             isRunning: false,
@@ -365,7 +390,7 @@ final class AppMigrationServiceTests: XCTestCase {
             withDestinationURL: staleRealAppURL.appendingPathComponent("Contents")
         )
 
-        try await AppMigrationService().moveAndLink(
+        try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
             appToMove: AppItem(name: "DeepResidue.app", path: localAppURL, status: AppStatus.local),
             destinationURL: externalAppURL,
             isRunning: false,
@@ -395,7 +420,7 @@ final class AppMigrationServiceTests: XCTestCase {
             withDestinationURL: staleRealAppURL.appendingPathComponent("Contents/MacOS")
         )
 
-        try await AppMigrationService().moveAndLink(
+        try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
             appToMove: AppItem(name: "HybridResidue.app", path: localAppURL, status: AppStatus.local),
             destinationURL: externalAppURL,
             isRunning: false,
@@ -405,6 +430,418 @@ final class AppMigrationServiceTests: XCTestCase {
         try assertStubPortal(localAppURL, pointsTo: externalAppURL)
         try assertRealAppBundle(externalAppURL)
         XCTAssertEqual(try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "fresh-local")
+    }
+
+    func testFailedCopyRemovesPartialDestinationAndCanBeRetried() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Retry.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Retry.app")
+        try createAppBundle(at: localAppURL, payload: "keep-original")
+        let unreadableURL = localAppURL.appendingPathComponent("Contents/Resources/blocked.dat")
+        try Data("retry-payload".utf8).write(to: unreadableURL)
+        try fileManager.setAttributes([.posixPermissions: 0], ofItemAtPath: unreadableURL.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: unreadableURL.path) }
+
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in 0 })
+        let item = AppItem(name: "Retry.app", path: localAppURL, status: AppStatus.local)
+        do {
+            try await service.moveAndLink(
+                appToMove: item,
+                destinationURL: externalAppURL,
+                isRunning: false,
+                progressHandler: nil
+            )
+            XCTFail("An unreadable source file must fail the migration")
+        } catch {
+            try assertRealAppBundle(localAppURL)
+            XCTAssertFalse(fileManager.fileExists(atPath: externalAppURL.path), "Partial copies must not block a retry")
+            XCTAssertEqual(
+                try String(contentsOf: localAppURL.appendingPathComponent("Contents/Resources/payload.txt")),
+                "keep-original"
+            )
+        }
+
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: unreadableURL.path)
+        try await service.moveAndLink(
+            appToMove: item,
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        XCTAssertEqual(
+            try Data(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/blocked.dat")),
+            Data("retry-payload".utf8)
+        )
+    }
+
+    func testMigrationOnlyRemovesQuarantineAndPreservesOtherExtendedAttributes() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Metadata.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Metadata.app")
+        try createAppBundle(at: localAppURL)
+        let resourcePath = "Contents/Resources/payload.txt"
+        let resourceURL = localAppURL.appendingPathComponent(resourcePath)
+        let marker = "preserved-metadata"
+        let attributeName = "com.appports.tests.migration"
+        let quarantine = "0081;00000000;AppPortsTests;"
+        for url in [localAppURL, resourceURL] {
+            XCTAssertEqual(marker.withCString { setxattr(url.path, attributeName, $0, marker.utf8.count, 0, 0) }, 0)
+            XCTAssertEqual(quarantine.withCString { setxattr(url.path, "com.apple.quarantine", $0, quarantine.utf8.count, 0, 0) }, 0)
+        }
+
+        try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
+            appToMove: AppItem(name: "Metadata.app", path: localAppURL, status: AppStatus.local),
+            destinationURL: externalAppURL,
+            isRunning: false,
+            progressHandler: nil
+        )
+
+        for url in [externalAppURL, externalAppURL.appendingPathComponent(resourcePath)] {
+            var buffer = [UInt8](repeating: 0, count: marker.utf8.count)
+            let count = getxattr(url.path, attributeName, &buffer, buffer.count, 0, 0)
+            XCTAssertEqual(count, marker.utf8.count, "Unrelated extended attributes must survive migration")
+            XCTAssertEqual(String(bytes: buffer, encoding: .utf8), marker)
+            XCTAssertEqual(getxattr(url.path, "com.apple.quarantine", nil, 0, 0, 0), -1)
+            XCTAssertEqual(errno, ENOATTR)
+        }
+    }
+
+    func testSourceDeletionFailureAlwaysKeepsTheCompleteExternalCopy() async throws {
+        for useFinderFallback in [false, true] {
+            let workspace = try makeWorkspace()
+            defer { cleanupWorkspace(workspace.rootURL) }
+            let localAppURL = workspace.localAppsURL.appendingPathComponent("ReadOnly.app")
+            let externalAppURL = workspace.externalRootURL.appendingPathComponent("ReadOnly.app")
+            try createAppBundle(at: localAppURL, payload: "complete-copy")
+            let blockedRelativePath = "Contents/Resources/blocked"
+            let blockedURL = localAppURL.appendingPathComponent(blockedRelativePath)
+            try fileManager.createDirectory(at: blockedURL, withIntermediateDirectories: true)
+            try Data("locked-content".utf8).write(to: blockedURL.appendingPathComponent("locked.dat"))
+            for index in 0..<30 {
+                try Data("payload-\(index)".utf8).write(
+                    to: localAppURL.appendingPathComponent("Contents/Resources/normal-\(index).dat")
+                )
+            }
+            try fileManager.setAttributes([.posixPermissions: 0o555], ofItemAtPath: blockedURL.path)
+            defer {
+                for root in [localAppURL, externalAppURL] {
+                    try? fileManager.setAttributes(
+                        [.posixPermissions: 0o755],
+                        ofItemAtPath: root.appendingPathComponent(blockedRelativePath).path
+                    )
+                }
+            }
+            let fallback: AppMigrationService.FinderRemover? = useFinderFallback ? { _ in
+                throw CocoaError(.fileWriteNoPermission)
+            } : nil
+
+            do {
+                try await AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).moveAndLink(
+                    appToMove: AppItem(name: "ReadOnly.app", path: localAppURL, status: AppStatus.local),
+                    destinationURL: externalAppURL,
+                    isRunning: false,
+                    deleteSourceFallback: fallback,
+                    progressHandler: nil
+                )
+                XCTFail("Deleting the read-only source subtree must fail")
+            } catch {
+                try assertRealAppBundle(externalAppURL)
+                for index in 0..<30 {
+                    XCTAssertEqual(
+                        try Data(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/normal-\(index).dat")),
+                        Data("payload-\(index)".utf8)
+                    )
+                }
+                XCTAssertEqual(
+                    try Data(contentsOf: externalAppURL.appendingPathComponent("\(blockedRelativePath)/locked.dat")),
+                    Data("locked-content".utf8)
+                )
+            }
+        }
+    }
+
+    func testCancelledRestoreCleansReadOnlyCopyAndRestoresTheOriginalPortal() async throws {
+        let workspace = try makeWorkspace()
+        defer { try? FileCopier.removeCopy(at: workspace.rootURL) }
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Cancelled.app")
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Cancelled.app")
+        try createAppBundle(at: externalAppURL, payload: "keep-external-source")
+        let largePayload = Data(repeating: 0xA5, count: 6 * 1024 * 1024)
+        let largePayloadPath = "Contents/Resources/large.dat"
+        try largePayload.write(to: externalAppURL.appendingPathComponent(largePayloadPath))
+        try fileManager.createSymbolicLink(at: localAppURL, withDestinationURL: externalAppURL)
+
+        let restoreTask = Task {
+            try await AppMigrationService(dockShortcutUpdater: { _, _ in
+                XCTFail("A cancelled restore must keep the external Dock target")
+                return 0
+            }).moveBack(
+                app: AppItem(name: "Cancelled.app", path: externalAppURL, status: AppStatus.linked),
+                localDestinationURL: localAppURL
+            ) { progress in
+                guard progress.copiedBytes > 0 else { return }
+                // Reproduce a cancellation after directory permissions have become read-only,
+                // without depending on filesystem enumeration order or wall-clock timing.
+                do {
+                    try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: localAppURL.path)
+                    withUnsafeCurrentTask { $0?.cancel() }
+                } catch {
+                    XCTFail("Failed to prepare the read-only cancellation: \(error)")
+                }
+            }
+        }
+
+        do {
+            try await restoreTask.value
+            XCTFail("The cancelled copy must fail the restore")
+        } catch is CancellationError {
+            // The original cancellation must propagate after cleanup and portal restoration.
+        }
+
+        try assertWholeAppSymlink(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(try Data(contentsOf: externalAppURL.appendingPathComponent(largePayloadPath)), largePayload)
+        XCTAssertEqual(
+            try String(contentsOf: externalAppURL.appendingPathComponent("Contents/Resources/payload.txt")),
+            "keep-external-source"
+        )
+    }
+
+    func testDockSyncFailureDoesNotUndoCompletedMigrationOrRestore() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("DockWriteFailure.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("DockWriteFailure.app")
+        try createAppBundle(at: localAppURL, payload: "keep-complete-app")
+        var attempts = 0
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in
+            attempts += 1
+            throw CocoaError(.fileWriteNoPermission)
+        })
+
+        try await service.moveAndLink(
+            appToMove: AppItem(name: "DockWriteFailure.app", path: localAppURL, status: AppStatus.local),
+            destinationURL: externalAppURL, isRunning: false, progressHandler: nil
+        )
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        try assertRealAppBundle(externalAppURL)
+
+        try await service.moveBack(
+            app: AppItem(name: "DockWriteFailure.app", path: externalAppURL, status: AppStatus.linked),
+            localDestinationURL: localAppURL, progressHandler: nil
+        )
+        try assertRealAppBundle(localAppURL)
+        XCTAssertEqual(try String(contentsOf: localAppURL.appendingPathComponent("Contents/Resources/payload.txt")), "keep-complete-app")
+        XCTAssertFalse(fileManager.fileExists(atPath: externalAppURL.path))
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func testRepairDockUsesExistingPortalWithoutRequiringVersionChange() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Existing.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Existing.app")
+        try createAppBundle(at: externalAppURL)
+        try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).linkApp(
+            appToLink: AppItem(name: "Existing.app", path: externalAppURL, status: AppStatus.unlinked),
+            destinationURL: localAppURL
+        )
+        var updates = 0
+        let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+            XCTAssertEqual(source, localAppURL)
+            XCTAssertEqual(destination.resolvingSymlinksInPath(), externalAppURL.resolvingSymlinksInPath())
+            updates += 1
+            return 1
+        })
+
+        XCTAssertEqual(try service.repairDockShortcuts(for: AppItem(
+            name: "Existing.app", path: localAppURL, status: AppStatus.linked
+        )), 1)
+        try assertStubPortal(localAppURL, pointsTo: externalAppURL)
+        XCTAssertEqual(updates, 1)
+
+        try fileManager.removeItem(at: externalAppURL)
+        XCTAssertThrowsError(try service.repairDockShortcuts(for: AppItem(
+            name: "Existing.app", path: localAppURL, status: AppStatus.linked
+        )))
+        XCTAssertEqual(updates, 1, "An offline portal must not redirect Dock to a missing app")
+    }
+
+    func testRepairDockRejectsStaleLinkedStatusOnARealLocalApp() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let realAppURL = workspace.localAppsURL.appendingPathComponent("Real.app").resolvingSymlinksInPath()
+        try createAppBundle(at: realAppURL)
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in
+            XCTFail("A real local app is not an AppPorts portal")
+            return 0
+        })
+        XCTAssertThrowsError(try service.repairDockShortcuts(for: AppItem(
+            name: "Real.app", path: realAppURL, status: AppStatus.linked
+        )))
+    }
+
+    func testRepairDockResolvesLegacyHybridComponents() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Legacy.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Legacy.app")
+        try createAppBundle(at: externalAppURL)
+        try fileManager.createDirectory(at: localAppURL.appendingPathComponent("Contents"), withIntermediateDirectories: true)
+        try fileManager.copyItem(
+            at: externalAppURL.appendingPathComponent("Contents/Info.plist"),
+            to: localAppURL.appendingPathComponent("Contents/Info.plist")
+        )
+        try fileManager.createSymbolicLink(
+            at: localAppURL.appendingPathComponent("Contents/MacOS"),
+            withDestinationURL: externalAppURL.appendingPathComponent("Contents/MacOS")
+        )
+        let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+            XCTAssertEqual(source, localAppURL)
+            XCTAssertEqual(destination.resolvingSymlinksInPath(), externalAppURL.resolvingSymlinksInPath())
+            return 1
+        })
+        XCTAssertEqual(try service.repairDockShortcuts(for: AppItem(
+            name: "Legacy.app", path: localAppURL, status: AppStatus.linked
+        )), 1)
+    }
+
+    func testRepairDockFolderKeepsTheCustomLocalSourcePath() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let customAppsURL = workspace.rootURL.appendingPathComponent("My Apps 中文")
+        try fileManager.createDirectory(at: customAppsURL, withIntermediateDirectories: true)
+        let localSuiteURL = customAppsURL.appendingPathComponent("Office")
+        let externalSuiteURL = workspace.externalRootURL.appendingPathComponent("Office")
+        try createAppBundle(at: externalSuiteURL.appendingPathComponent("Word.app"))
+        try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).linkApp(
+            appToLink: AppItem(name: "Office", path: externalSuiteURL, status: AppStatus.unlinked, isFolder: true, appCount: 1),
+            destinationURL: localSuiteURL
+        )
+        let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+            XCTAssertEqual(source, localSuiteURL)
+            XCTAssertEqual(destination.path, externalSuiteURL.path)
+            return 1
+        })
+        XCTAssertEqual(try service.repairDockShortcuts(for: AppItem(
+            name: "Office", path: localSuiteURL, status: AppStatus.linked, isFolder: true, appCount: 1
+        )), 1)
+    }
+
+    func testRestoreRepairsLegacyFlattenedDockPaths() async throws {
+        for containerKind in [AppContainerKind.appSuiteFolder, .singleAppContainer] {
+            let workspace = try makeWorkspace()
+            defer { cleanupWorkspace(workspace.rootURL) }
+            let customAppsURL = workspace.rootURL.appendingPathComponent("Custom Applications")
+            try fileManager.createDirectory(at: customAppsURL, withIntermediateDirectories: true)
+            let localSuiteURL = customAppsURL.appendingPathComponent("Office")
+            let externalSuiteURL = workspace.externalRootURL.appendingPathComponent("Office")
+            let externalAppURL = externalSuiteURL.appendingPathComponent("Word.app")
+            let flattenedPortalURL = customAppsURL.appendingPathComponent("Word.app")
+            try createAppBundle(at: externalAppURL)
+            try createStubPortal(at: flattenedPortalURL, pointingTo: externalAppURL)
+            var updates: [(source: URL, destination: URL)] = []
+            let service = AppMigrationService(dockShortcutUpdater: { source, destination in
+                XCTAssertTrue(self.fileManager.fileExists(atPath: destination.path))
+                updates.append((source, destination))
+                return 1
+            })
+
+            let app = AppItem(
+                name: "Office", path: externalSuiteURL, bundleURL: externalAppURL, status: AppStatus.linked,
+                isFolder: containerKind == .appSuiteFolder, containerKind: containerKind, appCount: 1
+            )
+            let destination = service.localDestinationForRestore(
+                of: app, defaultDirectory: workspace.localAppsURL, additionalDirectories: [customAppsURL]
+            )
+            XCTAssertEqual(destination, localSuiteURL, "Restore the complete container in its original custom directory")
+            try await service.moveBack(
+                app: app, localDestinationURL: destination, progressHandler: nil
+            )
+            XCTAssertEqual(updates.map { $0.source.path }, [externalSuiteURL.path, flattenedPortalURL.path])
+            XCTAssertEqual(updates.map { $0.destination.path }, [localSuiteURL.path, localSuiteURL.appendingPathComponent("Word.app").path])
+            try assertRealAppBundle(localSuiteURL.appendingPathComponent("Word.app"))
+            XCTAssertFalse(fileManager.fileExists(atPath: flattenedPortalURL.path))
+        }
+    }
+
+    func testRestoreRefusesFolderPortalForAnotherExternalSuite() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localSuiteURL = workspace.localAppsURL.appendingPathComponent("Office")
+        let requestedSuiteURL = workspace.externalRootURL.appendingPathComponent("Office")
+        let existingSuiteURL = workspace.externalRootURL.appendingPathComponent("Another Office")
+        try createAppBundle(at: requestedSuiteURL.appendingPathComponent("Word.app"), payload: "requested")
+        try createAppBundle(at: existingSuiteURL.appendingPathComponent("Word.app"), payload: "existing")
+        try AppMigrationService(dockShortcutUpdater: { _, _ in 0 }).linkApp(
+            appToLink: AppItem(name: "Office", path: existingSuiteURL, status: AppStatus.unlinked, isFolder: true, appCount: 1),
+            destinationURL: localSuiteURL
+        )
+        let markerURL = localSuiteURL.appendingPathComponent(AppMigrationService.folderPortalMarkerName)
+        let originalMarker = try Data(contentsOf: markerURL)
+        let service = AppMigrationService(dockShortcutUpdater: { _, _ in
+            XCTFail("A conflicting suite must not update any Dock shortcut")
+            return 0
+        })
+        do {
+            try await service.moveBack(
+                app: AppItem(name: "Office", path: requestedSuiteURL, status: AppStatus.linked, isFolder: true, appCount: 1),
+                localDestinationURL: localSuiteURL, progressHandler: nil
+            )
+            XCTFail("A folder marker for another external suite is a conflict")
+        } catch {
+            XCTAssertEqual(try Data(contentsOf: markerURL), originalMarker)
+            try assertStubPortal(localSuiteURL.appendingPathComponent("Word.app"), pointsTo: existingSuiteURL.appendingPathComponent("Word.app"))
+            try assertRealAppBundle(requestedSuiteURL.appendingPathComponent("Word.app"))
+            try assertRealAppBundle(existingSuiteURL.appendingPathComponent("Word.app"))
+        }
+    }
+
+    func testRestoreUpdatesDockEvenWhenExternalCleanupFails() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let localAppURL = workspace.localAppsURL.appendingPathComponent("Cleanup.app")
+        let externalAppURL = workspace.externalRootURL.appendingPathComponent("Cleanup.app")
+        try createAppBundle(at: externalAppURL)
+        try createStubPortal(at: localAppURL, pointingTo: externalAppURL)
+        var updates = 0
+        let service = AppMigrationService(
+            fileManager: CleanupFailingFileManager(protectedURL: externalAppURL),
+            dockShortcutUpdater: { source, destination in
+                XCTAssertEqual(source, externalAppURL)
+                XCTAssertEqual(destination, localAppURL)
+                try self.assertRealAppBundle(destination)
+                updates += 1
+                return 1
+            }
+        )
+
+        try await service.moveBack(
+            app: AppItem(name: "Cleanup.app", path: externalAppURL, status: AppStatus.linked),
+            localDestinationURL: localAppURL, progressHandler: nil
+        )
+        try assertRealAppBundle(localAppURL)
+        try assertRealAppBundle(externalAppURL)
+        XCTAssertEqual(updates, 1)
+    }
+
+    private final class CleanupFailingFileManager: FileManager {
+        let protectedURL: URL
+
+        init(protectedURL: URL) {
+            self.protectedURL = protectedURL
+            super.init()
+        }
+
+        override func removeItem(at URL: URL) throws {
+            if URL == protectedURL { throw CocoaError(.fileWriteNoPermission) }
+            try super.removeItem(at: URL)
+        }
     }
 
     func testAppleScriptEscapingHandlesQuotesBackslashesSpacesAndUnicode() {

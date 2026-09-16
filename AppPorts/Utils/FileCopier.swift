@@ -5,457 +5,525 @@
 //  Created by shimoko.com on 2026/2/6.
 //
 
+import Darwin
 import Foundation
 
-// MARK: - 文件复制工具
-
-/// 支持进度回调的异步文件复制工具
-///
-/// 使用 Swift Actor 模型确保线程安全的文件复制操作。提供实时进度回调，
-/// 支持复制大型目录结构，正确处理符号链接、扩展属性（xattr）和文件权限。
-///
-/// ## 主要特性
-/// - ✅ 异步操作，不阻塞主线程
-/// - ✅ 实时进度报告（字节级和文件计数）
-/// - ✅ 保留文件元数据（权限、扩展属性、创建/修改时间）
-/// - ✅ 正确处理符号链接
-/// - ✅ 智能进度更新（减少回调频率，提升性能）
-///
-/// ## 使用示例
-/// ```swift
-/// let copier = FileCopier()
-/// try await copier.copyDirectory(
-///     from: sourceURL,
-///     to: destinationURL,
-///     progressHandler: { progress in
-///         print("进度: \(progress.percentage)% - \(progress.currentFile)")
-///     }
-/// )
-/// ```
-///
-/// - Note: 使用 Actor 确保所有方法在隔离的执行上下文中运行，保证线程安全
+/// 单次遍历的文件复制器。网络卷最多同时复制 4 个普通文件，避免小文件的
+/// 元数据往返完全串行，也避免为整棵目录树预先创建任务或统计大小。
 actor FileCopier {
-
-    private let managedLinkMarkerFileName = ".appports-link-metadata.plist"
-    private let managedLinkMetadataSidecarSuffix = ".appports-link-metadata.plist"
-    
-    // MARK: - 公共类型
-    
-    /// 文件复制进度信息
-    ///
-    /// 包含当前复制的字节数、总字节数和正在处理的文件名
     struct Progress: Sendable {
-        /// 已复制的字节数
         let copiedBytes: Int64
-        
-        /// 总字节数（源目录总大小）
+        /// 复制期间为调用者已有的大小估算（0 表示未知），完成时为实际复制字节数。
         let totalBytes: Int64
-        
-        /// 当前正在复制的文件名
         let currentFile: String
-        
-        /// 复制进度百分比（0.0 到 1.0）
+
         var percentage: Double {
-            totalBytes > 0 ? Double(copiedBytes) / Double(totalBytes) : 0
+            totalBytes > 0 ? min(1, max(0, Double(copiedBytes) / Double(totalBytes))) : 0
         }
     }
-    
-    /// 进度回调函数类型
-    /// - Parameter progress: 当前复制进度信息
+
     typealias ProgressHandler = @Sendable (Progress) async -> Void
-    
-    // MARK: - 私有属性
-    
-    /// 文件管理器实例
+    typealias CopyOperation = @Sendable (URL, URL) async throws -> Void
+    typealias NetworkVolumeDetector = @Sendable (URL) -> Bool
+    typealias Clock = @Sendable () -> TimeInterval
+
     private let fileManager = FileManager.default
-    
-    /// 进度更新阈值：每复制 5MB 更新一次进度
-    /// - Note: 减少回调频率可以显著提升大文件复制性能
-    private let progressUpdateThreshold: Int64 = 5 * 1024 * 1024  // 5 MB
-    
-    /// 文件计数阈值：每复制 50 个文件更新一次进度
-    private let fileCountThreshold: Int = 50
-    
-    // MARK: - 公共 API
-    
-    /// 递归复制目录，并通过回调报告进度
-    ///
-    /// 该方法会：
-    /// 1. 计算源目录的总大小（用于进度计算）
-    /// 2. 创建目标目录
-    /// 3. 递归复制所有文件和子目录
-    /// 4. 保留文件权限、扩展属性和时间戳
-    /// 5. 定期通过回调报告进度
-    ///
-    /// - Parameters:
-    ///   - source: 源目录 URL（必须是目录）
-    ///   - destination: 目标目录 URL（如果不存在会自动创建）
-    ///   - progressHandler: 进度回调（可选）。在后台线程调用，可安全更新 UI
-    ///
-    /// - Throws:
-    ///   - 文件系统错误（权限不足、磁盘空间不足等）
-    ///   - 源路径不存在或不是目录
-    ///
-    /// - Note: 此方法在 Actor 上下文中执行，自动序列化所有文件操作
+    private let networkVolumeDetector: NetworkVolumeDetector
+    private let copyOperation: CopyOperation
+    private let clock: Clock
+    private let progressUpdateThreshold: Int64 = 5 * 1024 * 1024
+    private let itemCountThreshold = 50
+    private let progressUpdateInterval: TimeInterval = 0.2
+
+    init(
+        networkVolumeDetector: @escaping NetworkVolumeDetector = { FileCopier.isNetworkVolume(at: $0) },
+        copyOperation: @escaping CopyOperation = { try await FileCopier.copyWithRetry(at: $0, to: $1) },
+        clock: @escaping Clock = { ProcessInfo.processInfo.systemUptime }
+    ) {
+        self.networkVolumeDetector = networkVolumeDetector
+        self.copyOperation = copyOperation
+        self.clock = clock
+    }
+
+    /// estimatedTotalBytes 可复用扫描列表已有的大小，复制器不会为了进度另扫一遍目录。
+    /// removeQuarantine 仅供应用迁移使用，不影响其他扩展属性或源文件。
+    @discardableResult
     func copyDirectory(
         from source: URL,
         to destination: URL,
+        estimatedTotalBytes: Int64? = nil,
+        removeQuarantine: Bool = false,
         progressHandler: ProgressHandler?
-    ) async throws {
+    ) async throws -> Int64 {
+        try Task.checkCancellation()
+        let source = source.standardizedFileURL
+        let destination = destination.standardizedFileURL
         let operationID = AppLogger.shared.makeOperationID(prefix: "file-copy")
-        let sourceValues = try source.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-        AppLogger.shared.logContext(
-            "FileCopier 开始复制",
-            details: [
-                ("operation_id", operationID),
-                ("source", source.path),
-                ("destination", destination.path),
-                ("source_is_regular_file", sourceValues.isRegularFile == true ? "true" : "false"),
-                ("source_is_directory", sourceValues.isDirectory == true ? "true" : "false")
-            ],
-            level: "TRACE"
-        )
+        var state = CopyState(totalBytes: max(0, estimatedTotalBytes ?? 0), lastReportedAt: clock())
 
-        if sourceValues.isRegularFile == true {
-            let totalBytes = Int64(sourceValues.fileSize ?? 0)
+        // 在读取源目录之前先让界面显示当前操作；NAS 目录查询本身也可能较慢。
+        await progressHandler?(Progress(copiedBytes: 0, totalBytes: state.totalBytes, currentFile: source.lastPathComponent))
 
-            if let handler = progressHandler {
-                await handler(Progress(copiedBytes: 0, totalBytes: totalBytes, currentFile: source.lastPathComponent))
+        do {
+            let sourceValues = try source.resourceValues(forKeys: [.fileResourceTypeKey, .fileSizeKey])
+            guard source != destination else {
+                throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: destination.path])
             }
 
-            let parentURL = destination.deletingLastPathComponent()
-            try fileManager.createDirectory(at: parentURL, withIntermediateDirectories: true, attributes: nil)
-            try fileManager.copyItem(at: source, to: destination)
-            copyExtendedAttributes(from: source, to: destination)
-
-            if let handler = progressHandler {
-                await handler(Progress(copiedBytes: totalBytes, totalBytes: totalBytes, currentFile: source.lastPathComponent))
-            }
+            let concurrentCopies = networkVolumeDetector(source) || networkVolumeDetector(destination) ? 4 : 1
             AppLogger.shared.logContext(
-                "FileCopier 完成单文件复制",
+                "FileCopier 开始复制",
                 details: [
                     ("operation_id", operationID),
-                    ("bytes", String(totalBytes)),
+                    ("source", source.path),
+                    ("destination", destination.path),
+                    ("max_concurrent_copies", String(concurrentCopies)),
+                    ("estimated_total_bytes", String(state.totalBytes)),
+                    ("remove_quarantine", removeQuarantine ? "true" : "false")
+                ],
+                level: "TRACE"
+            )
+
+            switch sourceValues.fileResourceType {
+            case .directory:
+                let resolvedSource = source.resolvingSymlinksInPath().path
+                let resolvedDestination = destination.resolvingSymlinksInPath().path
+                guard resolvedDestination != resolvedSource,
+                      !resolvedDestination.hasPrefix(resolvedSource == "/" ? "/" : resolvedSource + "/") else {
+                    throw CocoaError(.fileWriteInvalidFileName, userInfo: [NSFilePathErrorKey: destination.path])
+                }
+                try await copyContents(
+                    from: source,
+                    to: destination,
+                    concurrentCopies: concurrentCopies,
+                    removeQuarantine: removeQuarantine,
+                    state: &state,
+                    progressHandler: progressHandler
+                )
+            case .regular:
+                var destinationInfo = stat()
+                guard lstat(destination.path, &destinationInfo) != 0 else {
+                    throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: destination.path])
+                }
+                state.totalBytes = Int64(sourceValues.fileSize ?? 0)
+                await progressHandler?(Progress(copiedBytes: 0, totalBytes: state.totalBytes, currentFile: source.lastPathComponent))
+                try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let result = try await Self.copyFile(
+                    from: source,
+                    to: destination,
+                    size: state.totalBytes,
+                    removeQuarantine: removeQuarantine,
+                    operation: copyOperation
+                )
+                state.copiedBytes = result.bytes
+                state.copiedItems = 1
+            case .symbolicLink:
+                try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Self.copySymbolicLink(from: source, to: destination, removeQuarantine: removeQuarantine)
+                state.copiedItems = 1
+            case .socket:
+                break
+            default:
+                throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: source.path])
+            }
+
+            try Task.checkCancellation()
+            await progressHandler?(Progress(copiedBytes: state.copiedBytes, totalBytes: state.copiedBytes, currentFile: ""))
+            AppLogger.shared.logContext(
+                "FileCopier 完成复制",
+                details: [
+                    ("operation_id", operationID),
+                    ("copied_bytes", String(state.copiedBytes)),
+                    ("copied_items", String(state.copiedItems)),
                     ("source", source.path),
                     ("destination", destination.path)
                 ],
                 level: "TRACE"
             )
+            return state.copiedBytes
+        } catch {
+            AppLogger.shared.logError(
+                "FileCopier 复制失败",
+                error: error,
+                context: [("operation_id", operationID), ("source", source.path), ("destination", destination.path)]
+            )
+            throw error
+        }
+    }
+
+    /// 对尚未创建的目标逐级查询父目录；statfs 会解析挂载点与父路径中的符号链接。
+    nonisolated static func isNetworkVolume(at url: URL) -> Bool {
+        var current = url.standardizedFileURL
+        while true {
+            var fileSystem = statfs()
+            if statfs(current.path, &fileSystem) == 0 {
+                return fileSystem.f_flags & UInt32(MNT_LOCAL) == 0
+            }
+            guard errno == ENOENT || errno == ENOTDIR else { return false }
+            let parent = current.deletingLastPathComponent()
+            guard parent != current else { return false }
+            current = parent
+        }
+    }
+
+    /// 仅用于调用者明确拥有的迁移副本。源目录的只读权限也会被复制，
+    /// 清理时临时允许其所有者遍历和删除；不改变符号链接指向的项目。
+    nonisolated static func removeCopy(at url: URL) throws {
+        let url = url.standardizedFileURL
+        let fileManager = FileManager.default
+        var rootInfo = stat()
+        guard lstat(url.path, &rootInfo) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+        }
+        guard rootInfo.st_mode & S_IFMT == S_IFDIR else {
+            try fileManager.removeItem(at: url)
             return
         }
 
-        // 1. 计算源目录总大小（Spotlight 加速或跳过）
-        let totalBytes = progressHandler != nil ? fastDirectorySize(at: source, fileManager: fileManager) : 0
-        
-        // 报告初始进度（0%）
-        if let handler = progressHandler {
-            await handler(Progress(copiedBytes: 0, totalBytes: totalBytes, currentFile: ""))
-        }
-        
-        // 2. 创建目标目录（包括必要的中间目录）
-        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true, attributes: nil)
-        
-        // 3. 递归复制文件内容
-        var state = CopyState(totalBytes: totalBytes)
-        try await copyContents(
-            from: source,
-            to: destination,
-            state: &state,
-            progressHandler: progressHandler
-        )
-        
-        // 4. 报告最终进度（100%）
-        if let handler = progressHandler {
-            await handler(Progress(copiedBytes: state.copiedBytes, totalBytes: totalBytes, currentFile: ""))
-        }
-        AppLogger.shared.logContext(
-            "FileCopier 完成目录复制",
-            details: [
-                ("operation_id", operationID),
-                ("copied_bytes", String(state.copiedBytes)),
-                ("total_bytes", String(totalBytes)),
-                ("source", source.path),
-                ("destination", destination.path)
-            ],
-            level: "TRACE"
-        )
-    }
-    
-    // MARK: - 私有类型
-    
-    /// 复制状态追踪
-    ///
-    /// 用于在递归复制过程中跟踪进度和优化回调频率
-    private struct CopyState {
-        /// 已复制的总字节数
-        var copiedBytes: Int64 = 0
-        
-        /// 上次报告进度时的字节数
-        var lastReportedBytes: Int64 = 0
-        
-        /// 自上次报告以来复制的文件数
-        var filesSinceLastReport: Int = 0
-        
-        /// 源目录的总字节数
-        let totalBytes: Int64
-    }
-    
-    // MARK: - 私有辅助方法
-    
-    /// 计算目录总大小（字节）
-    ///
-    /// 递归遍历目录树，累加所有常规文件的大小。
-    /// 符号链接不计入大小（避免重复计算或无限循环）。
-    ///
-    /// - Parameter url: 目录 URL
-    /// - Returns: 目录总大小（字节）
-    ///
-    /// - Note: 使用 FileManager.DirectoryEnumerator 进行深度优先遍历
-    /// 复制扩展属性（xattr）
-    ///
-    /// 扩展属性包含重要的元数据，如：
-    /// - 文件标签颜色
-    /// - Finder 注释
-    /// - 自定义图标
-    /// - Spotlight 元数据
-    ///
-    /// - Parameters:
-    ///   - source: 源文件/目录 URL
-    ///   - destination: 目标文件/目录 URL
-    ///
-    /// - Note: 使用 POSIX xattr API（listxattr、getxattr、setxattr）
-    private func copyExtendedAttributes(from source: URL, to destination: URL) {
-        let sourcePath = source.path
-        let destPath = destination.path
-        
-        // 1. 获取所有扩展属性名的总长度
-        let bufferSize = listxattr(sourcePath, nil, 0, 0)
-        guard bufferSize > 0 else { return }
-        
-        // 2. 读取所有属性名（以 null 分隔的字符串列表）
-        var nameBuffer = [CChar](repeating: 0, count: bufferSize)
-        let result = listxattr(sourcePath, &nameBuffer, bufferSize, 0)
-        guard result > 0 else { return }
-        
-        // 3. 解析属性名并逐个复制
-        nameBuffer.withUnsafeBufferPointer { buffer in
-            var ptr = buffer.baseAddress!
-            let end = ptr.advanced(by: result)
-            
-            while ptr < end {
-                // 读取一个属性名（null 结尾的 C 字符串）
-                let name = String(cString: ptr)
-                ptr = ptr.advanced(by: name.utf8.count + 1)
-                
-                // 获取属性值大小
-                let valueSize = getxattr(sourcePath, name, nil, 0, 0, 0)
-                guard valueSize > 0 else { continue }
-                
-                // 读取属性值
-                var valueBuffer = [UInt8](repeating: 0, count: valueSize)
-                let readSize = getxattr(sourcePath, name, &valueBuffer, valueSize, 0, 0)
-                guard readSize > 0 else { continue }
-                
-                // 写入属性值到目标文件
-                setxattr(destPath, name, valueBuffer, readSize, 0, 0)
+        var changedDirectories: [DirectoryPermissions] = []
+        do {
+            try prepareDirectoryForRemoval(at: url, info: rootInfo, changedDirectories: &changedDirectories)
+            var enumerationError: Error?
+            guard let enumerator = fileManager.enumerator(
+                at: url,
+                includingPropertiesForKeys: [],
+                options: [],
+                errorHandler: { _, error in
+                    enumerationError = error
+                    return false
+                }
+            ) else {
+                throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: url.path])
             }
+            for case let item as URL in enumerator {
+                var info = stat()
+                guard lstat(item.path, &info) == 0 else {
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: item.path])
+                }
+                if info.st_mode & S_IFMT == S_IFDIR {
+                    try prepareDirectoryForRemoval(at: item, info: info, changedDirectories: &changedDirectories)
+                }
+            }
+            if let enumerationError { throw enumerationError }
+            try fileManager.removeItem(at: url)
+        } catch {
+            // 部分删除失败时，先恢复仍存在的子目录，再恢复父目录。
+            // 用 inode/device 确认仍是原项目，避免修改同一路径下的替换文件。
+            for directory in changedDirectories.reversed() {
+                var info = stat()
+                if lstat(directory.url.path, &info) == 0,
+                   info.st_mode & S_IFMT == S_IFDIR,
+                   info.st_ino == directory.inode,
+                   info.st_dev == directory.device {
+                    _ = lchmod(directory.url.path, directory.mode)
+                }
+            }
+            throw error
         }
     }
-    
-    /// 递归复制目录内容
-    ///
-    /// 深度优先遍历源目录，逐个复制文件和子目录。
-    /// 正确处理符号链接、目录和常规文件，保留所有元数据。
-    ///
-    /// - Parameters:
-    ///   - source: 源目录 URL
-    ///   - destination: 目标目录 URL
-    ///   - state: 复制状态（in-out 参数，用于追踪进度）
-    ///   - progressHandler: 进度回调
-    ///
-    /// - Throws: 文件操作错误
+
+    private struct DirectoryPermissions {
+        let url: URL
+        let mode: mode_t
+        let inode: ino_t
+        let device: dev_t
+    }
+
+    nonisolated private static func prepareDirectoryForRemoval(
+        at url: URL,
+        info: stat,
+        changedDirectories: inout [DirectoryPermissions]
+    ) throws {
+        let originalMode = info.st_mode & 0o7777
+        let removableMode = originalMode | 0o700
+        guard removableMode != originalMode else { return }
+        guard lchmod(url.path, removableMode) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: url.path])
+        }
+        changedDirectories.append(DirectoryPermissions(url: url, mode: originalMode, inode: info.st_ino, device: info.st_dev))
+    }
+
+    private struct CopyState {
+        var copiedBytes: Int64 = 0
+        var copiedItems = 0
+        var lastReportedBytes: Int64 = 0
+        var itemsSinceLastReport = 0
+        var totalBytes: Int64
+        var lastReportedAt: TimeInterval
+    }
+
+    private struct CopiedFile: Sendable {
+        let bytes: Int64
+        let name: String
+    }
+
+    private struct DirectoryMetadata {
+        let source: URL
+        let destination: URL
+        let attributes: [FileAttributeKey: Any]
+        let groupOwnerID: gid_t?
+    }
+
     private func copyContents(
         from source: URL,
         to destination: URL,
+        concurrentCopies: Int,
+        removeQuarantine: Bool,
         state: inout CopyState,
         progressHandler: ProgressHandler?
     ) async throws {
-        // 获取目录内容
-        let contents = try fileManager.contentsOfDirectory(
+        var directories = [try directoryMetadata(from: source, to: destination)]
+        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Self.createDestinationDirectory(at: destination)
+
+        var enumerationError: Error?
+        let keys: [URLResourceKey] = [.fileResourceTypeKey, .fileSizeKey]
+        guard let enumerator = fileManager.enumerator(
             at: source,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey],
-            options: []
-        )
-        
-        // 遍历每个项目
-        for itemURL in contents {
-            let itemName = itemURL.lastPathComponent
-
-            if isManagedLinkMetadataFile(itemName) {
-                continue
+            includingPropertiesForKeys: keys,
+            options: [],
+            errorHandler: { _, error in
+                enumerationError = error
+                return false
             }
+        ) else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: source.path])
+        }
+        let operation = copyOperation
 
-            let destItemURL = destination.appendingPathComponent(itemName)
-            
-            let resourceValues: URLResourceValues
+        try await withThrowingTaskGroup(of: CopiedFile.self) { group in
+            var pendingCopies = 0
             do {
-                resourceValues = try itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
-            } catch {
-                AppLogger.shared.logError(
-                    "FileCopier 读取资源属性失败",
-                    error: error,
-                    context: [("item", itemURL.path), ("destination", destItemURL.path)],
-                    relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
-                )
-                throw error
-            }
-            
-            // 处理符号链接
-            if resourceValues.isSymbolicLink == true {
-                do {
-                    let linkDest = try fileManager.destinationOfSymbolicLink(atPath: itemURL.path)
-                    try fileManager.createSymbolicLink(atPath: destItemURL.path, withDestinationPath: linkDest)
-                } catch {
-                    AppLogger.shared.logError(
-                        "FileCopier 复制符号链接失败",
-                        error: error,
-                        context: [("item", itemURL.path), ("destination", destItemURL.path)],
-                        relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
-                    )
-                    throw error
-                }
-                continue
-            }
-            
-            // 处理目录（递归复制）
-            if resourceValues.isDirectory == true {
-                do {
-                    // 获取原目录的属性（权限、时间戳等）
-                    let sourceAttributes = try fileManager.attributesOfItem(atPath: itemURL.path)
-                    try fileManager.createDirectory(at: destItemURL, withIntermediateDirectories: false, attributes: sourceAttributes)
-                    
-                    // 复制扩展属性（包括 Finder 图标、标签等）
-                    copyExtendedAttributes(from: itemURL, to: destItemURL)
-                    
-                    // 递归复制子目录内容
-                    try await copyContents(
-                        from: itemURL,
-                        to: destItemURL,
-                        state: &state,
-                        progressHandler: progressHandler
-                    )
-                } catch {
-                    AppLogger.shared.logError(
-                        "FileCopier 复制目录失败",
-                        error: error,
-                        context: [("item", itemURL.path), ("destination", destItemURL.path)],
-                        relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
-                    )
-                    throw error
-                }
-                continue
-            }
-            
-            // 跳过 socket 文件（无法复制，如 VS Code 的 .sock IPC 文件）
-            var statBuf = stat()
-            if stat(itemURL.path, &statBuf) == 0 && (statBuf.st_mode & 0o170000) == 0o140000 {
-                AppLogger.shared.logContext(
-                    "跳过 socket 文件",
-                    details: [("path", itemURL.path)],
-                    level: "TRACE"
-                )
-                continue
-            }
-
-            // 处理常规文件
-            do {
-                // 如果目标已存在（如 macOS 自动重建的容器元数据文件），先删除再复制
-                if fileManager.fileExists(atPath: destItemURL.path) {
-                    do {
-                        try fileManager.removeItem(at: destItemURL)
-                    } catch {
-                        // 受保护文件无法删除（如 .com.apple.containermanagerd.metadata.plist），跳过
-                        AppLogger.shared.logContext(
-                            "目标文件已存在且无法删除，跳过复制",
-                            details: [("source", itemURL.path), ("destination", destItemURL.path)],
-                            level: "WARN"
-                        )
+                while let item = enumerator.nextObject() as? URL {
+                    try Task.checkCancellation()
+                    let values = try item.resourceValues(forKeys: Set(keys))
+                    if Self.isManagedLinkMetadataFile(item.lastPathComponent) {
+                        if values.fileResourceType == .directory { enumerator.skipDescendants() }
                         continue
                     }
+                    // Foundation 可能把 /var 等祖先软链展开为 /private/var。
+                    // 使用枚举层级取相对组件，不依赖源 URL 与枚举 URL 的前缀长度。
+                    let relativePath = item.pathComponents.suffix(enumerator.level).joined(separator: "/")
+                    let target = destination.appendingPathComponent(relativePath)
+
+                    switch values.fileResourceType {
+                    case .directory:
+                        directories.append(try directoryMetadata(from: item, to: target))
+                        try Self.createDestinationDirectory(at: target)
+                        await recordCompletion(bytes: 0, name: item.lastPathComponent, state: &state, progressHandler: progressHandler)
+                    case .symbolicLink:
+                        try Self.copySymbolicLink(from: item, to: target, removeQuarantine: removeQuarantine)
+                        await recordCompletion(bytes: 0, name: item.lastPathComponent, state: &state, progressHandler: progressHandler)
+                    case .socket:
+                        AppLogger.shared.logContext("跳过 socket 文件", details: [("path", item.path)], level: "TRACE")
+                    case .regular:
+                        let size = Int64(values.fileSize ?? 0)
+                        if concurrentCopies == 1 {
+                            let result = try await Self.copyFile(from: item, to: target, size: size, removeQuarantine: removeQuarantine, operation: operation)
+                            await recordCompletion(bytes: result.bytes, name: result.name, state: &state, progressHandler: progressHandler)
+                        } else {
+                            if pendingCopies == concurrentCopies, let result = try await group.next() {
+                                pendingCopies -= 1
+                                await recordCompletion(bytes: result.bytes, name: result.name, state: &state, progressHandler: progressHandler)
+                            }
+                            group.addTask {
+                                try await Self.copyFile(from: item, to: target, size: size, removeQuarantine: removeQuarantine, operation: operation)
+                            }
+                            pendingCopies += 1
+                        }
+                    default:
+                        throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: item.path])
+                    }
                 }
-                // 外部存储卷可能返回 EINTR（被中断的系统调用），加重试
-                try await copyWithRetry(at: itemURL, to: destItemURL)
-                // 复制后恢复 posix 权限（跨卷复制可能丢失）
-                if let srcPerms = (try? fileManager.attributesOfItem(atPath: itemURL.path))?[.posixPermissions] {
-                    try? fileManager.setAttributes([.posixPermissions: srcPerms], ofItemAtPath: destItemURL.path)
+                if let enumerationError { throw enumerationError }
+                while let result = try await group.next() {
+                    await recordCompletion(bytes: result.bytes, name: result.name, state: &state, progressHandler: progressHandler)
                 }
             } catch {
-                AppLogger.shared.logError(
-                    "FileCopier 复制文件失败",
-                    error: error,
-                    context: [("item", itemURL.path), ("destination", destItemURL.path)],
-                    relatedURLs: [("source_item", itemURL), ("destination_item", destItemURL)]
-                )
+                group.cancelAll()
+                // 同步文件 I/O 不能立即取消。等待所有在途写入结束后再抛出，
+                // 上层才能安全删除半成品，避免有任务在清理之后重新写回目标。
+                while let _ = await group.nextResult() {}
                 throw error
             }
-            
-            // 更新进度统计
-            if let fileSize = resourceValues.fileSize {
-                state.copiedBytes += Int64(fileSize)
-                state.filesSinceLastReport += 1
-                
-                // 只在达到阈值时才回调（减少开销，提升性能）
-                let bytesDelta = state.copiedBytes - state.lastReportedBytes
-                if bytesDelta >= progressUpdateThreshold || state.filesSinceLastReport >= fileCountThreshold {
-                    if let handler = progressHandler {
-                        let progress = Progress(
-                            copiedBytes: state.copiedBytes,
-                            totalBytes: state.totalBytes,
-                            currentFile: itemName
-                        )
-                        await handler(progress)
-                    }
-                    state.lastReportedBytes = state.copiedBytes
-                    state.filesSinceLastReport = 0
+        }
+
+        // 子项的创建会改变父目录时间；延后恢复，也允许复制只读目录的内容。
+        var groupRestoreFailures = 0
+        var firstGroupRestoreError: (path: String, code: Int32)?
+        for directory in directories.reversed() {
+            try Task.checkCancellation()
+            // mkdir 默认继承目标父目录的组，需恢复源目录的组归属。
+            // 网络卷可能不支持 chgrp；属组单独尽力保留，不让它阻断数据复制。
+            // chown 可能清除 setgid，所以必须先于后面的 mode 恢复执行。
+            if let groupID = directory.groupOwnerID,
+               lchown(directory.destination.path, uid_t.max, groupID) != 0 {
+                groupRestoreFailures += 1
+                if firstGroupRestoreError == nil {
+                    firstGroupRestoreError = (directory.destination.path, errno)
                 }
             }
+            Self.copyDirectoryExtendedAttributes(from: directory.source, to: directory.destination, removeQuarantine: removeQuarantine)
+            try fileManager.setAttributes(directory.attributes, ofItemAtPath: directory.destination.path)
+            await reportProgressIfNeeded(name: directory.source.lastPathComponent, state: &state, progressHandler: progressHandler)
+        }
+        if let firstGroupRestoreError {
+            AppLogger.shared.logContext(
+                "部分目录的组归属无法保留",
+                details: [
+                    ("directory_count", String(groupRestoreFailures)),
+                    ("destination", firstGroupRestoreError.path),
+                    ("errno", String(firstGroupRestoreError.code))
+                ],
+                level: "WARN"
+            )
         }
     }
 
-    /// 带重试的文件复制（外部存储卷可能返回 EINTR）
-    private func copyWithRetry(at source: URL, to destination: URL, maxAttempts: Int = 3) async throws {
-        var lastError: Error?
-        for attempt in 1...maxAttempts {
+    private func directoryMetadata(from source: URL, to destination: URL) throws -> DirectoryMetadata {
+        let sourceAttributes = try fileManager.attributesOfItem(atPath: source.path)
+        let retainedKeys: Set<FileAttributeKey> = [.posixPermissions, .creationDate, .modificationDate]
+        return DirectoryMetadata(
+            source: source,
+            destination: destination,
+            attributes: sourceAttributes.filter { retainedKeys.contains($0.key) },
+            groupOwnerID: (sourceAttributes[.groupOwnerAccountID] as? NSNumber)?.uint32Value
+        )
+    }
+
+    private func recordCompletion(bytes: Int64, name: String, state: inout CopyState, progressHandler: ProgressHandler?) async {
+        state.copiedBytes += bytes
+        state.copiedItems += 1
+        state.itemsSinceLastReport += 1
+        await reportProgressIfNeeded(name: name, state: &state, progressHandler: progressHandler)
+    }
+
+    private func reportProgressIfNeeded(name: String, state: inout CopyState, progressHandler: ProgressHandler?) async {
+        let now = clock()
+        if state.copiedBytes - state.lastReportedBytes >= progressUpdateThreshold
+            || state.itemsSinceLastReport >= itemCountThreshold
+            || now - state.lastReportedAt >= progressUpdateInterval {
+            await progressHandler?(Progress(copiedBytes: state.copiedBytes, totalBytes: state.totalBytes, currentFile: name))
+            state.lastReportedBytes = state.copiedBytes
+            state.itemsSinceLastReport = 0
+            state.lastReportedAt = now
+        }
+    }
+
+    nonisolated private static func createDestinationDirectory(at destination: URL) throws {
+        guard mkdir(destination.path, 0o777) != 0 else { return }
+        let creationError = errno
+        if creationError == EEXIST {
+            var info = stat()
+            // 不能把已有的目录软链当成目标目录穿透写入。
+            if lstat(destination.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR { return }
+        }
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(creationError), userInfo: [NSFilePathErrorKey: destination.path])
+    }
+
+    nonisolated private static func copyFile(
+        from source: URL,
+        to destination: URL,
+        size: Int64,
+        removeQuarantine: Bool,
+        operation: CopyOperation
+    ) async throws -> CopiedFile {
+        try Task.checkCancellation()
+        // FileManager 的原生复制保留权限、日期和扩展属性，无需再次 stat/chmod。
+        try await operation(source, destination)
+        if removeQuarantine { removeCopiedQuarantine(from: source, to: destination) }
+        try Task.checkCancellation()
+        return CopiedFile(bytes: size, name: source.lastPathComponent)
+    }
+
+    nonisolated private static func copySymbolicLink(from source: URL, to destination: URL, removeQuarantine: Bool) throws {
+        // copyItem 复制链接本身，保留相对路径，也支持悬空链接。
+        try FileManager.default.copyItem(at: source, to: destination)
+        if removeQuarantine { removeCopiedQuarantine(from: source, to: destination) }
+    }
+
+    nonisolated private static func copyWithRetry(at source: URL, to destination: URL) async throws {
+        let fileManager = FileManager.default
+        for attempt in 1...3 {
+            try Task.checkCancellation()
             do {
                 try fileManager.copyItem(at: source, to: destination)
                 return
             } catch {
-                lastError = error
                 let nsError = error as NSError
-                // 检查顶层或底层错误是否为 EINTR（NSPOSIXErrorDomain code 4）
-                // NSFileManager 可能将 EINTR 包装为 NSCocoaErrorDomain code 512
-                let isEINTR = (nsError.domain == NSPOSIXErrorDomain && nsError.code == 4)
-                    || nsError.underlyingErrors.contains { ($0 as NSError).domain == NSPOSIXErrorDomain && ($0 as NSError).code == 4 }
-                if attempt < maxAttempts && isEINTR {
-                    AppLogger.shared.logContext(
-                        "文件复制被中断，重试",
-                        details: [
-                            ("attempt", "\(attempt)/\(maxAttempts)"),
-                            ("source", source.path)
-                        ],
-                        level: "WARN"
-                    )
-                    try await Task.sleep(nanoseconds: UInt64(attempt) * 500_000_000)
-                } else {
+                let errors = [nsError] + nsError.underlyingErrors.map { $0 as NSError }
+                let interrupted = errors.contains { $0.domain == NSPOSIXErrorDomain && $0.code == Int(EINTR) }
+                let alreadyExists = errors.contains {
+                    ($0.domain == NSCocoaErrorDomain && $0.code == NSFileWriteFileExistsError)
+                        || ($0.domain == NSPOSIXErrorDomain && $0.code == Int(EEXIST))
+                }
+                guard attempt < 3, interrupted || alreadyExists else { throw error }
+
+                var destinationInfo = stat()
+                if lstat(destination.path, &destinationInfo) == 0,
+                   destinationInfo.st_mode & S_IFMT == S_IFDIR {
                     throw error
+                }
+
+                // 仅在复制确实报告冲突/中断时清理，不再为每个小文件查询目标是否存在。
+                // 无法替换的普通文件必须失败，不能静默跳过后让上层删除源。
+                do {
+                    try fileManager.removeItem(at: destination)
+                } catch let cleanupError as NSError {
+                    guard cleanupError.domain == NSCocoaErrorDomain && cleanupError.code == NSFileNoSuchFileError else {
+                        throw cleanupError
+                    }
+                }
+                if interrupted {
+                    AppLogger.shared.logContext("文件复制被中断，重试", details: [("attempt", String(attempt)), ("source", source.path)], level: "WARN")
+                    try await Task.sleep(nanoseconds: UInt64(attempt) * 500_000_000)
                 }
             }
         }
-        throw lastError!
     }
 
-    private func isManagedLinkMetadataFile(_ fileName: String) -> Bool {
-        fileName == managedLinkMarkerFileName
-            || (fileName.hasPrefix(".") && fileName.hasSuffix(managedLinkMetadataSidecarSuffix))
+    nonisolated private static func removeCopiedQuarantine(from source: URL, to destination: URL) {
+        let name = "com.apple.quarantine"
+        // 查询源上的属性；没有 quarantine 时不向 NAS 发起无用的删除请求。
+        guard getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW) >= 0 else { return }
+        if removexattr(destination.path, name, XATTR_NOFOLLOW) != 0, errno != ENOATTR, errno != ENOTSUP {
+            AppLogger.shared.logContext("清除已复制文件的隔离属性失败", details: [("destination", destination.path), ("errno", String(errno))], level: "WARN")
+        }
+    }
+
+    nonisolated private static func copyDirectoryExtendedAttributes(from source: URL, to destination: URL, removeQuarantine: Bool) {
+        let size = listxattr(source.path, nil, 0, XATTR_NOFOLLOW)
+        guard size > 0 else { return }
+        var names = [CChar](repeating: 0, count: size)
+        let count = listxattr(source.path, &names, size, XATTR_NOFOLLOW)
+        guard count > 0 else { return }
+        names.withUnsafeBufferPointer { buffer in
+            guard var pointer = buffer.baseAddress else { return }
+            let end = pointer.advanced(by: count)
+            while pointer < end {
+                let name = String(cString: pointer)
+                pointer = pointer.advanced(by: name.utf8.count + 1)
+                if removeQuarantine, name == "com.apple.quarantine" {
+                    // 新目录不复制 quarantine；若目标原有该属性，也只在源确有时清除。
+                    removexattr(destination.path, name, XATTR_NOFOLLOW)
+                    continue
+                }
+                let valueSize = getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW)
+                guard valueSize >= 0 else { continue }
+                if valueSize == 0 {
+                    setxattr(destination.path, name, nil, 0, 0, XATTR_NOFOLLOW)
+                } else {
+                    var value = [UInt8](repeating: 0, count: valueSize)
+                    let readSize = getxattr(source.path, name, &value, valueSize, 0, XATTR_NOFOLLOW)
+                    guard readSize >= 0 else { continue }
+                    setxattr(destination.path, name, value, readSize, 0, XATTR_NOFOLLOW)
+                }
+            }
+        }
+    }
+
+    nonisolated private static func isManagedLinkMetadataFile(_ fileName: String) -> Bool {
+        fileName == ".appports-link-metadata.plist"
+            || (fileName.hasPrefix(".") && fileName.hasSuffix(".appports-link-metadata.plist"))
     }
 }
