@@ -153,6 +153,163 @@ private final class ContributorsViewModel: ObservableObject {
     }
 }
 
+// MARK: - 赞助者数据
+
+/// 项目赞助者信息。
+///
+/// 数据来源为仓库根目录的 `sponsors.json`（文档站点会提供同一份数据）。
+/// `amount` 仅用于排序，不在 App 内展示。
+struct Sponsor: Identifiable, Codable, Equatable {
+    let name: String
+    let link: String
+    let amount: Double
+    let date: String
+
+    var id: String { link.isEmpty ? name : link }
+    var profileURL: URL? { URL(string: link) }
+
+    init(name: String, link: String, amount: Double = 0, date: String = "") {
+        self.name = name
+        self.link = link
+        self.amount = amount
+        self.date = date
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case link
+        case amount
+        case date
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        link = try container.decodeIfPresent(String.self, forKey: .link) ?? ""
+        amount = try container.decodeIfPresent(Double.self, forKey: .amount) ?? 0
+        date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+    }
+}
+
+private extension Array where Element == Sponsor {
+    /// 赞助金额从高到低；金额相同时按赞助时间从早到晚
+    func rankedBySponsorship() -> [Sponsor] {
+        sorted { lhs, rhs in
+            if lhs.amount != rhs.amount {
+                return lhs.amount > rhs.amount
+            }
+            return lhs.date < rhs.date
+        }
+    }
+}
+
+private let fallbackSponsors: [Sponsor] = [
+    Sponsor(name: "师杀", link: "https://space.bilibili.com/396481888", amount: 300, date: "2026-09-16"),
+]
+
+private struct SponsorsPayload: Decodable {
+    let sponsors: [Sponsor]
+}
+
+private struct SponsorsCache: Codable {
+    let sponsors: [Sponsor]
+}
+
+private struct SponsorsService {
+    private let fileManager = FileManager.default
+    private let endpoint = URL(string: "https://docs-appports.shimoko.com/sponsors.json")!
+
+    func loadCachedSponsors() -> [Sponsor]? {
+        guard let cacheURL,
+              let data = try? Data(contentsOf: cacheURL),
+              let cache = try? JSONDecoder().decode(SponsorsCache.self, from: data),
+              !cache.sponsors.isEmpty else {
+            return nil
+        }
+        return cache.sponsors.rankedBySponsorship()
+    }
+
+    func saveSponsorsToCache(_ sponsors: [Sponsor]) {
+        guard let cacheURL, !sponsors.isEmpty else { return }
+
+        do {
+            let parentURL = cacheURL.deletingLastPathComponent()
+            try fileManager.createDirectory(at: parentURL, withIntermediateDirectories: true)
+            let cache = SponsorsCache(sponsors: sponsors)
+            let data = try JSONEncoder().encode(cache)
+            try data.write(to: cacheURL, options: .atomic)
+        } catch {
+            AppLogger.shared.logError(
+                "保存赞助者缓存失败",
+                error: error,
+                errorCode: "ABOUT-SPONSORS-CACHE-WRITE-FAILED"
+            )
+        }
+    }
+
+    func fetchSponsors() async throws -> [Sponsor] {
+        var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("AppPorts", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw NSError(
+                domain: "AppPorts.AboutView",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "Sponsors endpoint returned status \(httpResponse.statusCode)"]
+            )
+        }
+
+        return try JSONDecoder().decode(SponsorsPayload.self, from: data).sponsors.rankedBySponsorship()
+    }
+
+    private var cacheURL: URL? {
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return appSupportURL
+            .appendingPathComponent("AppPorts", isDirectory: true)
+            .appendingPathComponent("sponsors-cache.json")
+    }
+}
+
+@MainActor
+private final class SponsorsViewModel: ObservableObject {
+    @Published private(set) var sponsors: [Sponsor] = fallbackSponsors
+
+    private let service = SponsorsService()
+    private var hasLoaded = false
+
+    func loadIfNeeded() {
+        guard !hasLoaded else { return }
+        hasLoaded = true
+
+        if let cachedSponsors = service.loadCachedSponsors() {
+            sponsors = cachedSponsors
+        }
+
+        Task {
+            do {
+                let fetchedSponsors = try await service.fetchSponsors()
+                guard !fetchedSponsors.isEmpty else { return }
+                sponsors = fetchedSponsors
+                service.saveSponsorsToCache(fetchedSponsors)
+            } catch {
+                AppLogger.shared.logError(
+                    "加载赞助者列表失败，已回退到缓存或内置列表",
+                    error: error,
+                    errorCode: "ABOUT-SPONSORS-FETCH-FAILED"
+                )
+            }
+        }
+    }
+}
+
 // MARK: - 关于窗口
 
 /// A separate, reusable window also works when the main window is closed (macOS 12+).
@@ -200,6 +357,7 @@ private struct AboutWindowContent: View {
 
 struct AboutView: View {
     @StateObject private var contributorsViewModel = ContributorsViewModel()
+    @StateObject private var sponsorsViewModel = SponsorsViewModel()
     @ObservedObject private var languageManager = LanguageManager.shared
 
     private var version: String {
@@ -252,6 +410,21 @@ struct AboutView: View {
                 }
 
                 Divider()
+                AboutSection(title: "赞助者".localized) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 10) {
+                        ForEach(sponsorsViewModel.sponsors) { sponsor in
+                            if let url = sponsor.profileURL {
+                                Link(destination: url) { Text(verbatim: sponsor.name) }
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    Link(destination: URL(string: "https://docs-appports.shimoko.com/sponsor.html")!) {
+                        Text("赞助 AppPorts".localized)
+                    }
+                }
+
+                Divider()
                 AboutUpdateSection()
 
                 Divider()
@@ -261,6 +434,12 @@ struct AboutView: View {
                     Link(destination: URL(string: "https://github.com/wzh4869/AppPorts/blob/main/LICENSE")!) {
                         Text(verbatim: "Apache License 2.0")
                     }
+                    Link(destination: URL(string: "https://docs-appports.shimoko.com/licenses.html")!) {
+                        Text("开放源代码许可证".localized)
+                    }
+                    Link(destination: URL(string: "https://docs-appports.shimoko.com/privacy.html")!) {
+                        Text("隐私政策".localized)
+                    }
                 }
             }
             .padding(32)
@@ -268,6 +447,7 @@ struct AboutView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .task { contributorsViewModel.loadIfNeeded() }
+        .task { sponsorsViewModel.loadIfNeeded() }
     }
 }
 

@@ -1,5 +1,11 @@
 import { defineConfig } from "vitepress";
 import { defineTeekConfig } from "vitepress-theme-teek/config";
+import { copyFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// 赞助者数据（仓库根目录的 sponsors.json）同时供文档站点与 App 使用
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const teekConfig = defineTeekConfig({
   teekHome: false,
@@ -26,6 +32,7 @@ const teekConfig = defineTeekConfig({
   },
   articleShare: { enabled: false },
   articleAnalyze: { showInfo: false, showDate: false, showWord: false, showReadingTime: false },
+  themeEnhance: { spotlight: { disabled: true } },
   vitePlugins: {
     sidebar: false,
     mdH1: false,
@@ -46,6 +53,23 @@ export default defineConfig({
     ["link", { rel: "icon", type: "image/png", href: "/logo.png" }],
     ["script", { defer: true, src: "https://cloud.umami.is/script.js", "data-website-id": "2f0679ac-f605-4a76-9a55-11681b47cef5" }],
   ],
+
+  vite: {
+    server: {
+      fs: {
+        // 允许开发服务器读取仓库根目录的 sponsors.json
+        allow: [repositoryRoot],
+      },
+    },
+  },
+
+  // 构建时把赞助者数据复制到站点根目录，供 App 与站点直接读取
+  buildEnd(siteConfig) {
+    copyFileSync(
+      resolve(repositoryRoot, "sponsors.json"),
+      resolve(siteConfig.outDir, "sponsors.json"),
+    );
+  },
 
   locales: {
     root: {
@@ -69,6 +93,7 @@ export default defineConfig({
           { text: "快速开始", link: "/faststart" },
           { text: "下载", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "更新日志", link: "/changelog" },
+          { text: "赞助", link: "/sponsor" },
         ],
         sidebar: [
           {
@@ -97,7 +122,10 @@ export default defineConfig({
               { text: "外部存储指南", link: "/storage-guide" },
               { text: "日志与诊断", link: "/logging" },
               { text: "更新日志", link: "/changelog" },
+              { text: "赞助", link: "/sponsor" },
               { text: "贡献者指南", link: "/contributing" },
+              { text: "开源许可", link: "/licenses" },
+              { text: "隐私政策", link: "/privacy" },
             ],
           },
         ],
@@ -125,6 +153,7 @@ export default defineConfig({
           { text: "Getting Started", link: "/en/faststart" },
           { text: "Download", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "Changelog", link: "/en/changelog" },
+          { text: "Sponsor", link: "/en/sponsor" },
         ],
         sidebar: [
           {
@@ -152,7 +181,10 @@ export default defineConfig({
               { text: "External Storage Guide", link: "/en/storage-guide" },
               { text: "Logging & Diagnostics", link: "/en/logging" },
               { text: "Changelog", link: "/en/changelog" },
+              { text: "Sponsor", link: "/en/sponsor" },
               { text: "Contributing", link: "/en/contributing" },
+              { text: "Open Source Licenses", link: "/en/licenses" },
+              { text: "Privacy Policy", link: "/en/privacy" },
             ],
           },
         ],
@@ -180,6 +212,7 @@ export default defineConfig({
           { text: "快速開始", link: "/zh-Hant/faststart" },
           { text: "下載", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "更新日誌", link: "/zh-Hant/changelog" },
+          { text: "贊助", link: "/zh-Hant/sponsor" },
         ],
         sidebar: [
           {
@@ -207,7 +240,9 @@ export default defineConfig({
               { text: "外部儲存指南", link: "/zh-Hant/storage-guide" },
               { text: "日誌與診斷", link: "/zh-Hant/logging" },
               { text: "更新日誌", link: "/zh-Hant/changelog" },
+              { text: "贊助", link: "/zh-Hant/sponsor" },
               { text: "貢獻者指南", link: "/zh-Hant/contributing" },
+              { text: "開源授權", link: "/zh-Hant/licenses" },
             ],
           },
         ],
@@ -235,6 +270,7 @@ export default defineConfig({
           { text: "クイックスタート", link: "/ja/faststart" },
           { text: "ダウンロード", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "変更履歴", link: "/ja/changelog" },
+          { text: "スポンサー", link: "/ja/sponsor" },
         ],
         sidebar: [
           {
@@ -262,7 +298,9 @@ export default defineConfig({
               { text: "外部ストレージガイド", link: "/ja/storage-guide" },
               { text: "ログと診断", link: "/ja/logging" },
               { text: "変更履歴", link: "/ja/changelog" },
+              { text: "スポンサー", link: "/ja/sponsor" },
               { text: "コントリビューション", link: "/ja/contributing" },
+              { text: "オープンソースライセンス", link: "/ja/licenses" },
             ],
           },
         ],
@@ -290,6 +328,7 @@ export default defineConfig({
           { text: "시작하기", link: "/ko/faststart" },
           { text: "다운로드", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "변경 로그", link: "/ko/changelog" },
+          { text: "후원", link: "/ko/sponsor" },
         ],
         sidebar: [
           {
@@ -317,7 +356,9 @@ export default defineConfig({
               { text: "외부 저장소 가이드", link: "/ko/storage-guide" },
               { text: "로그 및 진단", link: "/ko/logging" },
               { text: "변경 로그", link: "/ko/changelog" },
+              { text: "후원", link: "/ko/sponsor" },
               { text: "기여하기", link: "/ko/contributing" },
+              { text: "오픈 소스 라이선스", link: "/ko/licenses" },
             ],
           },
         ],
@@ -345,6 +386,7 @@ export default defineConfig({
           { text: "Schnellstart", link: "/de/faststart" },
           { text: "Download", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "Änderungsprotokoll", link: "/de/changelog" },
+          { text: "Unterstützen", link: "/de/sponsor" },
         ],
         sidebar: [
           {
@@ -372,7 +414,9 @@ export default defineConfig({
               { text: "Externer Speicherleitfaden", link: "/de/storage-guide" },
               { text: "Protokollierung & Diagnose", link: "/de/logging" },
               { text: "Änderungsprotokoll", link: "/de/changelog" },
+              { text: "Unterstützen", link: "/de/sponsor" },
               { text: "Beitragen", link: "/de/contributing" },
+              { text: "Open-Source-Lizenzen", link: "/de/licenses" },
             ],
           },
         ],
@@ -400,6 +444,7 @@ export default defineConfig({
           { text: "Démarrage", link: "/fr/faststart" },
           { text: "Télécharger", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "Journal des modifications", link: "/fr/changelog" },
+          { text: "Soutenir", link: "/fr/sponsor" },
         ],
         sidebar: [
           {
@@ -427,7 +472,9 @@ export default defineConfig({
               { text: "Guide de stockage externe", link: "/fr/storage-guide" },
               { text: "Journalisation et diagnostic", link: "/fr/logging" },
               { text: "Journal des modifications", link: "/fr/changelog" },
+              { text: "Soutenir", link: "/fr/sponsor" },
               { text: "Contribuer", link: "/fr/contributing" },
+              { text: "Licences open source", link: "/fr/licenses" },
             ],
           },
         ],
@@ -455,6 +502,7 @@ export default defineConfig({
           { text: "Inicio rápido", link: "/es/faststart" },
           { text: "Descargar", link: "https://github.com/wzh4869/AppPorts/releases" },
           { text: "Registro de cambios", link: "/es/changelog" },
+          { text: "Apoyar", link: "/es/sponsor" },
         ],
         sidebar: [
           {
@@ -482,7 +530,9 @@ export default defineConfig({
               { text: "Guía de almacenamiento externo", link: "/es/storage-guide" },
               { text: "Registro y diagnóstico", link: "/es/logging" },
               { text: "Registro de cambios", link: "/es/changelog" },
+              { text: "Apoyar", link: "/es/sponsor" },
               { text: "Contribuir", link: "/es/contributing" },
+              { text: "Licencias de código abierto", link: "/es/licenses" },
             ],
           },
         ],

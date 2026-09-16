@@ -158,6 +158,15 @@ struct AppMoverApp: App {
                 }
             }
             
+            // 赞助菜单
+            CommandMenu("赞助".localized) {
+                Button("赞助 AppPorts".localized) {
+                    if let url = URL(string: "https://docs-appports.shimoko.com/sponsor.html") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+
             // 帮助菜单 — 添加文档入口
             CommandGroup(after: .help) {
                 Button("用户文档".localized) {
