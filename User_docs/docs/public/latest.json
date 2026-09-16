@@ -1,0 +1,17 @@
+{
+  "version": "1.8.1",
+  "tag": "1.8.1",
+  "build": 1,
+  "publishedAt": "2026-09-16T00:00:00Z",
+  "minimumSupportedVersion": "1.0.0",
+  "releaseNotes": {
+    "zh-Hans": "## AppPorts v1.8.1 更新说明\n\n### 总结\n\n这次更新让应用迁移到外置硬盘后更省心：修复从 Dock 启动时额外出现相同图标的问题，支持直接修复已经迁移的 Dock 项目；NAS 复制更高效，迁移进度和失败状态更清楚。日志、重签名、数据恢复和多语言提示也更可靠，并新增了包含版本、贡献者、版权和手动检查更新的关于窗口。\n\n### 主要改进\n\n- 修复迁移应用的 Dock 固定项，保留原位置并直接指向外部真实应用。\n- 改进 NAS 小文件复制、权限和时间戳保留、取消清理及冲突恢复。\n- 按签名备份、数据迁移、重签名的顺序执行，并校验重签名结果。\n- 加强日志轮转、诊断脱敏、操作互斥和运行状态检查。\n- 新增独立的关于 AppPorts 窗口、贡献者链接、版权许可和手动更新检查。\n\n升级后如果 Dock 中仍有重复图标，可在本地应用列表中右键选择“修复 Dock 图标”。",
+    "en": "## AppPorts v1.8.1 Release Notes\n\n### Summary\n\nThis update makes migrated apps easier to use from an external drive. It fixes the extra matching Dock icon and lets you repair existing Dock pins without moving an app again. NAS copies are more efficient, progress and failure states are clearer, and logging, re-signing, data recovery, and localization are more reliable. The new About window includes version details, contributors, copyright, and manual update checking.\n\n### Main improvements\n\n- Repair existing Dock pins while preserving their position and pointing them to the real external app.\n- Improve NAS small-file copying, metadata preservation, cancellation cleanup, and conflict recovery.\n- Run signature backup, data migration, and re-signing in order, then verify the result.\n- Strengthen log rotation, diagnostic redaction, operation locking, and running-app checks.\n- Add a standalone About AppPorts window with contributor links, license details, and manual update checks.\n\nAfter upgrading, use “Repair Dock Icon” from the local app context menu if a duplicate Dock icon remains."
+  },
+  "links": {
+    "github": "https://github.com/wzh4869/AppPorts/releases/tag/1.8.1",
+    "primaryDownload": "https://file.shimoko.com/AppPorts",
+    "mirrorDownload": "https://github.com/wzh4869/AppPorts/releases/tag/1.8.1"
+  },
+  "sha256": ""
+}
