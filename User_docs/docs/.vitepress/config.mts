@@ -108,6 +108,7 @@ export default defineConfig({
                 { text: "工具目录识别", link: "/datamigrae/tools" },
                 { text: "操作指南", link: "/datamigrae/operation" },
                 { text: "重签名与崩溃防护", link: "/datamigrae/resign" },
+                { text: "容器数据与签名身份", link: "/datamigrae/container-identity" },
               ]},
               { text: "App迁移策略", items: [
                 { text: "迁移策略", link: "/migration-strategy/portal" },
@@ -116,6 +117,7 @@ export default defineConfig({
                 { text: "App Store 应用更新策略", link: "/migration-strategy/appstore-update" },
               ]},
               { text: "设置", link: "/settings" },
+              { text: "macOS 27 升级说明", link: "/macos-27" },
               { text: "兼容性与限制", link: "/limitations" },
               { text: "故障排除", link: "/troubleshooting" },
               { text: "常见问题", link: "/faq" },

@@ -6,6 +6,14 @@ outline: deep
 
 ![](https://pic.cdn.shimoko.com/appports/%E6%88%AA%E5%B1%8F2026-05-08%2008.38.37.png)
 
+::: warning 重签名不是通用修复手段
+Ad-hoc 重签名会抹掉应用的 `app-sandbox`、`application-groups`、`keychain-access-groups` 等授权以及 Team ID，并且在原始开发者证书不在本机钥匙串时无法还原。
+
+对**沙盒应用**（微信、聊天工具、依赖 Keychain 的应用）尤其危险：重签名后应用可能仍然正常使用数周甚至数月，但在后续 macOS 大版本升级后可能突然无法访问自己的容器数据，表现为双击无反应、进程秒退，且迁回数据与再次重签名都无法修复。
+
+迁移 `~/Library/Containers/` 或 `~/Library/Group Containers/` 数据时，推荐选择「不同意，仅迁移」。相关原理、自查与修复步骤见[容器数据与签名身份](/datamigrae/container-identity)。
+:::
+
 ## 为什么迁移数据后应用可能崩溃
 
 macOS 的代码签名机制（`codesign`）会验证应用包完整性，包括文件路径结构。当 AppPorts 将应用的数据目录迁移至外部存储并替换为符号链接后，签名密封可能被破坏，并导致以下问题：
@@ -140,7 +148,7 @@ flowchart TD
 | 场景 | 结果 |
 |------|------|
 | 备份 plist 文件不存在 | 抛出 `noBackupFound` 错误，无法恢复 |
-| 原始开发者证书不在本机钥匙串中 | 回退为 Ad-hoc 签名。应用可启动，但 Keychain 访问组和部分授权可能失效 |
+| 原始开发者证书不在本机钥匙串中 | 回退为 Ad-hoc 签名。应用可启动，但 Keychain 访问组和部分授权失效，且可能在后续 macOS 升级后无法访问自己的容器数据，见[容器数据与签名身份](/datamigrae/container-identity) |
 | Mac App Store 应用（SIP 保护） | 静默跳过。SIP 会阻止对系统保护应用签名的修改 |
 | 应用目录不可写且为 root 所有 | 尝试通过管理员权限修改所有者。若用户取消授权提示，则操作失败 |
 | `Contents` 符号链接目标已丢失 | 临时替换步骤中 `copyItem` 失败，签名无法执行 |

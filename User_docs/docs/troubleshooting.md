@@ -88,6 +88,45 @@ macOS 15.1 之前的系统不支持 App Store 应用原生安装到外部存储�
 4. **查看日志**：菜单栏 → 日志 → 在 Finder 中查看，搜索相关错误信息。
 5. **迁回本地**：在外部应用库中选择「迁回本地」，确认问题是否由外部存储引起。
 
+## 应用双击无反应（进程秒退）
+
+### 现象
+
+在 Finder 或 Dock 中双击应用没有反应：图标在 Dock 上闪一下就消失，没有报错弹窗，也没有崩溃报告。但从终端直接运行应用二进制时，有时又能正常打开。
+
+### 可能原因
+
+这类表现通常与**签名身份**有关，而不是数据损坏。常见于以下组合：
+
+- 迁移过 `~/Library/Containers/` 或 `~/Library/Group Containers/` 数据，并在迁移时执行过 Ad-hoc 重签名；
+- 随后升级了 macOS 大版本。
+
+重签名会抹掉应用的 `app-sandbox`、`application-groups`、`keychain-access-groups` 等授权和 Team ID，应用变成以普通进程身份访问自己的容器。较旧的系统通常放行，升级后校验变严就会被拒绝。
+
+### 处理方法
+
+1. 先确认签名状态：
+
+   ```bash
+   codesign -dv --verbose=4 /Applications/<应用名>.app 2>&1 | grep -E "Authority|TeamIdentifier|Signature"
+   codesign -d --entitlements - /Applications/<应用名>.app
+   ```
+
+   出现 `Signature=adhoc`、`TeamIdentifier=not set`，且 `--entitlements` 没有 XML 输出，即可确认属于该问题。
+
+2. 复现一次并检查系统日志是否拒绝访问容器：
+
+   ```bash
+   open -a /Applications/<应用名>.app; sleep 3
+   log show --last 1m --style compact 2>/dev/null | grep -i "rejected approval request"
+   ```
+
+3. 确认后，从官方渠道重新安装该应用以恢复原始签名。容器数据无需删除。
+
+::: warning 不要用「重签名」或「迁回数据」来修复
+重签名会再次抹掉授权，迁回数据也无法改变签名身份。完整的原理、自查与修复步骤见[容器数据与签名身份](/datamigrae/container-identity)。
+:::
+
 ## 迁移时提示目标已存在
 
 ### 现象
