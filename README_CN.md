@@ -8,7 +8,7 @@
 
 免费开源 · 原生 SwiftUI · macOS 12.0+
 
-[English](README_EN_REVIEW_1.9.0.md)｜[简体中文](README_CN_REVIEW_1.9.0.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+[English](README.mdmd)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <a href="https://github.com/wzh4869/AppPorts/releases"><img src="https://img.shields.io/github/v/release/wzh4869/AppPorts?style=flat-square&label=release&color=blue" alt="Release"></a>
 <a href="https://github.com/wzh4869/AppPorts/stargazers"><img src="https://img.shields.io/github/stars/wzh4869/AppPorts?style=flat-square&color=yellow" alt="Stars"></a>
