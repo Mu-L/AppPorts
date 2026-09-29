@@ -53,9 +53,11 @@ struct ProcessCommandRunner: ShellCommandRunning {
             }
 
             process.terminationHandler = { finished in
-                // 进程退出后管道写端关闭，两个读取任务随之结束。
-                readers.wait()
-                continuation.resume(returning: collector.result(status: finished.terminationStatus))
+                // 等两个管道读完再返回结果，但不阻塞系统的高优先级退出回调线程。
+                let status = finished.terminationStatus
+                readers.notify(queue: .global(qos: .utility)) {
+                    continuation.resume(returning: collector.result(status: status))
+                }
             }
 
             do {
