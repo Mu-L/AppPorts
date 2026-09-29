@@ -1,13 +1,14 @@
 <div align="center">
 
-# 📦 AppPorts
+<img src="assets/appports-banner.png" alt="AppPorts — macOS App & Data Migration" width="100%">
 
-**外置硬盘拯救世界！/ External drives save the world!**
+**大应用，搬出去。好空间，留给你。**
 
-一款专为 macOS 设计的应用程序迁移与链接工具。
-轻松将庞大的应用程序迁移至外部存储，同时保持系统无感运行。
+应用和数据迁往外置硬盘，熟悉的打开方式依然在。
 
-[English](README.md)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
+免费开源 · 原生 SwiftUI · macOS 12.0+
+
+[English](README_EN_REVIEW_1.9.0.md)｜[简体中文](README_CN_REVIEW_1.9.0.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
 <a href="https://github.com/wzh4869/AppPorts/releases"><img src="https://img.shields.io/github/v/release/wzh4869/AppPorts?style=flat-square&label=release&color=blue" alt="Release"></a>
 <a href="https://github.com/wzh4869/AppPorts/stargazers"><img src="https://img.shields.io/github/stars/wzh4869/AppPorts?style=flat-square&color=yellow" alt="Stars"></a>
@@ -39,86 +40,110 @@
 
 ## ✨ 简介
 
-Mac 的内置存储空间寸土寸金。**AppPorts** 允许您一键将 `/Applications` 目录下的应用程序迁移到外部移动硬盘、SD 卡或 NAS，并在原位置保留一个极小的**启动器壳**，让系统误以为应用仍在本地。
+Mac 的内置空间，留给正在做的事。**AppPorts** 是一款免费开源的 macOS 应用与数据迁移工具，帮助您把大型应用、应用数据和工具目录迁移到外部存储，让喜欢的应用和充足的空间同时存在。
 
-对 macOS 系统而言，应用依然"存在"于本地，您可以像往常一样启动它们，但实际占用的却是廉价的外部存储空间。本地启动器壳体积极小，且 Finder **不会显示快捷方式箭头**。
+迁移应用后，完整应用住进外部库，本机保留一个轻量的 **Stub Portal（启动器壳）**。图标没有快捷方式角标，连接外置盘后，您可以继续从 Finder、Dock 或系统应用入口打开应用。实际迁移方式取决于应用类型、系统版本和存储条件。
+
+占空间的不止应用本身。微信的聊天记录、图片视频、接收文件，以及其他应用的容器数据，也可以通过 **APFS 挂载迁移**放到外置盘：应用继续从原路径读取，原始签名保持不变。普通数据目录、开发工具目录和自定义文件夹则按适用条件使用符号链接迁移。
 
 ### ⚠️ "AppPorts"已损坏，无法打开
-如果打开应用时遇到此提示（且系统建议移到废纸篓），这是因为应用没有进行开发者签名，被 macOS 的 Gatekeeper 机制拦截。
-（注意：以下命令假设您已将 AppPorts 拖入 **应用程序** 文件夹）
-您需要在终端运行以下命令来移除隔离属性，即可正常打开：
+
+若从官方渠道下载的 AppPorts 在首次打开时提示「已损坏」，可能是未签名或未公证的构建被 macOS Gatekeeper 拦截。确认下载来源可信，并已将 AppPorts 拖入 **应用程序** 文件夹后，可在终端移除隔离属性，再尝试打开：
+
 ```bash
 xattr -rd com.apple.quarantine /Applications/AppPorts.app
 ```
 
+如果是**迁移后的其他应用**无法打开，请先检查外置盘连接、数据挂载和签名状态。旧版重签名导致的问题请按 [macOS 27 升级与修复指南](https://docs-appports.shimoko.com/macos-27.html)处理。
+
 ## 📸 截图
 
-| 欢迎页 | 主界面 |
+| 准备情况 | 主界面 |
 |:---:|:---:|
-| ![Welcome](https://pic.cdn.shimoko.com/appports/huanying.png) | ![Main](https://pic.cdn.shimoko.com/appports/zhuyemian.png) |
+| ![AppPorts 1.9.0 准备情况](assets/screenshots/cn/appports-readiness.png) | ![AppPorts 1.9.0 应用迁移主界面](assets/screenshots/cn/appports-main.png) |
 
-| 深色模式 | 语言切换 |
+| 应用数据 | 语言切换（English） |
 |:---:|:---:|
-| ![Dark](https://pic.cdn.shimoko.com/appports/shensemoshi.png) | ![Lang](https://pic.cdn.shimoko.com/appports/yuyan.png) |
+| ![AppPorts 1.9.0 应用数据目录](assets/screenshots/cn/appports-app-data.png) | ![AppPorts 1.9.0 英文界面](assets/screenshots/cn/appports-english.png) |
 
 ## 🚀 核心功能
 
-* **📦 无角标迁移**：一键将几十 GB 的大型应用迁移至外置硬盘。本地仅保留极小的启动器壳，Finder 不显示快捷方式箭头，Launchpad 和 macOS App 菜单正常显示。
-* **🛡️ 自动更新保护**：自动识别会自动更新的应用（Sparkle、Electron、Chrome 等），提供**锁定迁移**选项。锁定后外置硬盘上的应用不会被自动更新程序删除或覆盖。
-* **✍️ 代码签名管理**：迁移后出现「已损坏」提示？右键一键重签名。支持备份原始签名、恢复原始签名，数据目录迁移后可自动重签名。
-* **🔴 孤立链接检测**：外置硬盘拔出或应用被删除后，应用列表会显示红色「孤立链接」标签，方便您清理残留。
-* **🍎 macOS 15.1+ App Store 支持**：macOS 15.1+ 可将 App Store 应用直接安装到外置硬盘，App Store 可在外置硬盘上原地更新，无需迁回。
-* **↩️ 随时还原**：一键将应用迁回本地并自动移除链接。迁移中断会自动恢复。
-* **📊 数据目录管理**：可将应用数据目录（`~/Library/` 子文件夹、`~/.npm` 等）迁移到外部存储。支持树形分组视图、搜索和排序。
-* **🎨 现代界面**：原生 SwiftUI 开发，完美适配深色模式，支持 20+ 种语言。
-* **♿️ 无障碍**：VoiceOver 友好的语义标签，提供盲文（Braille）语言选项。
+* **📦 无角标迁移**：将大型应用搬到外置盘，本机保留轻量启动器壳和熟悉的图标。双栏列表展示本地与外部应用，迁移和还原时同步已有 Dock 快捷方式。
+* **🛡️ 自动更新保护**：识别 Sparkle、Electron 等更新机制，为适用的自更新应用提供**锁定迁移**选项，保护外部副本。更新前需先解锁；网络卷不使用这类本地文件锁。
+* **✍️ 代码签名管理**：检查签名状态，为「签名已替换」的应用提供修复入口。支持保存完整原始应用备份，并在条件满足时恢复原始签名；默认模式拒绝对沙盒应用重签名。
+* **🔴 孤立链接检测**：外置盘断开或目标不可用时标记异常链接，方便检查连接状态、定位缺失目标或清理残留入口。
+* **🍎 macOS 15.1+ App Store 支持**：结合系统原生外部安装能力处理 App Store 应用，支持符合条件的外部应用原地更新；具体路径和格式要求以系统及应用提示为准。
+* **↩️ 随时还原**：连接原来的外置盘，在本机空间充足时将应用或数据迁回。操作前检查运行状态与同名冲突；失败时尝试恢复，无法安全完成的步骤会保留副本并说明路径。
+* **📊 数据目录管理**：按应用整理关联数据，支持树形分组、搜索、排序和零字节目录显示开关；也可迁移 `~/.npm` 等工具目录及自行选择的文件夹。
+* **💾 APFS 容器迁移**：Containers 和 Group Containers 中适用的数据默认使用专用 APFS 卷挂载到原路径，无需替换应用签名。迁移前检查未加密 APFS、连接状态和可用空间，迁移后提供挂载、卸载、还原与自动接回功能。
+* **📐 更清楚的空间统计**：区分本地可迁出数据与已迁移数据，避免父子目录重复计入；遇到读取失败，明确提示统计不完整。
+* **🔎 启动自检**：检查完全磁盘访问、应用管理和外部存储状态，显示当前运行版本与路径，方便核对授权对象。
+* **🎨 现代界面**：原生 SwiftUI 开发，支持深色模式、树形目录展开动画和可调高度的信息栏，让应用与数据状态更直观。
+* **♿️ 无障碍**：提供 VoiceOver 语义标签、键盘快捷键和盲文（Braille）语言选项。
 * **🌍 全球化**：支持 20+ 种语言，包括 English、中文、日本語、한국어、Deutsch、Français、Español、Italiano、Português、Русский、العربية、हिन्दी、Tiếng Việt、ไทย、Türkçe、Nederlands、Polski、Indonesia、Esperanto、Braille，以及 👽 火星文。
 
 ## 🏆 为什么选择 AppPorts？
 
-AppPorts 采用独特的 **Stub Portal（启动器壳）** 技术 — 一个极小的本地壳体启动外置硬盘上的真实应用。兼顾美观、兼容性和系统整洁度。
+**搬走体积，留下熟悉。** AppPorts 使用 **Stub Portal（启动器壳）** 保留轻量的本地应用入口，并把迁移状态、更新保护、签名检查和还原操作放在同一个界面中。应用本体和数据可以分别管理，按需要释放空间。
 
 | 特性 | AppPorts（启动器壳） | 传统软链 |
 | :--- | :--- | :--- |
-| **Finder 图标** | ✅ 原生（无箭头） | ❌ 有箭头 |
-| **Launchpad** | ✅ 完美显示 | ⚠️ 经常失效 |
-| **App 菜单 (macOS 26)** | ✅ 完美支持 | ❌ 不支持 |
-| **自动更新保护** | ✅ 锁定模式 | ❌ 无保护 |
-| **签名管理** | ✅ 内置 | ❌ 无 |
-| **孤立链接检测** | ✅ 自动检测 | ❌ 无 |
+| **Finder 图标** | ✅ 保留应用图标，无快捷方式角标 | 通常带快捷方式箭头 |
+| **Launchpad** | 保留可被系统索引的本地应用入口 | 显示情况取决于系统索引 |
+| **App 菜单 (macOS 26)** | 使用本地 `.app` 启动入口 | 取决于系统对链接的识别 |
+| **自动更新保护** | 为适用应用提供锁定选项 | 需要自行维护 |
+| **签名管理** | 内置检查、备份与恢复入口 | 需要另行处理 |
+| **孤立链接检测** | 自动标记异常状态 | 需要自行检查目标路径 |
+
+容器数据采用独立的 APFS 挂载迁移，普通数据目录按适用条件保留符号链接。不同应用的后台组件、权限和更新方式可能影响兼容性，详见[使用限制](https://docs-appports.shimoko.com/limitations.html)。
 
 ## 🧭 迁移策略
 
-AppPorts 会根据应用类型和行为自动选择最佳迁移方案：
+AppPorts 根据应用类型、更新行为与数据目录类型选择迁移方式：
 
 | 应用类型 | 策略 | 默认开启 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **普通 Mac 应用** | 启动器壳 | ✅ 是 | 本地极小壳体，无箭头图标 |
-| **自更新应用**（Sparkle、Electron 等） | 启动器壳 + 锁定 | ✅ 是 | 外置硬盘上的应用被锁定（uchg），防止自动更新破坏 |
-| **iPhone/iPad 应用** | iOS 启动器壳 | ✅ 是 | 从 iOS 应用包提取图标 |
-| **Mac App Store 应用** | macOS 15.1+ 原生支持 | ✅ 15.1+ 自动 | App Store 可在外置硬盘上原地更新 |
-| **应用套件**（Office、Adobe 等） | 文件夹软链 | ✅ 是 | 整个文件夹作为一个单元迁移 |
+| **普通 Mac 应用** | 启动器壳 | ✅ 是 | 本机保留轻量入口，完整应用位于外部库 |
+| **自更新应用**（Sparkle、Electron 等） | 启动器壳 + 适用时锁定 | 按检测结果与迁移选项 | 保护外部副本，更新前先解锁；网络卷跳过本地文件锁 |
+| **iPhone/iPad 应用** | iOS 启动器壳 | ✅ macOS 15.1+ 自动开放；旧系统按设置 | 提取应用图标，运行仍取决于硬件、系统及应用支持 |
+| **Mac App Store 应用** | 结合系统原生外部安装能力 | ✅ macOS 15.1+ 自动开放；旧系统按设置 | 原生外部安装需在 App Store 中配置；旧系统更新后可能需要再次迁移 |
+| **应用套件**（文件夹内含多个应用） | 文件夹镜像入口 | ✅ 是 | 内部应用使用启动器，其余内容通过符号链接连接外部副本 |
+| **容器数据**（Containers / Group Containers） | APFS 挂载迁移 | ✅ 默认方式 | 当前要求未加密的 APFS 外部存储，保留原路径与原始签名 |
+| **普通数据、工具目录和自定义文件夹** | 符号链接 | 按目录适用条件 | 原路径保留链接，数据存放在外部存储 |
 | **系统应用** | 阻止 | ❌ | 受保护，不可迁移 |
 | **正在运行的应用** | 阻止 | ❌ | 请先退出应用 |
-| **已链接的应用** | 阻止 | ❌ | 防止重复链接 |
+| **已链接的应用** | 阻止重复链接 | ❌ | 可检查状态或还原到本机 |
+
+经典数据迁移模式默认关闭，保留旧的容器符号链接与沙盒重签名行为，兼容性取决于具体应用和系统。默认推荐使用 APFS 挂载迁移；不满足磁盘条件时，可以将容器数据保留在本机。
+
+**准备升级 macOS 27 的旧版用户，请先更新并打开一次 AppPorts**，让新版更新后台重签名脚本。macOS 27 及以上会停用开机自动重签名并清理旧任务。若旧方式迁移的应用无法打开，请按[修复指南](https://docs-appports.shimoko.com/macos-27.html)先还原旧容器符号链接数据，再恢复原始签名或从官方渠道重装；更新 AppPorts 不会自动转换旧迁移方式或恢复签名。
 
 ## 🛠️ 安装与运行
 
 ### 系统要求
-* macOS 12.0 (Monterey) 或更高版本。
+
+* macOS 12.0 (Monterey) 或更高版本，支持 Apple Silicon 与 Intel Mac。
+* 建议使用连接稳定、空间充足的外置 SSD；不同迁移方式对存储格式的要求不同。
+* 容器数据挂载迁移当前需要**未加密的 APFS** 外部存储。旧系统可能需要管理员授权，登录后也可能需要打开 AppPorts 手动挂载。
 
 ### 下载安装
+
 请前往 [官方网站](https://appports.shimoko.com/) 或 [Releases](https://github.com/wzh4869/AppPorts/releases) 页面下载最新版本的 `AppPorts.dmg`。
 
+将 AppPorts 放入 **应用程序** 文件夹后打开，按引导完成准备，连接外置盘并选择外部应用库。退出要迁移的应用后，即可在应用列表或数据目录中开始迁移。挂载迁移需要稳定的程序路径，请勿直接从 DMG 或临时路径运行。
+
+迁移后使用应用时保持外置盘连接；容器数据首次访问可移动宗卷时，按系统提示授权。拔盘前先退出相关应用并完成卸载或推出。重要数据建议提前备份，更多步骤见[快速入门](https://docs-appports.shimoko.com/faststart.html)。
+
 ### ⚠️ 权限说明
-首次运行时，AppPorts 需要 **"完全磁盘访问权限"** 才能读写 `/Applications` 目录。
+
+首次运行时，请按自检结果配置 **完全磁盘访问权限**，以便读取和迁移受保护的应用数据。应用管理、Finder 自动化或管理员权限会根据实际操作由系统提示。
 
 1. 打开 **系统设置** -> **隐私与安全性**。
 2. 选择 **完全磁盘访问权限**。
-3. 点击 `+` 号，添加 **AppPorts** 并开启开关。
-4. 重启 AppPorts。
+3. 点击 `+` 号，添加当前使用的 **AppPorts** 并开启开关。
+4. 退出并重新打开 AppPorts。
 
-*(应用内包含引导页面，可直接跳转至设置)*
+*(应用内包含引导页面，可直接跳转至设置；自检会显示当前运行版本和路径，方便核对授权对象。权限检查通过后，个别目录仍可能存在其他访问限制。)*
 
 ## 🧑‍💻 开发构建
 
@@ -143,12 +168,13 @@ AppPorts 完全免费、开源、无广告，项目由个人在业余时间维�
 
 <img src="https://pic.cdn.shimoko.com/thanks.png" alt="赞助二维码" width="220" />
 
-- 赞助时请在留言（备注）中留下你的**昵称**和**个人链接**（GitHub 主页、博客、社交账号等），它们会展示在 AppPorts 的「关于 AppPorts」页面以及[网站赞助页](https://docs-appports.shimoko.com/sponsor.html)。
+- 赞助时请在留言（备注）中留下你的**昵称**，也可以提供**个人链接**（GitHub 主页、博客、社交账号等），它们会展示在 AppPorts 的「关于 AppPorts」页面以及[网站赞助页](https://docs-appports.shimoko.com/sponsor.html)。
 - 赞助**没有最低金额要求**，多少随意，量力而行就好；赞助者按**金额从高到低**排序，金额相同时按**赞助时间从早到晚**排序，金额仅在[网站赞助页](https://docs-appports.shimoko.com/sponsor.html)展示。
 
 感谢以下赞助者（此列表与仓库根目录的 `sponsors.json` 同步）：
 
 - **师杀** · [space.bilibili.com/396481888](https://space.bilibili.com/396481888)
+- **符华**
 
 ## 🔗 进阶存储管理
 
