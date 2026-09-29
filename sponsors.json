@@ -2,12 +2,18 @@
   "sponsorPage": "https://docs-appports.shimoko.com/sponsor.html",
   "qrCode": "https://pic.cdn.shimoko.com/thanks.png",
   "currency": "CNY",
-  "updatedAt": "2026-09-17",
+  "updatedAt": "2026-09-29T04:39:01Z",
   "sponsors": [
     {
       "name": "师杀",
       "link": "https://space.bilibili.com/396481888",
-      "amount": 300,
+      "amount": 350,
+      "date": "2026-09-16"
+    },
+    {
+      "name": "符华",
+      "link": "",
+      "amount": 0.63,
       "date": "2026-09-16"
     }
   ]
