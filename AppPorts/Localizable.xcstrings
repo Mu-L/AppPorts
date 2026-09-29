@@ -1,6 +1,417 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+    "无法完整识别应用数据" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تحديد بيانات التطبيق بالكامل"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠝⠁⠃⠇⠑ ⠞⠕ ⠋⠥⠇⠇⠽ ⠊⠙⠑⠝⠞⠊⠋⠽ ⠁⠏⠏ ⠙⠁⠞⠁"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Daten konnten nicht vollständig erkannt werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to fully identify app data"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne eblas plene identigi la datumojn de la aplikaĵo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron identificar todos los datos de la app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’identifier toutes les données de l’app"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऐप डेटा की पूरी तरह पहचान नहीं हो सकी"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat mengidentifikasi seluruh data aplikasi"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile identificare tutti i dati dell’app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリのデータを完全に識別できません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 데이터를 완전히 식별할 수 없습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appgegevens konden niet volledig worden geïdentificeerd"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można w pełni zidentyfikować danych aplikacji"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível identificar todos os dados do app"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось полностью определить данные приложения"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถระบุข้อมูลแอปได้ครบถ้วน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulama verileri tamamen belirlenemedi"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể xác định đầy đủ dữ liệu ứng dụng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法完整识别应用数据"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法完整識別應用程式資料"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法完整識別應甪數據"
+          }
+        }
+      }
+    },
+    "应用信息读取失败，以下结果可能不完整。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّرت قراءة معلومات التطبيق. قد تكون النتائج أدناه غير مكتملة."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠝⠁⠃⠇⠑ ⠞⠕ ⠗⠑⠁⠙ ⠁⠏⠏ ⠊⠝⠋⠕⠗⠍⠁⠞⠊⠕⠝⠲ ⠠⠞⠓⠑ ⠗⠑⠎⠥⠇⠞⠎ ⠃⠑⠇⠕⠺ ⠍⠁⠽ ⠃⠑ ⠊⠝⠉⠕⠍⠏⠇⠑⠞⠑⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Informationen konnten nicht gelesen werden. Die folgenden Ergebnisse sind möglicherweise unvollständig."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to read app information. The results below may be incomplete."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne eblas legi la informojn pri la aplikaĵo. La subaj rezultoj eble estas nekompletaj."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer la información de la app. Los resultados siguientes pueden estar incompletos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lire les informations de l’app. Les résultats ci-dessous peuvent être incomplets."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऐप की जानकारी पढ़ी नहीं जा सकी। नीचे दिए गए परिणाम अधूरे हो सकते हैं।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat membaca informasi aplikasi. Hasil di bawah mungkin tidak lengkap."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere le informazioni dell’app. I risultati seguenti potrebbero essere incompleti."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ情報を読み取れませんでした。以下の結果は不完全な可能性があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 정보를 읽을 수 없습니다. 아래 결과가 불완전할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appinformatie kon niet worden gelezen. De onderstaande resultaten zijn mogelijk onvolledig."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można odczytać informacji o aplikacji. Poniższe wyniki mogą być niekompletne."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler as informações do app. Os resultados abaixo podem estar incompletos."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать сведения о приложении. Результаты ниже могут быть неполными."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถอ่านข้อมูลแอปได้ ผลลัพธ์ด้านล่างอาจไม่ครบถ้วน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulama bilgileri okunamadı. Aşağıdaki sonuçlar eksik olabilir."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể đọc thông tin ứng dụng. Kết quả bên dưới có thể chưa đầy đủ."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用信息读取失败，以下结果可能不完整。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "應用程式資訊讀取失敗，以下結果可能不完整。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "應甪信息讀取失敗，以下結菓可能不完整。"
+          }
+        }
+      }
+    },
+    "请检查应用路径；若应用位于外置磁盘，请连接磁盘后刷新。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحقّق من مسار التطبيق. إذا كان التطبيق على قرص خارجي، فوصّل القرص ثم حدّث النتائج."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠓⠑⠉⠅ ⠞⠓⠑ ⠁⠏⠏ ⠏⠁⠞⠓⠲ ⠠⠊⠋ ⠞⠓⠑ ⠁⠏⠏ ⠊⠎ ⠕⠝ ⠁⠝ ⠑⠭⠞⠑⠗⠝⠁⠇ ⠙⠊⠎⠅⠂ ⠉⠕⠝⠝⠑⠉⠞ ⠞⠓⠑ ⠙⠊⠎⠅ ⠁⠝⠙ ⠗⠑⠋⠗⠑⠎⠓⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe den App-Pfad. Wenn sich die App auf einem externen Laufwerk befindet, verbinde das Laufwerk und aktualisiere die Ansicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the app path. If the app is on an external disk, connect the disk and refresh."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontrolu la vojon al la aplikaĵo. Se ĝi estas sur ekstera disko, konektu la diskon kaj aktualigu."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprueba la ruta de la app. Si está en un disco externo, conecta el disco y actualiza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiez le chemin de l’app. Si elle se trouve sur un disque externe, connectez le disque puis actualisez."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऐप का पथ जाँचें। यदि ऐप बाहरी डिस्क पर है, तो डिस्क कनेक्ट करके रीफ़्रेश करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periksa jalur aplikasi. Jika aplikasi berada di disk eksternal, hubungkan disk lalu segarkan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controlla il percorso dell’app. Se si trova su un disco esterno, collega il disco e aggiorna."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリのパスを確認してください。アプリが外付けディスクにある場合は、ディスクを接続してから更新してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 경로를 확인하세요. 앱이 외장 디스크에 있다면 디스크를 연결한 후 새로 고침하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controleer het pad naar de app. Als de app op een externe schijf staat, sluit die dan aan en vernieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprawdź ścieżkę aplikacji. Jeśli aplikacja znajduje się na dysku zewnętrznym, podłącz dysk i odśwież."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifique o caminho do app. Se ele estiver em um disco externo, conecte o disco e atualize."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте путь к приложению. Если оно находится на внешнем диске, подключите диск и обновите результаты."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตรวจสอบพาธของแอป หากแอปอยู่บนดิสก์ภายนอก ให้เชื่อมต่อดิสก์แล้วรีเฟรช"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulama yolunu kontrol edin. Uygulama harici bir diskteyse diski bağlayın ve yenileyin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra đường dẫn ứng dụng. Nếu ứng dụng nằm trên ổ đĩa ngoài, hãy kết nối ổ đĩa rồi làm mới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查应用路径；若应用位于外置磁盘，请连接磁盘后刷新。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請檢查應用程式路徑；若應用程式位於外接磁碟，請連接磁碟後重新整理。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請檢查應甪蕗徑；若應甪位於外置磁盤，請連接磁盤後刷新。"
+          }
+        }
+      }
+    },
     "至少 %@" : {
       "extractionState" : "manual",
       "localizations" : {

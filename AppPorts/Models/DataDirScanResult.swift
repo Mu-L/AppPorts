@@ -33,6 +33,7 @@ struct DataDirReadIssue: Equatable, Sendable {
 struct DataDirScanResult: Sendable {
     let items: [DataDirItem]
     let readIssues: [DataDirReadIssue]
+    var identityIssue: AppIdentityIssue? = nil
 }
 
 struct DirectorySizeResult: Sendable {

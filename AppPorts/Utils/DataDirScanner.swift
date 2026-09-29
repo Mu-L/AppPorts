@@ -530,9 +530,18 @@ actor DataDirScanner {
         let scanID = AppLogger.shared.makeOperationID(prefix: "scanner-library-dirs")
         refreshMountRecords()
 
-        // 从 Info.plist 读取 BundleID
-        let bundleID = readBundleID(from: app.path)
-        let appName = app.name.replacingOccurrences(of: ".app", with: "")
+        let identity: ResolvedAppIdentity?
+        let identityIssue: AppIdentityIssue?
+        switch AppIdentityResolver.resolve(at: app.displayURL) {
+        case .success(let resolved):
+            identity = resolved
+            identityIssue = nil
+        case .failure(let issue):
+            identity = nil
+            identityIssue = issue
+        }
+        let bundleID = identity?.bundleIdentifier
+        let appName = app.displayName.replacingOccurrences(of: ".app", with: "")
         let matchProfile = buildMatchProfile(bundleID: bundleID, appName: appName)
         let appIsSandboxed = isSandboxedApplication(app.displayURL)
         AppLogger.shared.logContext(
@@ -542,6 +551,10 @@ actor DataDirScanner {
                 ("app_name", appName),
                 ("app_path", app.path.path),
                 ("bundle_id", bundleID),
+                ("identity_source", identity?.source.rawValue),
+                ("identity_bundle_path", identity?.identityBundleURL.path),
+                ("real_app_path", identity?.realAppURL.path),
+                ("identity_error", identityIssue?.reason.rawValue),
                 ("external_root", externalRootURL?.path),
                 ("sandboxed", appIsSandboxed ? "true" : "false"),
                 ("exact_match_count", String(matchProfile.exactMatches.count)),
@@ -676,7 +689,7 @@ actor DataDirScanner {
             ],
             level: "TRACE"
         )
-        return DataDirScanResult(items: sortedResults, readIssues: readIssues)
+        return DataDirScanResult(items: sortedResults, readIssues: readIssues, identityIssue: identityIssue)
     }
 
     /// 异步计算单个目录大小
@@ -1532,7 +1545,7 @@ actor DataDirScanner {
             }
         }
 
-        if let bundleID, !bundleID.isEmpty {
+        if let bundleID, !bundleID.isEmpty, !bundleID.lowercased().hasSuffix(".appports.stub") {
             exactMatches.insert(bundleID)
 
             let components = bundleID.split(separator: ".").map(String.init)
@@ -1939,16 +1952,6 @@ actor DataDirScanner {
         }
 
         return false
-    }
-
-    /// 从 Info.plist 读取 BundleID
-    private func readBundleID(from appURL: URL) -> String? {
-        let infoPlistURL = appURL.appendingPathComponent("Contents/Info.plist")
-        guard let data = try? Data(contentsOf: infoPlistURL),
-              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
-            return nil
-        }
-        return plist["CFBundleIdentifier"] as? String
     }
 
     /// 检测目录当前状态，并区分 AppPorts 受管链接、挂载迁移项和已有符号链接。

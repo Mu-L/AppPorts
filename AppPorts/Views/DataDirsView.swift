@@ -65,6 +65,7 @@ struct DataDirsView: View {
     @State private var libraryItems:   [DataDirItem] = []
     @State private var dotFolderReadIssues: [DataDirReadIssue] = []
     @State private var libraryReadIssues: [DataDirReadIssue] = []
+    @State private var libraryIdentityIssue: AppIdentityIssue?
     @State private var showReadinessCheck = false
     @AppStorage("showZeroByteDataDirectories") private var showZeroByteDirectories = false
 
@@ -362,6 +363,7 @@ struct DataDirsView: View {
                     libraryScanToken = UUID()
                     libraryItems = []
                     libraryReadIssues = []
+                    libraryIdentityIssue = nil
                     selectedAppIsSandboxed = false
                     isScanning = false
                 }
@@ -398,11 +400,19 @@ struct DataDirsView: View {
                     if selectedApp != nil {
                         directorySearchField
                         if hasActiveAppDataFilters { appDataFilterSummary }
-                        if !libraryItems.isEmpty || !libraryReadIssues.isEmpty {
+                        if !libraryItems.isEmpty || !libraryReadIssues.isEmpty || libraryIdentityIssue != nil {
                             HStack(spacing: 12) {
-                                statsSummary(items: filteredLibraryItems, allItems: libraryItems, readIssues: libraryReadIssues)
+                                statsSummary(
+                                    items: filteredLibraryItems,
+                                    allItems: libraryItems,
+                                    readIssues: libraryReadIssues,
+                                    hasIdentityIssue: libraryIdentityIssue != nil
+                                )
                                 zeroByteDirectoriesToggle
                             }
+                        }
+                        if let issue = libraryIdentityIssue {
+                            appIdentityWarning(issue: issue)
                         }
                         if !libraryReadIssues.isEmpty {
                             directoryReadWarning(issues: libraryReadIssues)
@@ -428,7 +438,13 @@ struct DataDirsView: View {
                     } else if isScanning && libraryItems.isEmpty {
                         loadingView
                     } else if libraryItems.isEmpty {
-                        ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未找到关联数据目录".localized)
+                        if libraryIdentityIssue != nil {
+                            ContentView.EmptyStateView(icon: "exclamationmark.circle", text: "无法完整识别应用数据".localized)
+                        } else if !libraryReadIssues.isEmpty {
+                            ContentView.EmptyStateView(icon: "exclamationmark.circle", text: "部分目录无法读取，请检查后刷新。".localized)
+                        } else {
+                            ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未找到关联数据目录".localized)
+                        }
                     } else if sortedFilteredLibraryItems.isEmpty {
                         ContentView.EmptyStateView(icon: "line.3.horizontal.decrease.circle", text: "没有匹配当前筛选条件的数据目录".localized)
                     } else {
@@ -770,8 +786,31 @@ struct DataDirsView: View {
         .font(.system(size: 12))
     }
 
-    private func statsSummary(items: [DataDirItem], allItems: [DataDirItem], readIssues: [DataDirReadIssue]) -> some View {
-        let summary = DataDirSpaceSummary(items: items, allItems: allItems, hasReadIssues: !readIssues.isEmpty)
+    private func appIdentityWarning(issue: AppIdentityIssue) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.circle")
+                .foregroundColor(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("应用信息读取失败，以下结果可能不完整。".localized)
+                if issue.reason == .realAppUnavailable {
+                    Text("请检查应用路径；若应用位于外置磁盘，请连接磁盘后刷新。".localized)
+                }
+            }
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 12))
+        .help(issue.url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func statsSummary(
+        items: [DataDirItem], allItems: [DataDirItem], readIssues: [DataDirReadIssue], hasIdentityIssue: Bool = false
+    ) -> some View {
+        let summary = DataDirSpaceSummary(
+            items: items, allItems: allItems, hasReadIssues: !readIssues.isEmpty, hasIdentityIssue: hasIdentityIssue
+        )
         let linked = items.filter { $0.status == "已链接" }.count
         let mounted = items.filter { DataDirStatus.mountStatuses.contains($0.status) }.count
         let needsNormalization = items.filter { $0.status == "待规范" }.count
@@ -1081,6 +1120,7 @@ struct DataDirsView: View {
         isScanning = true
         libraryItems = []
         libraryReadIssues = []
+        libraryIdentityIssue = nil
         let appDisplayName = app.displayName
         let appID = app.id
         let selectedExternalRoot = externalDriveURL
@@ -1106,6 +1146,7 @@ struct DataDirsView: View {
                       self.selectedApp?.id == appID else { return }
                 self.libraryItems = items
                 self.libraryReadIssues = scanResult.readIssues
+                self.libraryIdentityIssue = scanResult.identityIssue
                 self.selectedAppIsSandboxed = isSandboxed
             }
             AppLogger.shared.logContext(

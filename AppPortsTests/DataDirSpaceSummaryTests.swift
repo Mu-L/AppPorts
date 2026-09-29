@@ -2,6 +2,23 @@ import XCTest
 @testable import AppPorts
 
 final class DataDirSpaceSummaryTests: XCTestCase {
+    func testUnresolvedIdentityMakesEmptySummaryIncomplete() {
+        XCTAssertTrue(DataDirSpaceSummary(items: [], allItems: [], hasIdentityIssue: true).isIncomplete)
+        XCTAssertFalse(DataDirSpaceSummary(items: [], allItems: []).isIncomplete)
+    }
+
+    func testNameMatchedDataKeepsSizeButIsNotACompleteEstimate() {
+        let cache = item("/Library/Caches/wpsoffice", bytes: 500)
+        let summary = DataDirSpaceSummary(items: [cache], allItems: [cache], hasIdentityIssue: true)
+        XCTAssertEqual(summary.reclaimableBytes, 500)
+        XCTAssertTrue(summary.isIncomplete)
+        XCTAssertFalse(summary.isCalculating)
+    }
+
+    func testResolvingIdentityDoesNotHideRemainingDirectoryReadErrors() {
+        XCTAssertTrue(DataDirSpaceSummary(items: [], allItems: [], hasReadIssues: true, hasIdentityIssue: false).isIncomplete)
+    }
+
     func testProtectedWeChatParentsDoNotHideOrInflateMigratableChildren() {
         let items = [
             item("/Data/Documents", bytes: 9000, migratable: false),

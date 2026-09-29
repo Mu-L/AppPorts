@@ -6,7 +6,7 @@ struct DataDirSpaceSummary {
     let isCalculating: Bool
     let isIncomplete: Bool
 
-    init(items: [DataDirItem], allItems: [DataDirItem], hasReadIssues: Bool = false) {
+    init(items: [DataDirItem], allItems: [DataDirItem], hasReadIssues: Bool = false, hasIdentityIssue: Bool = false) {
         let nonLocalItems = allItems.filter { $0.status != DataDirStatus.local }
         let candidates = items.filter { item in
             item.status == DataDirStatus.local && item.isMigratable
@@ -16,7 +16,7 @@ struct DataDirSpaceSummary {
         // DirectoryEnumerator 不跨挂载卷，也不跟随软链，父项的测量已经排除了外置子目录。
         reclaimableBytes = roots.reduce(0) { $0 + $1.sizeBytes }
         isCalculating = roots.contains { $0.size == nil }
-        isIncomplete = hasReadIssues || roots.contains { $0.sizeIsIncomplete }
+        isIncomplete = hasReadIssues || hasIdentityIssue || roots.contains { $0.sizeIsIncomplete }
     }
 
     private static func isDescendant(_ item: DataDirItem, of ancestor: DataDirItem) -> Bool {
