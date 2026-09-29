@@ -7,7 +7,7 @@ outline: deep
 ::: tip 一句話結論
 `~/Library/Containers/` 和 `~/Library/Group Containers/` 裡的資料屬於**沙盒應用程式**。這類資料用"捷徑"（符號連結）搬到外接磁碟是讀不到的；AppPorts 以前靠「重簽名此應用」繞過這一點，代價是應用程式在 macOS 27 上可能無法開啟，登入狀態也可能遺失。
 
-從 1.8.2 起，容器資料改用[掛載遷移](/zh-Hant/datamigrae/mount-migration)，簽名一個位元組都不變更。已經被重簽名過的應用程式需要重新安裝，步驟見 [macOS 27 升級說明](/zh-Hant/macos-27)。
+從 1.9.0 起，容器資料改用[掛載遷移](/zh-Hant/datamigrae/mount-migration)，簽名一個位元組都不變更。已經被重簽名過的應用程式需要重新安裝，步驟見 [macOS 27 升級說明](/zh-Hant/macos-27)。
 :::
 
 這篇文件解釋來龍去脈。如果你的應用程式已經打不開了，直接去 [macOS 27 升級說明](/zh-Hant/macos-27) 看修復步驟。

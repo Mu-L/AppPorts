@@ -166,7 +166,13 @@ struct Sponsor: Identifiable, Codable, Equatable {
     let date: String
 
     var id: String { link.isEmpty ? name : link }
-    var profileURL: URL? { URL(string: link) }
+    var profileURL: URL? {
+        let value = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, let url = URL(string: value),
+              ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
+    }
 
     init(name: String, link: String, amount: Double = 0, date: String = "") {
         self.name = name
@@ -203,40 +209,60 @@ private extension Array where Element == Sponsor {
     }
 }
 
-private let fallbackSponsors: [Sponsor] = [
-    Sponsor(name: "师杀", link: "https://space.bilibili.com/396481888", amount: 300, date: "2026-09-16"),
-]
-
-private struct SponsorsPayload: Decodable {
+struct SponsorsPayload: Codable {
+    let updatedAt: String?
     let sponsors: [Sponsor]
 }
 
-private struct SponsorsCache: Codable {
-    let sponsors: [Sponsor]
-}
-
-private struct SponsorsService {
+struct SponsorsService {
     private let fileManager = FileManager.default
     private let endpoint = URL(string: "https://docs-appports.shimoko.com/sponsors.json")!
+    private let session: URLSession
+    private let cacheURL: URL?
 
-    func loadCachedSponsors() -> [Sponsor]? {
-        guard let cacheURL,
-              let data = try? Data(contentsOf: cacheURL),
-              let cache = try? JSONDecoder().decode(SponsorsCache.self, from: data),
-              !cache.sponsors.isEmpty else {
-            return nil
-        }
-        return cache.sponsors.rankedBySponsorship()
+    init(session: URLSession = .shared, cacheURL: URL? = SponsorsService.defaultCacheURL) {
+        self.session = session
+        self.cacheURL = cacheURL
     }
 
-    func saveSponsorsToCache(_ sponsors: [Sponsor]) {
-        guard let cacheURL, !sponsors.isEmpty else { return }
+    /// 线上是权威来源（包括空名单）；只有请求或解析失败才依次使用缓存、包内名单。
+    func loadSponsors() async -> SponsorsPayload? {
+        do {
+            let payload = try await fetchSponsors()
+            saveSponsorsToCache(payload)
+            return payload
+        } catch {
+            AppLogger.shared.logError(
+                "加载赞助者列表失败，已回退到缓存或内置列表",
+                error: error,
+                errorCode: "ABOUT-SPONSORS-FETCH-FAILED"
+            )
+            return loadCachedSponsors() ?? loadBundledSponsors()
+        }
+    }
+
+    func loadBundledSponsors(bundle: Bundle = .main) -> SponsorsPayload? {
+        guard let url = bundle.url(forResource: "sponsors", withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SponsorsPayload.self, from: data)
+    }
+
+    func loadCachedSponsors() -> SponsorsPayload? {
+        guard let cacheURL,
+              let data = try? Data(contentsOf: cacheURL),
+              let cache = try? JSONDecoder().decode(SponsorsPayload.self, from: data) else {
+            return nil
+        }
+        return cache
+    }
+
+    func saveSponsorsToCache(_ payload: SponsorsPayload) {
+        guard let cacheURL else { return }
 
         do {
             let parentURL = cacheURL.deletingLastPathComponent()
             try fileManager.createDirectory(at: parentURL, withIntermediateDirectories: true)
-            let cache = SponsorsCache(sponsors: sponsors)
-            let data = try JSONEncoder().encode(cache)
+            let data = try JSONEncoder().encode(payload)
             try data.write(to: cacheURL, options: .atomic)
         } catch {
             AppLogger.shared.logError(
@@ -247,13 +273,13 @@ private struct SponsorsService {
         }
     }
 
-    func fetchSponsors() async throws -> [Sponsor] {
-        var request = URLRequest(url: endpoint)
+    func fetchSponsors() async throws -> SponsorsPayload {
+        var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData)
         request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("AppPorts", forHTTPHeaderField: "User-Agent")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
@@ -265,11 +291,11 @@ private struct SponsorsService {
             )
         }
 
-        return try JSONDecoder().decode(SponsorsPayload.self, from: data).sponsors.rankedBySponsorship()
+        return try JSONDecoder().decode(SponsorsPayload.self, from: data)
     }
 
-    private var cacheURL: URL? {
-        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+    private static var defaultCacheURL: URL? {
+        guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
         return appSupportURL
@@ -280,7 +306,8 @@ private struct SponsorsService {
 
 @MainActor
 private final class SponsorsViewModel: ObservableObject {
-    @Published private(set) var sponsors: [Sponsor] = fallbackSponsors
+    @Published private(set) var sponsors: [Sponsor] = []
+    @Published private(set) var isLoading = true
 
     private let service = SponsorsService()
     private var hasLoaded = false
@@ -289,23 +316,10 @@ private final class SponsorsViewModel: ObservableObject {
         guard !hasLoaded else { return }
         hasLoaded = true
 
-        if let cachedSponsors = service.loadCachedSponsors() {
-            sponsors = cachedSponsors
-        }
-
         Task {
-            do {
-                let fetchedSponsors = try await service.fetchSponsors()
-                guard !fetchedSponsors.isEmpty else { return }
-                sponsors = fetchedSponsors
-                service.saveSponsorsToCache(fetchedSponsors)
-            } catch {
-                AppLogger.shared.logError(
-                    "加载赞助者列表失败，已回退到缓存或内置列表",
-                    error: error,
-                    errorCode: "ABOUT-SPONSORS-FETCH-FAILED"
-                )
-            }
+            let payload = await service.loadSponsors()
+            sponsors = payload?.sponsors.rankedBySponsorship() ?? []
+            isLoading = false
         }
     }
 }
@@ -411,10 +425,16 @@ struct AboutView: View {
 
                 Divider()
                 AboutSection(title: "赞助者".localized) {
+                    if sponsorsViewModel.isLoading {
+                        ProgressView().controlSize(.small)
+                    }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .leading)], alignment: .leading, spacing: 10) {
                         ForEach(sponsorsViewModel.sponsors) { sponsor in
                             if let url = sponsor.profileURL {
                                 Link(destination: url) { Text(verbatim: sponsor.name) }
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else {
+                                Text(verbatim: sponsor.name)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }

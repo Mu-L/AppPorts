@@ -28,12 +28,12 @@ Zum Unterstützen den Code mit WeChat scannen. **Es gibt keinen Mindestbetrag** 
 
 ## Name und Link in der Nachricht
 
-Bitte hinterlasse beim Unterstützen in der Nachricht (dem Verwendungszweck) deinen **Namen** und einen **Link** – GitHub-Profil, Blog, Social-Media-Konto, ganz wie du möchtest.
+Bitte hinterlasse beim Unterstützen in der Nachricht deinen **Namen**. Ein **Link ist optional** – etwa dein GitHub-Profil, Blog oder Social-Media-Konto.
 
 Name und Link erscheinen anschließend in der Liste oben und auf der Seite „Über AppPorts".
 
 ::: tip Lieber anonym bleiben?
-Ohne Namen und Link zeigen wir keine Informationen an.
+Ohne Namen zeigen wir keine Informationen zur Unterstützung an. Wird nur ein Name angegeben, erscheint dieser als Text ohne Link.
 :::
 
 ## Reihenfolge

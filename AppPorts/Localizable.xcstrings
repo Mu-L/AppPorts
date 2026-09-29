@@ -1,6 +1,828 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+    "至少 %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "على الأقل %@"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠁⠞ ⠇⠑⠁⠎⠞ %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mindestens %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least %@"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Almenaŭ %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al menos %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au moins %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कम से कम %@"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setidaknya %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Almeno %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "少なくとも %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최소 %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minstens %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Co najmniej %@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pelo menos %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не менее %@"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อย่างน้อย %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En az %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ít nhất %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少 %@"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "至少 %@"
+          }
+        }
+      }
+    },
+    "无法读取" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذرت القراءة"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠥⠝⠗⠑⠁⠙⠁⠃⠇⠑"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht lesbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unreadable"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nelegebla"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede leer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Illisible"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पढ़ा नहीं जा सका"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat dibaca"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Illeggibile"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取り不可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽을 수 없음"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onleesbaar"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można odczytać"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível ler"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อ่านไม่ได้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Okunamıyor"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể đọc"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法讀取"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法讀取"
+          }
+        }
+      }
+    },
+    "显示零字节目录" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار المجلدات ذات صفر بايت"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠎⠓⠕⠺ ⠵⠑⠗⠕⠤⠃⠽⠞⠑ ⠋⠕⠇⠙⠑⠗⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0-Byte-Ordner anzeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show zero-byte folders"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montri dosierujojn de 0 bajtoj"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar carpetas de 0 bytes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les dossiers de 0 octet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0 बाइट वाले फ़ोल्डर दिखाएँ"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tampilkan folder 0 byte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra cartelle da 0 byte"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0バイトのフォルダを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0바이트 폴더 표시"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mappen van 0 bytes tonen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokaż foldery o rozmiarze 0 bajtów"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar pastas de 0 bytes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показать папки размером 0 байт"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แสดงโฟลเดอร์ขนาด 0 ไบต์"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0 baytlık klasörleri göster"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện thư mục 0 byte"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示零字节目录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示零位元組目錄"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示零芓節目錄"
+          }
+        }
+      }
+    },
+    "部分目录无法读取，请检查后刷新。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذرت قراءة بعض المجلدات. تحقق من الوصول ثم حدّث."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠎⠕⠍⠑ ⠋⠕⠇⠙⠑⠗⠎ ⠉⠕⠥⠇⠙ ⠝⠕⠞ ⠃⠑ ⠗⠑⠁⠙⠲ ⠠⠉⠓⠑⠉⠅ ⠁⠉⠉⠑⠎⠎⠂ ⠞⠓⠑⠝ ⠗⠑⠋⠗⠑⠎⠓⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einige Ordner konnten nicht gelesen werden. Zugriff prüfen und aktualisieren."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some folders could not be read. Check access, then refresh."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kelkaj dosierujoj ne povis esti legitaj. Kontrolu la aliron, poste refreŝigu."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron leer algunas carpetas. Comprueba el acceso y actualiza."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certains dossiers n’ont pas pu être lus. Vérifiez l’accès, puis actualisez."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कुछ फ़ोल्डर पढ़े नहीं जा सके। पहुँच जाँचें, फिर रीफ़्रेश करें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beberapa folder tidak dapat dibaca. Periksa akses, lalu segarkan."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere alcune cartelle. Verifica l’accesso, poi aggiorna."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部のフォルダを読み取れませんでした。アクセス権を確認して再読み込みしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일부 폴더를 읽을 수 없습니다. 접근 권한을 확인한 후 새로고침하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sommige mappen konden niet worden gelezen. Controleer de toegang en vernieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można odczytać niektórych folderów. Sprawdź uprawnienia i odśwież."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler algumas pastas. Verifique o acesso e atualize."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать некоторые папки. Проверьте права доступа и обновите."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถอ่านบางโฟลเดอร์ได้ โปรดตรวจสอบสิทธิ์แล้วรีเฟรช"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bazı klasörler okunamadı. Erişimi kontrol edip yenileyin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể đọc một số thư mục. Kiểm tra quyền truy cập rồi làm mới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分目录无法读取，请检查后刷新。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分目錄無法讀取，請檢查後重新整理。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蔀汾目錄無法讀取，請檢查後刷新。"
+          }
+        }
+      }
+    },
+    "检查访问权限" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التحقق من الوصول"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠓⠑⠉⠅ ⠁⠉⠉⠑⠎⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugriff prüfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check access"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontroli aliron"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprobar acceso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier l’accès"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पहुँच जाँचें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Periksa akses"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verifica accesso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクセス権を確認"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "접근 권한 확인"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toegang controleren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprawdź uprawnienia"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verificar acesso"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить доступ"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตรวจสอบสิทธิ์"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erişimi kontrol et"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra quyền truy cập"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查访问权限"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查存取權限"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查訪問權限"
+          }
+        }
+      }
+    },
+    "空间统计不完整" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدير المساحة غير مكتمل"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠎⠏⠁⠉⠑ ⠑⠎⠞⠊⠍⠁⠞⠑ ⠊⠝⠉⠕⠍⠏⠇⠑⠞⠑"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speicherberechnung unvollständig"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space estimate incomplete"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spackalkulo nekompleta"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cálculo de espacio incompleto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimation de l’espace incomplète"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "स्थान का अनुमान अधूरा है"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perkiraan ruang belum lengkap"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stima dello spazio incompleta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容量の集計が不完全です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공간 집계가 불완전함"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruimteberekening onvolledig"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obliczanie miejsca niekompletne"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimativa de espaço incompleta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расчёт места неполный"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การคำนวณพื้นที่ไม่สมบูรณ์"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alan hesabı tamamlanamadı"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ước tính dung lượng chưa đầy đủ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间统计不完整"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空間統計不完整"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "涳間統計卟完整"
+          }
+        }
+      }
+    },
     " 可释放" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -123287,6 +124109,965 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重試"
+          }
+        }
+      }
+    },
+    "调整信息栏高度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ضبط ارتفاع لوحة المعلومات"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠁⠙⠚⠥⠎⠞ ⠊⠝⠋⠕⠗⠍⠁⠞⠊⠕⠝ ⠏⠁⠝⠑⠇ ⠓⠑⠊⠛⠓⠞"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höhe des Infobereichs anpassen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust information panel height"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alĝustigi la altecon de la informpanelo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustar la altura del panel de información"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajuster la hauteur du panneau d’informations"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जानकारी पैनल की ऊँचाई समायोजित करें"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesuaikan tinggi panel informasi"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regola l’altezza del pannello informazioni"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "情報パネルの高さを調整"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정보 패널 높이 조절"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoogte van het informatiepaneel aanpassen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostosuj wysokość panelu informacji"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustar a altura do painel de informações"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изменить высоту панели информации"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ปรับความสูงของแผงข้อมูล"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilgi paneli yüksekliğini ayarla"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Điều chỉnh chiều cao bảng thông tin"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整信息栏高度"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整資訊欄高度"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整信息欄髙喥"
+          }
+        }
+      }
+    },
+    "当前运行的 AppPorts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts قيد التشغيل حاليًا"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠉⠥⠗⠗⠑⠝⠞⠇⠽ ⠗⠥⠝⠝⠊⠝⠛ ⠠⠁⠏⠏⠠⠏⠕⠗⠞⠎"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Derzeit ausgeführtes AppPorts"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currently running AppPorts"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nun rulata AppPorts"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts en ejecución"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts en cours d’exécution"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वर्तमान में चल रहा AppPorts"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts yang sedang berjalan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts attualmente in esecuzione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在実行中の AppPorts"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 실행 중인 AppPorts"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Momenteel actieve AppPorts"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualnie uruchomiony AppPorts"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts em execução"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запущенный экземпляр AppPorts"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts ที่กำลังทำงาน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şu anda çalışan AppPorts"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts đang chạy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前运行的 AppPorts"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前執行中的 AppPorts"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前運行の AppPorts"
+          }
+        }
+      }
+    },
+    "版本 %@（构建 %@）" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصدار %@ (البنية %@)"
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠧⠑⠗⠎⠊⠕⠝ %@ ⠐⠣⠃⠥⠊⠇⠙ %@⠐⠜"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@ (Build %@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@ (build %@)"
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versio %@ (konstruo %@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión %@ (compilación %@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@ (build %@)"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "संस्करण %@ (बिल्ड %@)"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versi %@ (build %@)"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versione %@ (build %@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン %@（ビルド %@）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버전 %@ (빌드 %@)"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versie %@ (build %@)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wersja %@ (kompilacja %@)"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão %@ (compilação %@)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версия %@ (сборка %@)"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เวอร์ชัน %@ (บิลด์ %@)"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sürüm %@ (derleme %@)"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản %@ (bản dựng %@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@（构建 %@）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@（組建 %@）"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蝂夲 %@（構建 %@）"
+          }
+        }
+      }
+    },
+    "当前 AppPorts 读取受保护文件时被系统拒绝。若已开启权限，请核对授权的是否为当前这份应用，并退出重开。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رفض النظام وصول نسخة AppPorts هذه إلى الملفات المحمية. إذا كان الوصول مفعّلًا، فتحقق من أنه يخص هذه النسخة، ثم أغلقها وأعد فتحها."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠞⠓⠑ ⠎⠽⠎⠞⠑⠍ ⠙⠑⠝⠊⠑⠙ ⠞⠓⠊⠎ ⠠⠁⠏⠏⠠⠏⠕⠗⠞⠎ ⠁⠉⠉⠑⠎⠎ ⠞⠕ ⠏⠗⠕⠞⠑⠉⠞⠑⠙ ⠋⠊⠇⠑⠎⠲ ⠠⠊⠋ ⠁⠉⠉⠑⠎⠎ ⠊⠎ ⠁⠇⠗⠑⠁⠙⠽ ⠑⠝⠁⠃⠇⠑⠙⠂ ⠉⠓⠑⠉⠅ ⠞⠓⠁⠞ ⠊⠞ ⠁⠏⠏⠇⠊⠑⠎ ⠞⠕ ⠞⠓⠊⠎ ⠉⠕⠏⠽⠂ ⠞⠓⠑⠝ ⠟⠥⠊⠞ ⠁⠝⠙ ⠗⠑⠕⠏⠑⠝ ⠊⠞⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das System hat diesem AppPorts den Zugriff auf geschützte Dateien verweigert. Falls der Zugriff aktiviert ist, prüfen Sie, ob er für diese Kopie gilt, und starten Sie sie neu."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The system denied this AppPorts access to protected files. If access is already enabled, check that it applies to this copy, then quit and reopen it."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La sistemo rifuzis al ĉi tiu AppPorts aliron al protektitaj dosieroj. Se aliro jam estas ebligita, kontrolu ĉu ĝi validas por ĉi tiu kopio, poste fermu kaj remalfermu ĝin."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El sistema denegó a este AppPorts el acceso a archivos protegidos. Si el acceso ya está activado, compruebe que corresponde a esta copia, ciérrela y ábrala de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le système a refusé à cet AppPorts l’accès aux fichiers protégés. Si l’accès est déjà activé, vérifiez qu’il concerne cette copie, puis quittez-la et rouvrez-la."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सिस्टम ने इस AppPorts को संरक्षित फ़ाइलों तक पहुँच नहीं दी। यदि अनुमति पहले से चालू है, तो जाँचें कि वह इसी प्रति के लिए है, फिर इसे बंद करके दोबारा खोलें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sistem menolak akses AppPorts ini ke file yang dilindungi. Jika akses sudah diaktifkan, pastikan izin berlaku untuk salinan ini, lalu tutup dan buka kembali."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il sistema ha negato a questo AppPorts l’accesso ai file protetti. Se l’accesso è già attivo, verifica che riguardi questa copia, quindi chiudila e riaprila."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この AppPorts による保護されたファイルへのアクセスがシステムに拒否されました。許可済みの場合は、このコピーに対する許可か確認し、終了して開き直してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템이 이 AppPorts의 보호된 파일 접근을 거부했습니다. 이미 허용했다면 현재 복사본에 대한 권한인지 확인하고 종료 후 다시 여세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het systeem heeft deze AppPorts toegang tot beveiligde bestanden geweigerd. Als toegang al is ingeschakeld, controleer dan of dit voor deze kopie geldt en herstart de app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System odmówił tej kopii AppPorts dostępu do chronionych plików. Jeśli dostęp jest włączony, sprawdź, czy dotyczy tej kopii, a następnie zamknij ją i otwórz ponownie."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O sistema negou a este AppPorts o acesso a arquivos protegidos. Se o acesso já estiver ativado, confirme que se aplica a esta cópia, encerre-a e abra-a novamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Система отказала этому AppPorts в доступе к защищённым файлам. Если доступ уже разрешён, убедитесь, что разрешение относится к этой копии, затем закройте и снова откройте её."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ระบบปฏิเสธไม่ให้ AppPorts ชุดนี้เข้าถึงไฟล์ที่ได้รับการป้องกัน หากเปิดสิทธิ์แล้ว ให้ตรวจสอบว่าสิทธิ์นั้นเป็นของชุดนี้ แล้วปิดและเปิดแอปใหม่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sistem bu AppPorts kopyasının korunan dosyalara erişimini reddetti. Erişim açıksa iznin bu kopyaya ait olduğunu doğrulayın, ardından kapatıp yeniden açın."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hệ thống từ chối quyền đọc tệp được bảo vệ của bản AppPorts này. Nếu đã bật quyền, hãy kiểm tra quyền có áp dụng cho bản này không, rồi thoát và mở lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 AppPorts 读取受保护文件时被系统拒绝。若已开启权限，请核对授权的是否为当前这份应用，并退出重开。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前 AppPorts 讀取受保護檔案時遭系統拒絕。若已開啟權限，請核對授權的是否為目前這份應用程式，並結束後重新開啟。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 AppPorts 讀取受保護呅件時被系统拒絕。若已開啟權限，請核對授權の是否為当前這份應用，並退出重開。"
+          }
+        }
+      }
+    },
+    "无法确认当前 AppPorts 的访问权限：检查文件不可用或发生其他读取错误。请在系统设置中核对。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر تأكيد وصول نسخة AppPorts هذه: ملفات الاختبار غير متاحة أو حدث خطأ قراءة آخر. تحقق من إعدادات النظام."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠁⠉⠉⠑⠎⠎ ⠋⠕⠗ ⠞⠓⠊⠎ ⠠⠁⠏⠏⠠⠏⠕⠗⠞⠎ ⠉⠕⠥⠇⠙ ⠝⠕⠞ ⠃⠑ ⠉⠕⠝⠋⠊⠗⠍⠑⠙⠒ ⠞⠓⠑ ⠞⠑⠎⠞ ⠋⠊⠇⠑⠎ ⠁⠗⠑ ⠥⠝⠁⠧⠁⠊⠇⠁⠃⠇⠑ ⠕⠗ ⠁⠝⠕⠞⠓⠑⠗ ⠗⠑⠁⠙ ⠑⠗⠗⠕⠗ ⠕⠉⠉⠥⠗⠗⠑⠙⠲ ⠠⠉⠓⠑⠉⠅ ⠠⠎⠽⠎⠞⠑⠍ ⠠⠎⠑⠞⠞⠊⠝⠛⠎⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Zugriff für dieses AppPorts konnte nicht bestätigt werden: Die Prüfdateien fehlen oder ein anderer Lesefehler ist aufgetreten. Prüfen Sie die Systemeinstellungen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access for this AppPorts could not be confirmed: the test files are unavailable or another read error occurred. Check System Settings."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne eblis konfirmi aliron por ĉi tiu AppPorts: la testdosieroj ne disponeblas aŭ okazis alia legeraro. Kontrolu la sistemajn agordojn."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo confirmar el acceso de este AppPorts: los archivos de prueba no están disponibles o se produjo otro error de lectura. Revise Ajustes del Sistema."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de confirmer l’accès de cet AppPorts : les fichiers de test sont indisponibles ou une autre erreur de lecture s’est produite. Vérifiez Réglages Système."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इस AppPorts की पहुँच की पुष्टि नहीं हो सकी: जाँच फ़ाइलें उपलब्ध नहीं हैं या पढ़ने में कोई अन्य त्रुटि हुई। सिस्टम सेटिंग्स में जाँचें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Akses AppPorts ini tidak dapat dipastikan: file pemeriksaan tidak tersedia atau terjadi kesalahan baca lain. Periksa Pengaturan Sistem."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile confermare l’accesso per questo AppPorts: i file di verifica non sono disponibili o si è verificato un altro errore di lettura. Controlla Impostazioni di Sistema."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この AppPorts のアクセス権を確認できません。検査用ファイルが利用できないか、別の読み取りエラーが発生しました。システム設定で確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 AppPorts의 접근 권한을 확인할 수 없습니다. 검사 파일을 사용할 수 없거나 다른 읽기 오류가 발생했습니다. 시스템 설정에서 확인하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De toegang voor deze AppPorts kon niet worden bevestigd: testbestanden zijn niet beschikbaar of er is een andere leesfout opgetreden. Controleer Systeeminstellingen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się potwierdzić dostępu tej kopii AppPorts: pliki testowe są niedostępne lub wystąpił inny błąd odczytu. Sprawdź Ustawienia systemowe."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível confirmar o acesso deste AppPorts: os arquivos de teste estão indisponíveis ou ocorreu outro erro de leitura. Verifique os Ajustes do Sistema."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось подтвердить доступ этого AppPorts: проверочные файлы недоступны или произошла другая ошибка чтения. Проверьте Системные настройки."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถยืนยันสิทธิ์ของ AppPorts ชุดนี้ได้ เนื่องจากไฟล์ทดสอบไม่พร้อมใช้งานหรือเกิดข้อผิดพลาดอื่นในการอ่าน โปรดตรวจสอบในการตั้งค่าระบบ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu AppPorts kopyasının erişimi doğrulanamadı: test dosyaları kullanılamıyor veya başka bir okuma hatası oluştu. Sistem Ayarları’nı kontrol edin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể xác nhận quyền truy cập của bản AppPorts này: tệp kiểm tra không khả dụng hoặc có lỗi đọc khác. Hãy kiểm tra Cài đặt hệ thống."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法确认当前 AppPorts 的访问权限：检查文件不可用或发生其他读取错误。请在系统设置中核对。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法確認目前 AppPorts 的存取權限：檢查檔案無法使用或發生其他讀取錯誤。請在系統設定中核對。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法確認当前 AppPorts の訪問權限：檢查呅件不可用或發生其他讀取錯誤。請在系统設置中核對。"
+          }
+        }
+      }
+    },
+    "当前 AppPorts 已通过受保护文件读取检查；个别目录仍可能有其他访问限制。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اجتازت نسخة AppPorts هذه اختبار الوصول إلى الملفات المحمية؛ قد تخضع بعض المجلدات لقيود أخرى."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠞⠓⠊⠎ ⠠⠁⠏⠏⠠⠏⠕⠗⠞⠎ ⠏⠁⠎⠎⠑⠙ ⠞⠓⠑ ⠏⠗⠕⠞⠑⠉⠞⠑⠙⠤⠋⠊⠇⠑ ⠁⠉⠉⠑⠎⠎ ⠉⠓⠑⠉⠅⠆ ⠊⠝⠙⠊⠧⠊⠙⠥⠁⠇ ⠋⠕⠇⠙⠑⠗⠎ ⠍⠁⠽ ⠎⠞⠊⠇⠇ ⠓⠁⠧⠑ ⠕⠞⠓⠑⠗ ⠁⠉⠉⠑⠎⠎ ⠗⠑⠎⠞⠗⠊⠉⠞⠊⠕⠝⠎⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses AppPorts hat die Zugriffsprüfung für geschützte Dateien bestanden. Einzelne Ordner können weiterhin anderen Beschränkungen unterliegen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This AppPorts passed the protected-file access check; individual folders may still have other access restrictions."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ĉi tiu AppPorts sukcesis en la alirkontrolo de protektitaj dosieroj; unuopaj dosierujoj povas havi aliajn limigojn."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este AppPorts superó la comprobación de acceso a archivos protegidos; algunas carpetas pueden tener otras restricciones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet AppPorts a réussi le test d’accès aux fichiers protégés ; certains dossiers peuvent avoir d’autres restrictions."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इस AppPorts ने संरक्षित फ़ाइलों की पहुँच जाँच पास कर ली है; कुछ फ़ोल्डरों पर अन्य प्रतिबंध हो सकते हैं।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts ini lulus pemeriksaan akses file yang dilindungi; folder tertentu mungkin memiliki batasan lain."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo AppPorts ha superato la verifica di accesso ai file protetti; alcune cartelle potrebbero avere altre restrizioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この AppPorts は保護されたファイルへのアクセス検査に合格しました。個別のフォルダには別の制限がある場合があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 AppPorts는 보호된 파일 접근 검사를 통과했습니다. 개별 폴더에는 다른 접근 제한이 있을 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze AppPorts is geslaagd voor de toegangscontrole van beveiligde bestanden; afzonderlijke mappen kunnen andere beperkingen hebben."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta kopia AppPorts przeszła test dostępu do chronionych plików; poszczególne foldery mogą mieć inne ograniczenia."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este AppPorts passou na verificação de acesso a arquivos protegidos; algumas pastas podem ter outras restrições."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот AppPorts прошёл проверку доступа к защищённым файлам; отдельные папки могут иметь другие ограничения."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppPorts ชุดนี้ผ่านการตรวจสอบการอ่านไฟล์ที่ได้รับการป้องกันแล้ว แต่บางโฟลเดอร์อาจยังมีข้อจำกัดอื่น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu AppPorts kopyası korunan dosyalara erişim denetimini geçti; bazı klasörlerde başka kısıtlamalar olabilir."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản AppPorts này đã vượt qua kiểm tra đọc tệp được bảo vệ; một số thư mục vẫn có thể chịu hạn chế khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 AppPorts 已通过受保护文件读取检查；个别目录仍可能有其他访问限制。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前 AppPorts 已通過受保護檔案讀取檢查；個別目錄仍可能有其他存取限制。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 AppPorts 已通過受保護呅件讀取檢查；個別目錄仍可能有其他訪問限制。"
+          }
+        }
+      }
+    },
+    "检查针对当前进程，无法直接比对系统授权列表中的版本。若已开启但仍被拒绝，请将此处的 AppPorts 重新添加到「完全磁盘访问权限」，退出重开后再检查。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يختبر الفحص العملية الحالية ولا يقارن مباشرة الإصدارات في قائمة أذونات النظام. إذا كان الوصول مفعّلًا لكنه لا يزال مرفوضًا، فأعد إضافة نسخة AppPorts الموضحة هنا إلى الوصول الكامل إلى القرص، ثم أغلقها وأعد فتحها وفحصها."
+          }
+        },
+        "br" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⠠⠞⠓⠊⠎ ⠉⠓⠑⠉⠅⠎ ⠞⠓⠑ ⠉⠥⠗⠗⠑⠝⠞ ⠏⠗⠕⠉⠑⠎⠎⠆ ⠊⠞ ⠉⠁⠝⠝⠕⠞ ⠙⠊⠗⠑⠉⠞⠇⠽ ⠉⠕⠍⠏⠁⠗⠑ ⠧⠑⠗⠎⠊⠕⠝⠎ ⠊⠝ ⠞⠓⠑ ⠎⠽⠎⠞⠑⠍ ⠏⠑⠗⠍⠊⠎⠎⠊⠕⠝ ⠇⠊⠎⠞⠲ ⠠⠊⠋ ⠁⠉⠉⠑⠎⠎ ⠊⠎ ⠑⠝⠁⠃⠇⠑⠙ ⠃⠥⠞ ⠎⠞⠊⠇⠇ ⠙⠑⠝⠊⠑⠙⠂ ⠁⠙⠙ ⠞⠓⠑ ⠠⠁⠏⠏⠠⠏⠕⠗⠞⠎ ⠎⠓⠕⠺⠝ ⠓⠑⠗⠑ ⠞⠕ ⠠⠋⠥⠇⠇ ⠠⠙⠊⠎⠅ ⠠⠁⠉⠉⠑⠎⠎ ⠁⠛⠁⠊⠝⠂ ⠞⠓⠑⠝ ⠟⠥⠊⠞⠂ ⠗⠑⠕⠏⠑⠝⠂ ⠁⠝⠙ ⠗⠑⠉⠓⠑⠉⠅⠲"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geprüft wird der aktuelle Prozess; Versionen in der Berechtigungsliste lassen sich nicht direkt vergleichen. Wird der aktivierte Zugriff weiterhin verweigert, fügen Sie das hier angezeigte AppPorts erneut zum Festplattenvollzugriff hinzu, starten Sie es neu und prüfen Sie erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This checks the current process; it cannot directly compare versions in the system permission list. If access is enabled but still denied, add the AppPorts shown here to Full Disk Access again, then quit, reopen, and recheck."
+          }
+        },
+        "eo" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La kontrolo koncernas la nunan procezon; ĝi ne povas rekte kompari versiojn en la sistema permeslisto. Se ebligita aliro ankoraŭ estas rifuzata, denove aldonu la ĉi tie montratan AppPorts al plena diskaliro, fermu, remalfermu kaj rekontrolu ĝin."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se comprueba el proceso actual; no se pueden comparar directamente las versiones de la lista de permisos. Si el acceso está activado pero sigue denegado, añada de nuevo el AppPorts mostrado aquí a Acceso total al disco, ciérrelo, vuelva a abrirlo y repita la comprobación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le test concerne le processus actuel ; les versions de la liste des autorisations ne peuvent pas être comparées directement. Si l’accès activé reste refusé, ajoutez à nouveau l’AppPorts indiqué ici à Accès complet au disque, quittez-le, rouvrez-le et relancez le test."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह वर्तमान प्रक्रिया की जाँच करता है; सिस्टम अनुमति सूची में संस्करणों की सीधे तुलना नहीं कर सकता। अनुमति चालू होने पर भी पहुँच न मिले, तो यहाँ दिखाए गए AppPorts को पूर्ण डिस्क पहुँच में फिर जोड़ें, बंद करके दोबारा खोलें और जाँचें।"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pemeriksaan berlaku untuk proses saat ini; versi dalam daftar izin sistem tidak dapat dibandingkan secara langsung. Jika akses sudah aktif tetapi tetap ditolak, tambahkan kembali AppPorts yang ditampilkan di sini ke Akses Disk Penuh, tutup, buka kembali, lalu periksa lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La verifica riguarda il processo corrente; non può confrontare direttamente le versioni nell’elenco dei permessi. Se l’accesso è attivo ma ancora negato, aggiungi nuovamente l’AppPorts indicato qui ad Accesso completo al disco, chiudilo, riaprilo e ripeti la verifica."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のプロセスを検査するもので、システムの許可リスト内のバージョンを直接照合することはできません。許可済みでも拒否される場合は、ここに表示された AppPorts を「フルディスクアクセス」に追加し直し、終了して開き直してから再検査してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 프로세스를 검사하며 시스템 권한 목록의 버전을 직접 비교할 수는 없습니다. 허용했는데도 거부된다면 여기에 표시된 AppPorts를 전체 디스크 접근 권한에 다시 추가하고 종료 후 다시 열어 검사하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De controle geldt voor het huidige proces; versies in de lijst met systeemrechten kunnen niet rechtstreeks worden vergeleken. Als toegang is ingeschakeld maar toch wordt geweigerd, voeg de hier getoonde AppPorts opnieuw toe aan Volledige schijftoegang, herstart de app en controleer opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test dotyczy bieżącego procesu; nie można bezpośrednio porównać wersji na liście uprawnień systemowych. Jeśli dostęp jest włączony, ale nadal odmawiany, ponownie dodaj widoczny tu AppPorts do Pełnego dostępu do dysku, zamknij go, otwórz i ponów test."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A verificação se aplica ao processo atual; não compara diretamente as versões na lista de permissões. Se o acesso estiver ativado mas ainda for negado, adicione novamente o AppPorts mostrado aqui ao Acesso Total ao Disco, encerre-o, reabra-o e verifique de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверяется текущий процесс; напрямую сравнить версии в списке разрешений нельзя. Если доступ включён, но всё ещё запрещён, снова добавьте указанный здесь AppPorts в «Полный доступ к диску», закройте, откройте и повторите проверку."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การตรวจสอบนี้ใช้กับกระบวนการปัจจุบัน ไม่สามารถเทียบเวอร์ชันในรายการสิทธิ์ของระบบโดยตรง หากเปิดสิทธิ์แล้วยังถูกปฏิเสธ ให้เพิ่ม AppPorts ที่แสดงที่นี่ในสิทธิ์เข้าถึงดิสก์แบบเต็มอีกครั้ง แล้วปิด เปิดใหม่ และตรวจสอบอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçerli işlem denetlenir; sistem izin listesindeki sürümler doğrudan karşılaştırılamaz. Erişim açıkken hâlâ reddediliyorsa burada gösterilen AppPorts’u Tam Disk Erişimi’ne yeniden ekleyin, kapatıp açın ve tekrar denetleyin."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra áp dụng cho tiến trình hiện tại, không thể so sánh trực tiếp phiên bản trong danh sách quyền hệ thống. Nếu đã bật quyền nhưng vẫn bị từ chối, hãy thêm lại AppPorts hiển thị ở đây vào Quyền truy cập toàn bộ ổ đĩa, thoát, mở lại và kiểm tra."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查针对当前进程，无法直接比对系统授权列表中的版本。若已开启但仍被拒绝，请将此处的 AppPorts 重新添加到「完全磁盘访问权限」，退出重开后再检查。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查針對目前程序，無法直接比對系統授權列表中的版本。若已開啟但仍遭拒絕，請將此處的 AppPorts 重新加入「完整磁碟存取權」，結束並重新開啟後再檢查。"
+          }
+        },
+        "zh-martian" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查針對当前進程，無法直接比對系统授權列表中の蝂夲。若已開啟但仍被拒絕，請將此處の AppPorts 重新添加到「完全磁盤訪問權限」，退出重開後再檢查。"
           }
         }
       }

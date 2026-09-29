@@ -1240,7 +1240,7 @@ actor ContainerVolumeMigrator {
         return true
     }
 
-    /// 1.8.2 之前的版本挂载时没带 `nobrowse`，卷会一直显示在 Finder 边栏和桌面上。
+    /// 1.9.0 之前的版本挂载时没带 `nobrowse`，卷会一直显示在 Finder 边栏和桌面上。
     /// 发现这种挂载就原地补上，不用等下次插盘或开机。失败只记日志：卷照常可用，下次重挂时会带上。
     private func hideFromFinderIfNeeded(_ mountPoint: URL) async {
         guard let flags = mountFlags(mountPoint), flags & UInt32(MNT_DONTBROWSE) == 0 else { return }

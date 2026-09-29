@@ -170,7 +170,7 @@ W4 中数据**完全在本地**，日志里也没有任何 `/Volumes` 相关的�
 - **「禁止重签名」不足以解决问题**——不重签名仍然读不到数据；
 - 符号链接迁移对沙盒应用**在机制上不成立**，与 macOS 版本无关（macOS 26 上能「用」，靠的是重签名把沙盒拆掉，而不是符号链接生效）。
 
-基于本实验，AppPorts 1.8.2 起对容器目录只提供[挂载迁移](/datamigrae/mount-migration)；后续的[挂载点实验](/research/sandbox-mountpoint)验证了该方案。
+基于本实验，AppPorts 1.9.0 起对容器目录只提供[挂载迁移](/datamigrae/mount-migration)；后续的[挂载点实验](/research/sandbox-mountpoint)验证了该方案。
 
 ### 本次实验的边界
 

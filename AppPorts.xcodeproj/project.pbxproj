@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2A2693822F667A0E0044F015 /* icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2A2693812F667A0E0044F015 /* icon.icon */; };
 		2A2693832F667A0E0044F015 /* icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2A2693812F667A0E0044F015 /* icon.icon */; };
+		A92026092900000000000001 /* sponsors.json in Resources */ = {isa = PBXBuildFile; fileRef = A92026092900000000000002 /* sponsors.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +26,7 @@
 		2A2693812F667A0E0044F015 /* icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = icon.icon; sourceTree = "<group>"; };
 		2A2693852F667C1B0044F015 /* AppPorts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppPorts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A2693862F667CCC0044F015 /* AppPortsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppPortsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A92026092900000000000002 /* sponsors.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = sponsors.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -61,6 +63,7 @@
 		2A6892E62ECB9A7D0074F02E = {
 			isa = PBXGroup;
 			children = (
+				A92026092900000000000002 /* sponsors.json */,
 				2A6892F12ECB9A7D0074F02E /* AppPorts */,
 				B10000012F00100000000002 /* AppPortsTests */,
 				2A2693812F667A0E0044F015 /* icon.icon */,
@@ -182,6 +185,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A92026092900000000000001 /* sponsors.json in Resources */,
 				2A2693822F667A0E0044F015 /* icon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -359,7 +363,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = MQ7XG7WM3F;
 				ENABLE_APP_INTENTS_METADATA_PROVIDER = NO;
@@ -375,7 +379,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.8.2;
+				MARKETING_VERSION = 1.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPorts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -395,7 +399,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = MQ7XG7WM3F;
 				ENABLE_APP_INTENTS_METADATA_PROVIDER = NO;
@@ -411,7 +415,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.8.2;
+				MARKETING_VERSION = 1.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shimoko.AppPorts;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

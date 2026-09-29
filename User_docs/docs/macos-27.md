@@ -110,7 +110,7 @@ log show --last 1m --style compact 2>/dev/null | grep -i "rejected approval requ
 `Signature=adhoc` 需要与原始签名记录一起判断。`kTCCServiceSystemPolicyAppData ... denied` 是容器访问被拒绝的线索，单独出现不能证明一定由重签名导致。更多检查见[容器数据、沙盒与签名身份](/datamigrae/container-identity#自查)。
 :::
 
-## AppPorts 1.8.2 做了什么
+## AppPorts 1.9.0 做了什么
 
 以下是当前开发版本的处理方式：
 

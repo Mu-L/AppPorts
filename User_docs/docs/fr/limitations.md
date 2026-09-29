@@ -79,7 +79,7 @@ Historiques WeChat, images de machines virtuelles, bibliothèques de jeux, bases
 :::
 
 ::: warning Les conteneurs exigent la migration par montage
-Les applications en bac à sable ne peuvent pas lire les données de `~/Library/Containers/` et `~/Library/Group Containers/` déplacées par lien symbolique. L’ancienne méthode contournait cela par une re-signature, qui peut empêcher l’ouverture sous macOS 27. Depuis 1.8.2, ces répertoires proposent uniquement la [migration par montage](/fr/datamigrae/mount-migration) et les applications isolées ne sont plus re-signées. Voir [Données de conteneur, bac à sable et identité de signature](/fr/datamigrae/container-identity).
+Les applications en bac à sable ne peuvent pas lire les données de `~/Library/Containers/` et `~/Library/Group Containers/` déplacées par lien symbolique. L’ancienne méthode contournait cela par une re-signature, qui peut empêcher l’ouverture sous macOS 27. Depuis 1.9.0, ces répertoires proposent uniquement la [migration par montage](/fr/datamigrae/mount-migration) et les applications isolées ne sont plus re-signées. Voir [Données de conteneur, bac à sable et identité de signature](/fr/datamigrae/container-identity).
 :::
 
 ::: warning Périmètre des dossiers personnalisés

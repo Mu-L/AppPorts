@@ -5,7 +5,7 @@ outline: deep
 # Warum das externe Laufwerk APFS verwenden muss
 
 ::: tip Kurz erklärt
-Seit 1.8.2 erstellt AppPorts beim Migrieren von `~/Library/Containers/` (App-Containerdaten, etwa WeChat-Chats) ein neues Volume im APFS-Container des externen Laufwerks und bindet es direkt am ursprünglichen Ordner ein. Das funktioniert nur mit APFS. Für exFAT / NTFS haben wir auch den Umweg über ein Image getestet. Das Ergebnis: **Nach dem Abziehen war das gesamte Image unbrauchbar.** Deshalb bieten wir diesen Weg nicht an.
+Seit 1.9.0 erstellt AppPorts beim Migrieren von `~/Library/Containers/` (App-Containerdaten, etwa WeChat-Chats) ein neues Volume im APFS-Container des externen Laufwerks und bindet es direkt am ursprünglichen Ordner ein. Das funktioniert nur mit APFS. Für exFAT / NTFS haben wir auch den Umweg über ein Image getestet. Das Ergebnis: **Nach dem Abziehen war das gesamte Image unbrauchbar.** Deshalb bieten wir diesen Weg nicht an.
 
 **Wenn dein Laufwerk kein APFS verwendet, musst du es nicht sofort ändern.** Apps und normale Datenordner lassen sich weiterhin migrieren. Nur die Containerdaten bleiben vorerst auf diesem Mac; die Apps funktionieren wie gewohnt. Möchtest du sie später migrieren, folge [APFS-Laufwerk vorbereiten](#prepare-apfs). Freier Speicher innerhalb einer exFAT-Partition bedeutet nicht, dass sich daraus direkt eine neue Partition erstellen lässt.
 :::

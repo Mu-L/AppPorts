@@ -126,8 +126,10 @@ struct CustomDirsView: View {
                         )
                         .tag(entry.id)
                         .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+                        .modifier(ContentView.RowSeparatorVisibility())
                     }
                     .listStyle(.plain)
+                    .modifier(ContentView.TransparentListBackground())
                 }
             }
 
@@ -145,11 +147,12 @@ struct CustomDirsView: View {
             ContentView.HeaderView(
                 title: "外部文件夹".localized,
                 subtitle: String(format: "%lld 个目录".localized, Int64(configs.count)),
-                icon: "externaldrive.fill"
+                icon: "externaldrive.fill",
+                tint: .teal
             )
 
             ZStack {
-                Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
+                Color(nsColor: .controlBackgroundColor).ignoresSafeArea()
 
                 if externalEntries.isEmpty {
                     ContentView.EmptyStateView(icon: "externaldrive.badge.plus", text: "未添加目录迁移".localized)
@@ -163,15 +166,14 @@ struct CustomDirsView: View {
                         )
                         .tag(entry.id)
                         .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+                        .modifier(ContentView.RowSeparatorVisibility())
                     }
                     .listStyle(.plain)
+                    .modifier(ContentView.TransparentListBackground())
                 }
             }
 
             VStack(spacing: 0) {
-                Divider()
-                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-
                 HStack(spacing: 8) {
                     Button(action: relinkSelected) {
                         footerLabel(title: relinkButtonTitle, icon: "link")
@@ -190,7 +192,7 @@ struct CustomDirsView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
-            .background(.bar)
+            .background(Color(nsColor: .controlBackgroundColor))
         }
     }
 

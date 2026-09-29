@@ -9,7 +9,7 @@ outline: deep
 ::: warning Re-signer n’est pas une réparation universelle
 Une re-signature Ad-hoc remplace la signature du développeur et retire les autorisations de bac à sable, de groupes d’applications et de trousseau. Une application en bac à sable, comme WeChat ou une application App Store, peut alors ne plus s’ouvrir sous macOS 27 et perdre sa session de connexion. La nouvelle version conserve d’abord l’application d’origine complète afin de restaurer sa signature et ses autorisations ; la restauration de la signature ne garantit pas celle d’une session déjà perdue.
 
-Depuis la version 1.8.2, AppPorts refuse par défaut de re-signer les applications en bac à sable. Il faut activer le mode classique et confirmer les risques. Les données de conteneur utilisent désormais la [migration par montage](/fr/datamigrae/mount-migration), sans modification de signature. Voir [Données de conteneur, bac à sable et identité de signature](/fr/datamigrae/container-identity).
+Depuis la version 1.9.0, AppPorts refuse par défaut de re-signer les applications en bac à sable. Il faut activer le mode classique et confirmer les risques. Les données de conteneur utilisent désormais la [migration par montage](/fr/datamigrae/mount-migration), sans modification de signature. Voir [Données de conteneur, bac à sable et identité de signature](/fr/datamigrae/container-identity).
 :::
 
 ## Quel problème la re-signature résout-elle ?

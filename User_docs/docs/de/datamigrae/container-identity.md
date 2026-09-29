@@ -7,7 +7,7 @@ outline: deep
 ::: tip Kurz erklärt
 Daten in `~/Library/Containers/` und `~/Library/Group Containers/` gehören zu **Sandbox-Apps**. Werden sie über „Verknüpfungen“ (symbolische Links) extern ausgelagert, kann die App sie nicht lesen. AppPorts umging dies früher durch erneutes Signieren. Dadurch können Apps unter macOS 27 nicht mehr öffnen und Anmeldesitzungen verloren gehen.
 
-Seit 1.8.2 verwenden Containerdaten [Mount-Migration](/de/datamigrae/mount-migration), ohne ein Byte der Signatur zu ändern. Bereits neu signierte Apps müssen neu installiert werden. Siehe [Hinweise zum Upgrade auf macOS 27](/de/macos-27).
+Seit 1.9.0 verwenden Containerdaten [Mount-Migration](/de/datamigrae/mount-migration), ohne ein Byte der Signatur zu ändern. Bereits neu signierte Apps müssen neu installiert werden. Siehe [Hinweise zum Upgrade auf macOS 27](/de/macos-27).
 :::
 
 Diese Seite erklärt die Hintergründe. Öffnet sich deine App bereits nicht mehr, gehe direkt zu den Reparaturschritten in den [Hinweisen zum Upgrade auf macOS 27](/de/macos-27).

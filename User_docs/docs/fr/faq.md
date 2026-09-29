@@ -154,7 +154,7 @@ Oui, avec « Migration par montage ». Sélectionnez WeChat dans « App Data ».
 
 Deux cas :
 
-- **Migration par montage avec 1.8.2** : vérifiez le disque connecté, l’état « Monté » et que l’autorisation n’a pas été refusée. Voir le [dépannage](/fr/troubleshooting#l-application-ne-voit-pas-les-donnees-apres-migration-par-montage).
+- **Migration par montage avec 1.9.0** : vérifiez le disque connecté, l’état « Monté » et que l’autorisation n’a pas été refusée. Voir le [dépannage](/fr/troubleshooting#l-application-ne-voit-pas-les-donnees-apres-migration-par-montage).
 - **Ancienne migration par lien symbolique** : WeChat isolé ne peut pas lire les données hors du conteneur. C’est une restriction du système. Utilisez « Restaurer » pour revenir au local ; si vous aviez accepté la re-signature, réinstallez aussi WeChat depuis son site. Voir [Réparation sous macOS 27](/fr/macos-27#reparation).
 
 **Ne re-signez pas pour réparer** : cela aggrave le problème.

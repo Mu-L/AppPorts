@@ -172,7 +172,7 @@ For directories under `~/Library/Containers/` and `~/Library/Group Containers/`:
 - **"Forbidding re-signing" is not enough to solve the problem**: without re-signing, the data still cannot be read;
 - For sandboxed apps, symbolic-link migration **does not work at the mechanism level**, regardless of macOS version (on macOS 26 it "worked" because re-signing stripped out the sandbox, not because the symbolic link took effect).
 
-Based on this experiment, starting with AppPorts 1.8.2 only [mount migration](/en/datamigrae/mount-migration) is offered for container directories; the follow-up [mount point experiment](/en/research/sandbox-mountpoint) validated that approach.
+Based on this experiment, starting with AppPorts 1.9.0 only [mount migration](/en/datamigrae/mount-migration) is offered for container directories; the follow-up [mount point experiment](/en/research/sandbox-mountpoint) validated that approach.
 
 ### Limits of This Experiment
 

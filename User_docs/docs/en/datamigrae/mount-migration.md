@@ -5,7 +5,7 @@ outline: deep
 # Mount Migration: Move Container Data to an External Drive
 
 ::: tip The key point
-Data in `~/Library/Containers/` and `~/Library/Group Containers/`, including WeChat chat history, QQ Music caches, and App Store app data, cannot be moved using symbolic links. Starting with AppPorts 1.8.2, AppPorts creates a dedicated APFS data volume on the external drive, copies the data into it, and **mounts that volume at the original directory**. The app sees the same path, and its signature stays unchanged.
+Data in `~/Library/Containers/` and `~/Library/Group Containers/`, including WeChat chat history, QQ Music caches, and App Store app data, cannot be moved using symbolic links. Starting with AppPorts 1.9.0, AppPorts creates a dedicated APFS data volume on the external drive, copies the data into it, and **mounts that volume at the original directory**. The app sees the same path, and its signature stays unchanged.
 
 Three requirements: use an unencrypted APFS external drive, allow the permission prompt the first time you open the app, and connect the drive before opening the app.
 :::

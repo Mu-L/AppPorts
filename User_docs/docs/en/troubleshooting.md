@@ -24,7 +24,7 @@ Repair in this order: restore container data → reinstall from an official sour
 | External storage is not APFS | The drive uses exFAT / NTFS / HFS+ | Keep container data on this Mac and migrate other data normally. When ready, use an APFS drive or follow [Prepare an APFS External Drive](/en/why-apfs#prepare-apfs). Built-in tools cannot directly shrink exFAT |
 | External storage is encrypted | The drive uses encrypted APFS; a new data volume does not inherit its password | Keep things as they are, or select unencrypted APFS. See [Encrypted External Drives](/en/why-apfs#encrypted-drives) |
 | Insufficient space | Not enough space on the external drive for migration or on this Mac for restoration | Free space and retry. This check happens before creating a volume or copying; no data has been changed |
-| Disk command failed … `kDAReturnNotPrivileged` | Older systems such as macOS 12 do not let ordinary users mount at custom paths | AppPorts retries with an administrator password prompt. Enter the password. Versions before 1.8.2 did not have this step |
+| Disk command failed … `kDAReturnNotPrivileged` | Older systems such as macOS 12 do not let ordinary users mount at custom paths | AppPorts retries with an administrator password prompt. Enter the password. Versions before 1.9.0 did not have this step |
 | Administrator authorization cancelled | The password prompt was cancelled | Run the operation again |
 | Mount point is not empty | The app wrote local files while the volume was unmounted | Move those files elsewhere, then click "Mount" |
 | Post-mount verification failed | The volume mounted at an unexpected path | Export a diagnostic package and submit an Issue |

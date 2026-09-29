@@ -5,7 +5,7 @@ outline: deep
 # Pourquoi le disque externe doit être APFS
 
 ::: tip L’essentiel
-Depuis la version 1.8.2, pour migrer `~/Library/Containers/`, qui contient notamment l’historique WeChat, AppPorts crée un volume dans le conteneur APFS du disque externe et le raccorde directement au répertoire d’origine. Seul un disque APFS le permet. Nous avons essayé une image disque sur exFAT / NTFS : **un débranchement a rendu l’image entière inutilisable**. Cette solution n’est donc pas proposée.
+Depuis la version 1.9.0, pour migrer `~/Library/Containers/`, qui contient notamment l’historique WeChat, AppPorts crée un volume dans le conteneur APFS du disque externe et le raccorde directement au répertoire d’origine. Seul un disque APFS le permet. Nous avons essayé une image disque sur exFAT / NTFS : **un débranchement a rendu l’image entière inutilisable**. Cette solution n’est donc pas proposée.
 
 **Si votre disque n’est pas APFS, inutile de le modifier immédiatement.** Les applications et répertoires de données ordinaires peuvent toujours être migrés. Seules les données de conteneur restent sur ce Mac, sans gêner l’utilisation. Pour les migrer plus tard, consultez [Préparer un disque externe APFS](#prepare-apfs). De l’espace libre à l’intérieur d’une partition exFAT ne permet pas forcément de créer directement une nouvelle partition.
 :::

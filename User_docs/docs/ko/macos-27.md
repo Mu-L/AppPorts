@@ -94,7 +94,7 @@ log show --last 1m --style compact 2>/dev/null | grep -i "rejected approval requ
 ```
 :::
 
-## AppPorts 1.8.2의 변경 사항
+## AppPorts 1.9.0의 변경 사항
 
 다음은 현재 개발 버전의 동작입니다.
 

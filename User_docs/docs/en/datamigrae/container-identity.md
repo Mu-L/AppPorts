@@ -7,7 +7,7 @@ outline: deep
 ::: tip The key point
 Data in `~/Library/Containers/` and `~/Library/Group Containers/` belongs to **sandboxed apps**. Moving it to an external drive with a "shortcut" (symbolic link) makes it unreadable to those apps. AppPorts previously used re-signing to bypass this, at the cost of apps potentially failing to open on macOS 27 and losing login sessions.
 
-Starting with 1.8.2, container data uses [mount migration](/en/datamigrae/mount-migration), without changing a single byte of the signature. Apps that have already been re-signed need to be reinstalled; see [Upgrading to macOS 27](/en/macos-27).
+Starting with 1.9.0, container data uses [mount migration](/en/datamigrae/mount-migration), without changing a single byte of the signature. Apps that have already been re-signed need to be reinstalled; see [Upgrading to macOS 27](/en/macos-27).
 :::
 
 This page explains the background. If your app already fails to open, go directly to the repair steps in [Upgrading to macOS 27](/en/macos-27).

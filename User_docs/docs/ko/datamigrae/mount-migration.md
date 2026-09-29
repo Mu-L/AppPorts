@@ -5,7 +5,7 @@ outline: deep
 # 마운트 마이그레이션: 컨테이너 데이터를 외장 드라이브로 옮기기
 
 ::: tip 핵심 내용
-`~/Library/Containers/`와 `~/Library/Group Containers/`의 데이터(WeChat 채팅 기록, QQ Music 캐시, App Store 앱 데이터)는 심볼릭 링크로 옮길 수 없습니다. AppPorts 1.8.2부터는 외장 드라이브에 전용 APFS 데이터 볼륨을 만들고 데이터를 복사한 뒤 **그 볼륨을 원래 디렉토리에 마운트**합니다. 앱에 보이는 경로와 서명은 그대로입니다.
+`~/Library/Containers/`와 `~/Library/Group Containers/`의 데이터(WeChat 채팅 기록, QQ Music 캐시, App Store 앱 데이터)는 심볼릭 링크로 옮길 수 없습니다. AppPorts 1.9.0부터는 외장 드라이브에 전용 APFS 데이터 볼륨을 만들고 데이터를 복사한 뒤 **그 볼륨을 원래 디렉토리에 마운트**합니다. 앱에 보이는 경로와 서명은 그대로입니다.
 
 조건은 세 가지입니다. 암호화되지 않은 APFS 외장 드라이브를 사용하고, 앱을 처음 열 때 권한 창에서 허용하며, 앱을 열기 전에 드라이브를 연결해야 합니다.
 :::

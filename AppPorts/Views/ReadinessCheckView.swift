@@ -156,12 +156,49 @@ struct ReadinessCheckSheet: View {
                 .help("关闭".localized)
             }
 
-            ReadinessCheckView()
-
-            Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    RunningApplicationCard()
+                    ReadinessCheckView()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(24)
-        .frame(minWidth: 460, minHeight: 420)
+        .frame(width: 560, height: 600)
+    }
+}
+
+/// 展示检查对应的实际应用，帮助用户在系统设置中添加正确的副本。
+private struct RunningApplicationCard: View {
+    private let application = LaunchReadinessChecker.RunningApplication()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("当前运行的 AppPorts".localized, systemImage: "app.badge.checkmark")
+                .font(.headline)
+            Text(String(format: "版本 %@（构建 %@）".localized, application.version, application.build))
+                .font(.subheadline)
+            Text(application.url.path)
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button("在 Finder 中显示".localized) {
+                    NSWorkspace.shared.activateFileViewerSelecting([application.url])
+                }
+                Button("复制路径".localized) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(application.url.path, forType: .string)
+                }
+            }
+            .controlSize(.small)
+            Text("检查针对当前进程，无法直接比对系统授权列表中的版本。若已开启但仍被拒绝，请将此处的 AppPorts 重新添加到「完全磁盘访问权限」，退出重开后再检查。".localized)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .settingsCardBackground()
     }
 }
 
@@ -182,7 +219,7 @@ private struct ReadinessCard: View {
             if let action = item.action {
                 Button(action: { onAction(action) }) {
                     HStack(spacing: 3) {
-                        Text("去授权".localized)
+                        Text(action == .fullDiskAccess ? "打开系统设置".localized : "去授权".localized)
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 9, weight: .bold))
                     }
@@ -228,11 +265,11 @@ private struct ReadinessCard: View {
 
 /// 设置页统一的卡片容器：淡底色 + 圆角 + 内边距。
 extension View {
-    func settingsCardBackground() -> some View {
+    func settingsCardBackground(opacity: Double = 0.03) -> some View {
         self
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.03))
+            .background(Color.primary.opacity(opacity))
             .cornerRadius(12)
     }
 }

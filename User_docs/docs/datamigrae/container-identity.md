@@ -7,7 +7,7 @@ outline: deep
 ::: tip 一句话结论
 `~/Library/Containers/` 和 `~/Library/Group Containers/` 里的数据属于**沙盒应用**。这类数据用"快捷方式"（符号链接）搬到外置盘是读不到的；AppPorts 以前靠「重签名」绕过这一点，代价是应用在 macOS 27 上可能无法打开，登录态也可能丢失。
 
-从 1.8.2 起，容器数据改用[挂载迁移](/datamigrae/mount-migration)，签名一个字节都不动。已经被重签名过的应用需要重装，步骤见 [macOS 27 升级说明](/macos-27)。
+从 1.9.0 起，容器数据改用[挂载迁移](/datamigrae/mount-migration)，签名一个字节都不动。已经被重签名过的应用需要重装，步骤见 [macOS 27 升级说明](/macos-27)。
 :::
 
 这篇文档解释来龙去脉。如果你的应用已经打不开了，直接去 [macOS 27 升级说明](/macos-27) 看修复步骤。

@@ -28,12 +28,12 @@ Scannez le code avec WeChat pour soutenir le projet. **Aucun montant minimum** :
 
 ## Pseudonyme et lien dans le message
 
-Lors du soutien, indiquez dans le message (ou la remarque) votre **pseudonyme** et un **lien** — profil GitHub, blog, réseau social, au choix.
+Lors du soutien, indiquez votre **pseudonyme** dans le message. Un **lien est facultatif** — profil GitHub, blog ou réseau social, au choix.
 
 Le pseudonyme et le lien apparaîtront dans la liste ci-dessus ainsi que sur la page « À propos d'AppPorts ».
 
 ::: tip Vous préférez rester anonyme ?
-Sans pseudonyme ni lien, aucune information ne sera affichée.
+Sans pseudonyme, aucune information sur le soutien ne sera affichée. Si vous fournissez un pseudonyme sans lien, il sera affiché en texte simple.
 :::
 
 ## Ordre d'affichage

@@ -154,7 +154,7 @@ Sí, con «Migración por montaje». Seleccione WeChat en «App Data». Los subd
 
 Hay dos casos:
 
-- **Migración por montaje con 1.8.2**: compruebe la conexión del disco, el estado «Montado» y que no haya denegado el permiso. Consulte [Resolución de problemas](/es/troubleshooting#la-app-no-ve-los-datos-despues-de-migrar-por-montaje).
+- **Migración por montaje con 1.9.0**: compruebe la conexión del disco, el estado «Montado» y que no haya denegado el permiso. Consulte [Resolución de problemas](/es/troubleshooting#la-app-no-ve-los-datos-despues-de-migrar-por-montaje).
 - **Migración antigua con enlace simbólico**: el aislamiento impide a WeChat leer fuera de su contenedor. Es una restricción del sistema. Use «Restaurar» para devolver los datos al Mac; si aceptó volver a firmar, reinstale WeChat desde su web. Consulte [Reparación en macOS 27](/es/macos-27#reparacion).
 
 **No vuelva a firmar para repararlo**: solo empeorará el problema.

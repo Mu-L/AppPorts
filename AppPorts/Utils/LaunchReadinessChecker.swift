@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 
 // MARK: - 启动自检
 
@@ -18,6 +19,26 @@ import Foundation
 ///
 /// 结果只用于提示，不阻断用户进入主界面：外部存储可以稍后再选。
 struct LaunchReadinessChecker: Sendable {
+
+    /// 当前进程实际打开受保护文件的结果，不代表读到了系统设置的授权记录。
+    enum FullDiskAccessState: Equatable, Sendable {
+        case granted
+        case denied
+        case unknown
+    }
+
+    /// 始终使用运行中的 bundle，不能通过名称查找 /Applications 中的另一份副本。
+    struct RunningApplication: Equatable, Sendable {
+        let url: URL
+        let version: String
+        let build: String
+
+        init(bundle: Bundle = .main) {
+            url = bundle.bundleURL.resolvingSymlinksInPath().standardizedFileURL
+            version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+            build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        }
+    }
 
     // MARK: 结果类型
 
@@ -73,7 +94,7 @@ struct LaunchReadinessChecker: Sendable {
 
     /// 检测用到的外部依赖；测试注入假实现，避免依赖真机状态。
     struct Probe: Sendable {
-        var hasFullDiskAccess: @Sendable () -> Bool
+        var fullDiskAccessState: @Sendable () -> FullDiskAccessState
         var hasAppManagementPermission: @Sendable () -> Bool
         var externalDrivePath: @Sendable () -> String?
         var externalDriveState: @Sendable (_ path: String) async -> ExternalDriveState
@@ -98,7 +119,7 @@ struct LaunchReadinessChecker: Sendable {
         }
 
         return Self.items(
-            hasFullDiskAccess: probe.hasFullDiskAccess(),
+            fullDiskAccessState: probe.fullDiskAccessState(),
             hasAppManagementPermission: probe.hasAppManagementPermission(),
             externalDriveState: driveState
         )
@@ -106,34 +127,44 @@ struct LaunchReadinessChecker: Sendable {
 
     /// 纯函数版本：把已检测到的状态映射成检查项，方便测试。
     static func items(
-        hasFullDiskAccess: Bool,
+        fullDiskAccessState: FullDiskAccessState,
         hasAppManagementPermission: Bool,
         externalDriveState: ExternalDriveState
     ) -> [Item] {
         [
-            fullDiskAccessItem(granted: hasFullDiskAccess),
+            fullDiskAccessItem(state: fullDiskAccessState),
             appManagementItem(granted: hasAppManagementPermission),
             externalDriveItem(state: externalDriveState)
         ]
     }
 
-    private static func fullDiskAccessItem(granted: Bool) -> Item {
-        guard granted else {
+    private static func fullDiskAccessItem(state: FullDiskAccessState) -> Item {
+        switch state {
+        case .denied:
             return Item(
                 id: ItemID.fullDiskAccess,
                 level: .failed,
                 title: "完全磁盘访问权限".localized,
-                detail: "AppPorts 读取邮件、信息等受保护的应用数据目录需要它。请在「系统设置 › 隐私与安全性 › 完全磁盘访问权限」里勾选 AppPorts。".localized,
+                detail: "当前 AppPorts 读取受保护文件时被系统拒绝。若已开启权限，请核对授权的是否为当前这份应用，并退出重开。".localized,
                 action: .fullDiskAccess
             )
+        case .unknown:
+            return Item(
+                id: ItemID.fullDiskAccess,
+                level: .warning,
+                title: "完全磁盘访问权限".localized,
+                detail: "无法确认当前 AppPorts 的访问权限：检查文件不可用或发生其他读取错误。请在系统设置中核对。".localized,
+                action: .fullDiskAccess
+            )
+        case .granted:
+            return Item(
+                id: ItemID.fullDiskAccess,
+                level: .ok,
+                title: "完全磁盘访问权限".localized,
+                detail: "当前 AppPorts 已通过受保护文件读取检查；个别目录仍可能有其他访问限制。".localized,
+                action: nil
+            )
         }
-        return Item(
-            id: ItemID.fullDiskAccess,
-            level: .ok,
-            title: "完全磁盘访问权限".localized,
-            detail: "已授予，可以读取受保护的应用数据目录。".localized,
-            action: nil
-        )
     }
 
     private static func appManagementItem(granted: Bool) -> Item {
@@ -227,24 +258,36 @@ struct LaunchReadinessChecker: Sendable {
     static func fullDiskAccessProbePaths(homeDirectory: String = NSHomeDirectory()) -> [String] {
         [
             "\(homeDirectory)/Library/Application Support/com.apple.TCC/TCC.db",
-            "\(homeDirectory)/Library/Messages/chat.db",
             "/Library/Application Support/com.apple.TCC/TCC.db"
         ]
     }
 
     /// 尝试打开受 TCC 保护的文件来判断完全磁盘访问权限。
     ///
-    /// - Note: 用 `open` 而不是 `FileManager.isReadableFile`：系统拦截的是真正的打开操作。
-    ///   所有候选文件都不存在时无法判断，按「未授权」处理，引导用户去系统设置确认。
-    static func hasFullDiskAccess(candidatePaths: [String] = fullDiskAccessProbePaths()) -> Bool {
-        for path in candidatePaths where FileManager.default.fileExists(atPath: path) {
-            let descriptor = open(path, O_RDONLY)
-            if descriptor >= 0 {
-                close(descriptor)
-                return true
-            }
+    /// - Note: 直接 `open`，不以 fileExists/isReadableFile 代替访问检查；只打开并关闭，
+    ///   不读取数据库内容。没有可用检查文件或发生 I/O 错误时不能断言用户未授权。
+    ///   不使用 Messages 等可能获单独文件授权的路径作为完全磁盘访问权限的依据。
+    static func fullDiskAccessState(
+        candidatePaths: [String] = fullDiskAccessProbePaths(),
+        openProbe: (String) -> Int32 = probeProtectedFile
+    ) -> FullDiskAccessState {
+        var wasDenied = false
+        for path in candidatePaths {
+            let error = openProbe(path)
+            if error == 0 { return .granted }
+            if error == EACCES || error == EPERM { wasDenied = true }
         }
-        return false
+        return wasDenied ? .denied : .unknown
+    }
+
+    private static func probeProtectedFile(at path: String) -> Int32 {
+        let descriptor = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else { return errno }
+        defer { close(descriptor) }
+        var metadata = stat()
+        guard fstat(descriptor, &metadata) == 0 else { return errno }
+        // 目录或替代链接不能证明受保护数据库可访问。
+        return (metadata.st_mode & S_IFMT) == S_IFREG ? 0 : EINVAL
     }
 
     /// 往 `/Applications` 写一个临时文件来判断 App 管理权限，与「应用数据」页的判断方式一致。
@@ -275,7 +318,7 @@ struct LaunchReadinessChecker: Sendable {
 extension LaunchReadinessChecker.Probe {
     /// 真机上的检测实现。
     static let live = LaunchReadinessChecker.Probe(
-        hasFullDiskAccess: { LaunchReadinessChecker.hasFullDiskAccess() },
+        fullDiskAccessState: { LaunchReadinessChecker.fullDiskAccessState() },
         hasAppManagementPermission: { LaunchReadinessChecker.hasAppManagementPermission() },
         externalDrivePath: { UserDefaults.standard.string(forKey: LaunchReadinessChecker.externalDrivePathKey) },
         externalDriveState: { path in await LaunchReadinessChecker.externalDriveState(atPath: path) }

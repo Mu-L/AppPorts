@@ -5,7 +5,7 @@ outline: deep
 # Migración por montaje: llevar los datos de contenedores al disco externo
 
 ::: tip Lo esencial
-Los datos de `~/Library/Containers/` y `~/Library/Group Containers/`, como el historial de WeChat, la caché de QQ Music y los datos de apps de App Store, no se pueden trasladar mediante enlaces simbólicos. Desde AppPorts 1.8.2, se crea un volumen APFS de datos dedicado en el disco externo, se copian los datos y el volumen se **monta en el directorio original**. La app ve la misma ruta y su firma no cambia.
+Los datos de `~/Library/Containers/` y `~/Library/Group Containers/`, como el historial de WeChat, la caché de QQ Music y los datos de apps de App Store, no se pueden trasladar mediante enlaces simbólicos. Desde AppPorts 1.9.0, se crea un volumen APFS de datos dedicado en el disco externo, se copian los datos y el volumen se **monta en el directorio original**. La app ve la misma ruta y su firma no cambia.
 
 Tres requisitos: disco APFS sin encriptar, aceptar el permiso al abrir la app por primera vez y conectar el disco antes de usarla.
 :::

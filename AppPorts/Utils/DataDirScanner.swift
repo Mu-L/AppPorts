@@ -105,45 +105,69 @@ func fastDirectorySize(
     fileManager: FileManager = .default,
     isMountPoint: (URL) -> Bool = { DiskUtility.isMountPoint($0) }
 ) -> Int64 {
+    measureDirectorySize(at: url, fileManager: fileManager, isMountPoint: isMountPoint).bytes
+}
+
+/// 界面需要同时知道大小和读取是否完整，不能把读取失败当成 0 字节。
+func measureDirectorySize(
+    at url: URL,
+    fileManager: FileManager = .default,
+    useCache: Bool = true,
+    isMountPoint: (URL) -> Bool = { DiskUtility.isMountPoint($0) }
+) -> DirectorySizeResult {
     let cacheKey = sizeCacheKey(for: url.standardizedFileURL.path, isMountPoint: isMountPoint(url))
-    if let cached = directorySizeCache.object(forKey: cacheKey) {
-        return cached.int64Value
+    if useCache, let cached = directorySizeCache.object(forKey: cacheKey) {
+        return DirectorySizeResult(bytes: cached.int64Value)
     }
+    directorySizeCache.removeObject(forKey: cacheKey)
 
     let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey, .isDirectoryKey]
-    guard let values = try? url.resourceValues(forKeys: Set(resourceKeys)) else { return 0 }
+    let values: URLResourceValues
+    do {
+        values = try url.resourceValues(forKeys: Set(resourceKeys))
+    } catch {
+        return DirectorySizeResult(readIssues: [DataDirReadIssue(url: url, error: error)])
+    }
 
     // 单文件：直接返回大小
     if values.isRegularFile == true {
         let size = Int64(values.fileSize ?? 0)
         directorySizeCache.setObject(NSNumber(value: size), forKey: cacheKey)
-        return size
+        return DirectorySizeResult(bytes: size)
     }
 
-    guard values.isDirectory == true else { return 0 }
+    guard values.isDirectory == true else { return DirectorySizeResult() }
 
     // 枚举器遍历（单次批量遍历，替代手动递归的 contentsOfDirectory）
+    var result = DirectorySizeResult()
     guard let enumerator = fileManager.enumerator(
         at: url,
         includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey],
         options: [],
-        errorHandler: nil
-    ) else { return 0 }
+        errorHandler: { failedURL, error in
+            result.readIssues.append(DataDirReadIssue(url: failedURL, error: error))
+            return true
+        }
+    ) else {
+        return DirectorySizeResult(readIssues: [DataDirReadIssue(url: url, error: CocoaError(.fileReadUnknown))])
+    }
 
-    var total: Int64 = 0
     for case let fileURL as URL in enumerator {
-        guard let attrs = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]),
-              attrs.isSymbolicLink != true,
-              attrs.isRegularFile == true,
-              let fileSize = attrs.fileSize else { continue }
-        total += Int64(fileSize)
+        do {
+            let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey])
+            guard attrs.isSymbolicLink != true, attrs.isRegularFile == true,
+                  let fileSize = attrs.fileSize else { continue }
+            result.bytes += Int64(fileSize)
+        } catch {
+            result.readIssues.append(DataDirReadIssue(url: fileURL, error: error))
+        }
     }
     // 0 不写缓存：未挂载的挂载点就是一个空目录，算出来同样是 0；缓存下来会让卷挂好之后
     // 一直显示「0 字节」。空目录重新遍历的代价可以忽略，所以每次重算更安全。
-    if total > 0 {
-        directorySizeCache.setObject(NSNumber(value: total), forKey: cacheKey)
+    if result.isComplete && result.bytes > 0 {
+        directorySizeCache.setObject(NSNumber(value: result.bytes), forKey: cacheKey)
     }
-    return total
+    return result
 }
 
 // MARK: - 数据目录扫描器
@@ -162,6 +186,7 @@ actor DataDirScanner {
     private let isSandboxedApplication: @Sendable (URL) -> Bool
     /// 本轮扫描开始时读取一次的挂载记录，避免逐路径重复读文件。
     private var mountRecordsByPath: [String: ContainerMountRecord] = [:]
+    private var readIssues: [DataDirReadIssue] = []
 
     private struct ManagedLinkMetadata: Codable, Sendable {
         let schemaVersion: Int
@@ -496,7 +521,12 @@ actor DataDirScanner {
     ///   - externalRootURL: 已选择的外部存储根目录。若存在，会额外扫描其镜像目录中的可接回数据。
     /// - Returns: 找到的关联数据目录列表（未计算大小）
     func scanLibraryDirs(for app: AppItem, externalRootURL: URL? = nil) -> [DataDirItem] {
-        guard !app.isFolder else { return [] }
+        scanLibraryDirsWithDiagnostics(for: app, externalRootURL: externalRootURL).items
+    }
+
+    func scanLibraryDirsWithDiagnostics(for app: AppItem, externalRootURL: URL? = nil) -> DataDirScanResult {
+        readIssues = []
+        guard !app.isFolder else { return DataDirScanResult(items: [], readIssues: []) }
         let scanID = AppLogger.shared.makeOperationID(prefix: "scanner-library-dirs")
         refreshMountRecords()
 
@@ -646,7 +676,7 @@ actor DataDirScanner {
             ],
             level: "TRACE"
         )
-        return sortedResults
+        return DataDirScanResult(items: sortedResults, readIssues: readIssues)
     }
 
     /// 异步计算单个目录大小
@@ -1809,7 +1839,17 @@ actor DataDirScanner {
         guard let enumerator = fileManager.enumerator(
             at: baseURL,
             includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles],
+            errorHandler: { failedURL, error in
+                // 不将其他应用目录的访问限制算成当前应用的扫描失败。
+                let path = failedURL.standardizedFileURL.path
+                if path == baseURL.standardizedFileURL.path
+                    || matched.contains(where: { path == $0.path || path.hasPrefix($0.path + "/") })
+                    || self.matchesDirectoryName(failedURL.lastPathComponent, profile: matchProfile) {
+                    self.recordReadIssue(at: failedURL, error: error)
+                }
+                return true
+            }
         ) else { return [] }
 
         let baseDepth = baseURL.standardizedFileURL.pathComponents.count
@@ -1839,18 +1879,41 @@ actor DataDirScanner {
     }
 
     private func directoryEntries(at baseURL: URL) -> [URL] {
-        let contents = (try? fileManager.contentsOfDirectory(
-            at: baseURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: .skipsHiddenFiles
-        )) ?? []
+        let contents: [URL]
+        do {
+            contents = try fileManager.contentsOfDirectory(
+                at: baseURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                options: .skipsHiddenFiles
+            )
+        } catch {
+            recordReadIssue(at: baseURL, error: error)
+            return []
+        }
 
         return contents.filter { itemURL in
-            let resourceValues = try? itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-            let isDir = resourceValues?.isDirectory ?? false
-            let isSymlink = resourceValues?.isSymbolicLink ?? false
-            return isDir || isSymlink
+            do {
+                let values = try itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                return values.isDirectory == true || values.isSymbolicLink == true
+            } catch {
+                recordReadIssue(at: itemURL, error: error)
+                return false
+            }
         }
+    }
+
+    private func recordReadIssue(at url: URL, error: Error) {
+        // 不存在的可选目录很常见；只有实际的读取失败影响统计完整性。
+        guard !DataDirReadIssue.isMissingFile(error) else { return }
+        let issue = DataDirReadIssue(url: url, error: error)
+        guard !readIssues.contains(where: { $0.url == issue.url }) else { return }
+        readIssues.append(issue)
+        AppLogger.shared.logError(
+            "应用数据目录读取失败，空间统计不完整",
+            error: error,
+            errorCode: "DATA-DIR-SCAN-READ-FAILED",
+            relatedURLs: [("path", url)]
+        )
     }
 
     private func matchesDirectoryName(_ rawName: String, profile: AppMatchProfile) -> Bool {

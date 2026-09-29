@@ -25,7 +25,8 @@ const numberFormat = computed(
     new Intl.NumberFormat(props.locale, {
       style: "currency",
       currency: data.currency ?? "CNY",
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }),
 );
 

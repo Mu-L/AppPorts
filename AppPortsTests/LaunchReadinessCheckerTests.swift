@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 import Testing
 @testable import AppPorts
 
@@ -17,7 +18,7 @@ struct LaunchReadinessCheckerTests {
     @Test("三项都满足时全部通过")
     func allSatisfied() {
         let items = LaunchReadinessChecker.items(
-            hasFullDiskAccess: true,
+            fullDiskAccessState: .granted,
             hasAppManagementPermission: true,
             externalDriveState: .apfs
         )
@@ -34,7 +35,7 @@ struct LaunchReadinessCheckerTests {
     @Test("缺少完全磁盘访问权限时报失败并给出设置入口")
     func missingFullDiskAccess() throws {
         let items = LaunchReadinessChecker.items(
-            hasFullDiskAccess: false,
+            fullDiskAccessState: .denied,
             hasAppManagementPermission: true,
             externalDriveState: .apfs
         )
@@ -45,10 +46,22 @@ struct LaunchReadinessCheckerTests {
         #expect(item.title == "完全磁盘访问权限")
     }
 
+    @Test("检查不确定时提醒核对，不误报已授权或权限被拒绝")
+    func unknownFullDiskAccess() throws {
+        let items = LaunchReadinessChecker.items(
+            fullDiskAccessState: .unknown,
+            hasAppManagementPermission: true,
+            externalDriveState: .apfs
+        )
+        let item = try #require(items.first { $0.id == LaunchReadinessChecker.ItemID.fullDiskAccess })
+        #expect(item.level == .warning)
+        #expect(item.action == .fullDiskAccess)
+    }
+
     @Test("缺少 App 管理权限时报失败并给出设置入口")
     func missingAppManagement() {
         let items = LaunchReadinessChecker.items(
-            hasFullDiskAccess: true,
+            fullDiskAccessState: .granted,
             hasAppManagementPermission: false,
             externalDriveState: .apfs
         )
@@ -125,7 +138,7 @@ struct LaunchReadinessCheckerTests {
     func checkUsesSavedPath() async {
         let recorder = PathRecorder()
         let checker = LaunchReadinessChecker(probe: LaunchReadinessChecker.Probe(
-            hasFullDiskAccess: { true },
+            fullDiskAccessState: { .granted },
             hasAppManagementPermission: { true },
             externalDrivePath: { "/Volumes/TestDrive" },
             externalDriveState: { path in
@@ -144,7 +157,7 @@ struct LaunchReadinessCheckerTests {
     func checkSkipsDiskutilWithoutSavedPath() async {
         let recorder = PathRecorder()
         let checker = LaunchReadinessChecker(probe: LaunchReadinessChecker.Probe(
-            hasFullDiskAccess: { true },
+            fullDiskAccessState: { .granted },
             hasAppManagementPermission: { true },
             externalDrivePath: { nil },
             externalDriveState: { path in
@@ -162,7 +175,7 @@ struct LaunchReadinessCheckerTests {
     @Test("空字符串的外部路径按「未选择」处理")
     func checkTreatsEmptyPathAsNotSelected() async {
         let checker = LaunchReadinessChecker(probe: LaunchReadinessChecker.Probe(
-            hasFullDiskAccess: { true },
+            fullDiskAccessState: { .granted },
             hasAppManagementPermission: { true },
             externalDrivePath: { "" },
             externalDriveState: { _ in .apfs }
@@ -234,7 +247,7 @@ struct LaunchReadinessCheckerTests {
         let readable = workspace.root.appendingPathComponent("readable.db")
         try Data("x".utf8).write(to: readable)
 
-        #expect(LaunchReadinessChecker.hasFullDiskAccess(candidatePaths: [readable.path]))
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [readable.path]) == .granted)
     }
 
     @Test("打不开受保护文件时判定为未授权")
@@ -245,21 +258,90 @@ struct LaunchReadinessCheckerTests {
         try Data("x".utf8).write(to: unreadable)
         try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadable.path)
 
-        #expect(LaunchReadinessChecker.hasFullDiskAccess(candidatePaths: [unreadable.path]) == false)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [unreadable.path]) == .denied)
     }
 
-    @Test("候选文件都不存在时按未授权处理")
+    @Test("候选文件都不存在时不能断言未授权")
     func fullDiskAccessProbeWithoutCandidates() {
         let missing = "/tmp/appports-missing-\(UUID().uuidString)/TCC.db"
-        #expect(LaunchReadinessChecker.hasFullDiskAccess(candidatePaths: [missing]) == false)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [missing]) == .unknown)
     }
 
     @Test("默认候选路径覆盖用户与系统 TCC 数据库")
     func defaultProbePaths() {
         let paths = LaunchReadinessChecker.fullDiskAccessProbePaths(homeDirectory: "/Users/example")
         #expect(paths.contains("/Users/example/Library/Application Support/com.apple.TCC/TCC.db"))
-        #expect(paths.contains("/Users/example/Library/Messages/chat.db"))
+        #expect(!paths.contains("/Users/example/Library/Messages/chat.db"))
         #expect(paths.contains("/Library/Application Support/com.apple.TCC/TCC.db"))
+    }
+
+    @Test("直接检查打开结果，正确区分权限拒绝和无法确认", arguments: [
+        (EPERM, LaunchReadinessChecker.FullDiskAccessState.denied),
+        (EACCES, .denied),
+        (ENOENT, .unknown),
+        (EIO, .unknown)
+    ])
+    func protectedFileErrors(error: Int32, expected: LaunchReadinessChecker.FullDiskAccessState) {
+        // 路径无需真的存在；不能用 fileExists 把拒绝访问误认为缺少检查文件。
+        let state = LaunchReadinessChecker.fullDiskAccessState(
+            candidatePaths: ["/unavailable/TCC.db"], openProbe: { _ in error }
+        )
+        #expect(state == expected)
+    }
+
+    @Test("一个候选文件可打开即可通过，全部失败时保留权限拒绝")
+    func multipleProbeCandidates() {
+        let results: [String: Int32] = ["missing": ENOENT, "denied": EPERM, "readable": 0]
+        #expect(LaunchReadinessChecker.fullDiskAccessState(
+            candidatePaths: ["missing", "denied", "readable"], openProbe: { results[$0]! }
+        ) == .granted)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(
+            candidatePaths: ["missing", "denied"], openProbe: { results[$0]! }
+        ) == .denied)
+    }
+
+    @Test("重新检查会重新打开文件，不复用之前的授权结果")
+    func accessProbeIsNotCached() {
+        let path = "/probe/\(UUID().uuidString)/TCC.db"
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [path], openProbe: { _ in EPERM }) == .denied)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [path], openProbe: { _ in 0 }) == .granted)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [path], openProbe: { _ in EACCES }) == .denied)
+    }
+
+    @Test("目录或指向普通文件的链接不能冒充受保护数据库")
+    func invalidProbeTargets() throws {
+        let workspace = try TemporaryWorkspace()
+        defer { workspace.cleanup() }
+        let file = workspace.root.appendingPathComponent("readable.db")
+        let link = workspace.root.appendingPathComponent("TCC.db")
+        try Data("x".utf8).write(to: file)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [workspace.root.path]) == .unknown)
+        #expect(LaunchReadinessChecker.fullDiskAccessState(candidatePaths: [link.path]) == .unknown)
+    }
+
+    @Test("同名同版本的不同构建保留各自的应用路径与构建号")
+    func runningApplicationIdentity() throws {
+        let workspace = try TemporaryWorkspace()
+        defer { workspace.cleanup() }
+        var identities: [LaunchReadinessChecker.RunningApplication] = []
+        for (directory, build) in [("Installed", "20"), ("Preview", "21")] {
+            let url = workspace.root.appendingPathComponent(directory).appendingPathComponent("AppPorts.app", isDirectory: true)
+            let contents = url.appendingPathComponent("Contents")
+            try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+            let info = ["CFBundleIdentifier": "test.AppPorts", "CFBundlePackageType": "APPL",
+                        "CFBundleShortVersionString": "1.9.0", "CFBundleVersion": build]
+            try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+                .write(to: contents.appendingPathComponent("Info.plist"))
+            let bundle = try #require(Bundle(url: url))
+            let identity = LaunchReadinessChecker.RunningApplication(bundle: bundle)
+            #expect(identity.url == url.resolvingSymlinksInPath().standardizedFileURL)
+            #expect(identity.version == "1.9.0")
+            #expect(identity.build == build)
+            identities.append(identity)
+        }
+        #expect(identities[0] != identities[1])
+        #expect(LaunchReadinessChecker.RunningApplication().url == Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL)
     }
 
     // MARK: 系统设置入口
@@ -278,7 +360,7 @@ struct LaunchReadinessCheckerTests {
 
     private func driveItem(state: LaunchReadinessChecker.ExternalDriveState) -> LaunchReadinessChecker.Item? {
         LaunchReadinessChecker.items(
-            hasFullDiskAccess: true,
+            fullDiskAccessState: .granted,
             hasAppManagementPermission: true,
             externalDriveState: state
         ).first { $0.id == LaunchReadinessChecker.ItemID.externalDrive }

@@ -154,7 +154,7 @@ Ja, mit „Mount-Migration“. Wähle WeChat unter „App Data“. Die nach Kont
 
 Unterscheide zwei Fälle:
 
-- **Mount-Migration mit 1.8.2:** Prüfe Laufwerk, Status „Eingebunden“ und ob die Zugriffsabfrage abgelehnt wurde. Siehe [Fehlerbehebung](/de/troubleshooting#app-sieht-nach-mount-migration-keine-daten).
+- **Mount-Migration mit 1.9.0:** Prüfe Laufwerk, Status „Eingebunden“ und ob die Zugriffsabfrage abgelehnt wurde. Siehe [Fehlerbehebung](/de/troubleshooting#app-sieht-nach-mount-migration-keine-daten).
 - **Alte Migration über symbolische Links:** Die Sandbox kann Daten außerhalb des Containers nicht lesen. Das ist eine Systembeschränkung. Stelle den Ordner in AppPorts lokal wieder her. Hattest du der Neusignierung zugestimmt, installiere WeChat zusätzlich von der offiziellen Website neu. Siehe [Reparatur für macOS 27](/de/macos-27#reparatur).
 
 **Signiere nicht erneut**, um das zu reparieren; das verschlechtert die Situation.

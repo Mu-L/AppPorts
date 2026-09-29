@@ -7,7 +7,7 @@ outline: deep
 ::: tip L’essentiel
 Les données de `~/Library/Containers/` et `~/Library/Group Containers/` appartiennent à des **applications en bac à sable**. Les déplacer sur un disque externe avec un « raccourci », ou lien symbolique, les rend illisibles pour l’application. AppPorts contournait cela en re-signant l’application, au prix d’échecs d’ouverture possibles sous macOS 27 et d’une perte de session.
 
-Depuis la version 1.8.2, les conteneurs utilisent la [migration par montage](/fr/datamigrae/mount-migration), sans modifier un octet de signature. Les applications déjà re-signées doivent être réinstallées ; voir le [guide de mise à niveau vers macOS 27](/fr/macos-27).
+Depuis la version 1.9.0, les conteneurs utilisent la [migration par montage](/fr/datamigrae/mount-migration), sans modifier un octet de signature. Les applications déjà re-signées doivent être réinstallées ; voir le [guide de mise à niveau vers macOS 27](/fr/macos-27).
 :::
 
 Cette page explique l’origine du problème. Si votre application ne s’ouvre plus, consultez directement les réparations du [guide macOS 27](/fr/macos-27).

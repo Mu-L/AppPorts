@@ -143,7 +143,7 @@ const policies = {
       {
         title: "第十一条  赞助者信息的公开",
         paras: [
-          "当您通过赞助二维码支持本项目，并按提示在留言中填写昵称与链接时，该等信息（昵称、链接、金额、时间）将公开显示于用户文档站的赞助页及本软件“关于 AppPorts”窗口的赞助者区块。",
+          "当您通过赞助二维码支持本项目，并在留言中填写昵称时，昵称将公开显示于用户文档站赞助页及本软件“关于 AppPorts”窗口的赞助者区块。个人链接为选填，未提供时仅展示昵称；赞助金额仅在网站赞助页展示。",
           "上述情形是本项目中唯一涉及个人信息公开的场景，且以您的自愿提供为前提。若您不希望昵称或链接被公开，可在赞助时不作填写，或依第十八条载明的方式要求更正、删除。",
         ],
       },
@@ -343,7 +343,7 @@ const policies = {
       {
         title: "11. Publication of Sponsor Information",
         paras: [
-          "If you support the project through the sponsor QR code and, as prompted, leave a nickname and a link in the payment note, that information (nickname, link, amount, date) will be published on the sponsor page of the documentation site and in the sponsor section of the “About AppPorts” window.",
+          "If you support the project through the sponsor QR code and leave a nickname in the payment note, it will be published on the sponsor page of the documentation site and in the sponsor section of the “About AppPorts” window. A personal link is optional; without one, only the nickname is shown. Sponsorship amounts are displayed only on the website sponsor page.",
           "This is the only case in this project in which personal information is made public, and it depends on your voluntary provision. If you would rather not have your nickname or link published, simply leave it out when sponsoring, or request correction or removal in the manner set out in clause 18.",
         ],
       },

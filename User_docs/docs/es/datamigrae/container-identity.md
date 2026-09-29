@@ -7,7 +7,7 @@ outline: deep
 ::: tip Lo esencial
 Los datos de `~/Library/Containers/` y `~/Library/Group Containers/` pertenecen a **apps aisladas**. Moverlos al disco externo con un «acceso directo», o enlace simbólico, impide que la app los lea. Antes, AppPorts lo evitaba volviendo a firmar la app, a costa de que pudiera dejar de abrirse en macOS 27 y perder su sesión.
 
-Desde la versión 1.8.2, los contenedores usan [migración por montaje](/es/datamigrae/mount-migration), sin modificar ni un byte de la firma. Las apps ya firmadas de nuevo necesitan reinstalarse; consulte la [guía de actualización a macOS 27](/es/macos-27).
+Desde la versión 1.9.0, los contenedores usan [migración por montaje](/es/datamigrae/mount-migration), sin modificar ni un byte de la firma. Las apps ya firmadas de nuevo necesitan reinstalarse; consulte la [guía de actualización a macOS 27](/es/macos-27).
 :::
 
 Esta página explica el origen del problema. Si la app ya no se abre, consulte directamente la reparación en la [guía de macOS 27](/es/macos-27).

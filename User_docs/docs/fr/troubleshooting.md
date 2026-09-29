@@ -24,7 +24,7 @@ Réparation : restaurer les données de conteneur → réinstaller depuis une so
 | Stockage externe non APFS | Disque exFAT / NTFS / HFS+ | Gardez la situation actuelle : conteneurs locaux, autres données migrées normalement. Pour les conteneurs, choisissez un disque APFS ou suivez la [préparation](/fr/why-apfs#prepare-apfs). Les outils intégrés ne réduisent pas directement exFAT |
 | Stockage externe chiffré | APFS chiffré dont le nouveau volume n’hériterait pas du mot de passe | Gardez en l’état ou choisissez APFS non chiffré ; voir [Disques chiffrés](/fr/why-apfs#encrypted-drives) |
 | Espace insuffisant | Disque externe trop plein pour migrer, ou espace local insuffisant pour restaurer | Libérez de l’espace et réessayez. Le contrôle précède la création du volume ou la copie ; aucune donnée n’a changé |
-| Échec de commande disque … `kDAReturnNotPrivileged` | Un ancien système, comme macOS 12, interdit à l’utilisateur ordinaire le montage sur un chemin personnalisé | AppPorts réessaie avec un dialogue administrateur. Saisissez le mot de passe ; cette étape n’existait pas avant 1.8.2 |
+| Échec de commande disque … `kDAReturnNotPrivileged` | Un ancien système, comme macOS 12, interdit à l’utilisateur ordinaire le montage sur un chemin personnalisé | AppPorts réessaie avec un dialogue administrateur. Saisissez le mot de passe ; cette étape n’existait pas avant 1.9.0 |
 | Autorisation administrateur annulée | Dialogue de mot de passe annulé | Relancez l’opération |
 | Point de montage non vide | L’application a écrit des fichiers localement pendant l’absence du volume | Déplacez-les puis cliquez sur « Monter » |
 | Vérification après montage échouée | Le volume est monté au mauvais endroit | Exportez un diagnostic et ouvrez une Issue |

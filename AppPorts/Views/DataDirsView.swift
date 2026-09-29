@@ -63,6 +63,10 @@ struct DataDirsView: View {
     // MARK: - 内部状态
     @State private var dotFolderItems: [DataDirItem] = []
     @State private var libraryItems:   [DataDirItem] = []
+    @State private var dotFolderReadIssues: [DataDirReadIssue] = []
+    @State private var libraryReadIssues: [DataDirReadIssue] = []
+    @State private var showReadinessCheck = false
+    @AppStorage("showZeroByteDataDirectories") private var showZeroByteDirectories = false
 
     @State private var showAppDataFilters = false
     @State private var selectedPriorityFilters: Set<DataDirPriority> = []
@@ -211,6 +215,9 @@ struct DataDirsView: View {
         .warningSheet($migrationRiskRequest)
         .warningSheet($containerDataResignRequest)
         .warningSheet($mountMigrationRequest)
+        .sheet(isPresented: $showReadinessCheck) {
+            ReadinessCheckSheet()
+        }
         // 错误弹窗
         .alert("操作失败".localized, isPresented: $showError) {
             Button("好的".localized, role: .cancel) {}
@@ -265,7 +272,7 @@ struct DataDirsView: View {
 
             // 统计栏
             if !dotFolderItems.isEmpty {
-                statsBar(items: dotFolderItems)
+                statsBar(items: filteredDotFolderItems)
             }
 
             // 列表
@@ -276,10 +283,12 @@ struct DataDirsView: View {
                     loadingView
                 } else if dotFolderItems.isEmpty {
                     ContentView.EmptyStateView(icon: "folder.badge.questionmark", text: "未发现已知工具目录".localized)
+                } else if filteredDotFolderItems.isEmpty {
+                    ContentView.EmptyStateView(icon: "line.3.horizontal.decrease.circle", text: "没有匹配当前筛选条件的数据目录".localized)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 4) {
-                            ForEach(dotFolderItems) { item in
+                            ForEach(filteredDotFolderItems) { item in
                                 DataDirRowView(
                                     item: item,
                                     isSelected: selectedItemID == item.id,
@@ -290,7 +299,7 @@ struct DataDirsView: View {
                                     onRelinkExternalData: { askRelinkExternalData($0) }
                                 )
                                 .onTapGesture { selectedItemID = item.id }
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 12)
                             }
                         }
                         .padding(.vertical, 8)
@@ -306,36 +315,7 @@ struct DataDirsView: View {
         HSplitView {
             // 左侧：应用选择列表
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                    TextField("搜索应用...".localized, text: $appSearchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                    if !appSearchText.isEmpty {
-                        Button(action: { appSearchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if !localApps.isEmpty {
-                        let count = localApps.filter { !$0.isFolder }.count
-                        Text("\(count)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.06))
-                            .clipShape(Capsule())
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                Divider()
+                appSelectionHeader
 
                 if localApps.isEmpty {
                     ContentView.EmptyStateView(icon: "app.dashed", text: "无本地应用".localized)
@@ -357,38 +337,8 @@ struct DataDirsView: View {
                         }
                     }()
 
-                    // 排序切换按钮
-                    HStack(spacing: 6) {
-                        Menu {
-                            ForEach(AppSortMode.allCases, id: \.self) { mode in
-                                Button(action: { selectedAppSortMode = mode }) {
-                                    HStack {
-                                        Text(mode.localizedTitle)
-                                        Spacer()
-                                        if selectedAppSortMode == mode {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.up.arrow.down")
-                                    .font(.system(size: 10))
-                                Text(selectedAppSortMode.localizedTitle)
-                                    .font(.system(size: 11))
-                            }
-                            .foregroundColor(.secondary)
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        Spacer()
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-
                     ScrollView {
-                        LazyVStack(spacing: 2) {
+                        LazyVStack(spacing: 4) {
                             ForEach(sortedApps, id: \.id) { app in
                                 Button {
                                     selectedApp = app
@@ -400,8 +350,8 @@ struct DataDirsView: View {
                                 .accessibilityAddTraits(selectedApp?.id == app.id ? .isSelected : [])
                             }
                         }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 8)
+                        .padding(.bottom, 12)
+                        .padding(.horizontal, 12)
                     }
                 }
             }
@@ -411,6 +361,7 @@ struct DataDirsView: View {
                 else {
                     libraryScanToken = UUID()
                     libraryItems = []
+                    libraryReadIssues = []
                     selectedAppIsSandboxed = false
                     isScanning = false
                 }
@@ -442,17 +393,25 @@ struct DataDirsView: View {
                             appDataFilterButton
                         }
                     }
+                    .frame(minHeight: 22)
 
                     if selectedApp != nil {
                         directorySearchField
                         if hasActiveAppDataFilters { appDataFilterSummary }
+                        if !libraryItems.isEmpty || !libraryReadIssues.isEmpty {
+                            HStack(spacing: 12) {
+                                statsSummary(items: filteredLibraryItems, allItems: libraryItems, readIssues: libraryReadIssues)
+                                zeroByteDirectoriesToggle
+                            }
+                        }
+                        if !libraryReadIssues.isEmpty {
+                            directoryReadWarning(issues: libraryReadIssues)
+                        }
                     }
                 }
                 .font(.headline)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                Divider()
+                .settingsCardBackground(opacity: 0.05)
+                .padding(12)
 
                 // 外部存储路径提示
                 if externalDriveURL == nil { externalDriveWarning }
@@ -461,13 +420,8 @@ struct DataDirsView: View {
                     signatureReplacedBanner(for: app)
                 }
 
-                // 统计栏
-                if !libraryItems.isEmpty {
-                    statsBar(items: filteredLibraryItems)
-                }
-
                 ZStack {
-                    Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
+                    Color(nsColor: .controlBackgroundColor).ignoresSafeArea()
 
                     if selectedApp == nil {
                         ContentView.EmptyStateView(icon: "arrow.left.circle", text: "从左侧选择一个应用".localized)
@@ -489,9 +443,89 @@ struct DataDirsView: View {
             }
             .frame(minWidth: 340, maxWidth: .infinity)
         }
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     // MARK: - 辅助子视图
+
+    private var appSelectionHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("应用".localized)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    Text("\(localApps.filter { !$0.isFolder }.count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                        .fixedSize()
+                }
+
+                Spacer(minLength: 4)
+
+                if !localApps.isEmpty {
+                    appSelectionSortMenu
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 28)
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundColor(.primary.opacity(0.6))
+                    .frame(width: 32)
+                TextField(
+                    "搜索应用...".localized,
+                    text: $appSearchText,
+                    prompt: Text("搜索应用...".localized).foregroundColor(.primary.opacity(0.6))
+                )
+                    .textFieldStyle(.plain)
+                    .foregroundColor(.primary)
+                    .onExitCommand { appSearchText = "" }
+                if !appSearchText.isEmpty {
+                    Button { appSearchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("清除搜索".localized)
+                }
+            }
+            .font(.system(size: 12))
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Color.primary.opacity(0.045))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 24)
+        .padding(.bottom, 12)
+    }
+
+    private var appSelectionSortMenu: some View {
+        Menu {
+            ForEach(AppSortMode.allCases, id: \.self) { mode in
+                Button(action: { selectedAppSortMode = mode }) {
+                    HStack {
+                        Text(mode.localizedTitle)
+                        Spacer()
+                        if selectedAppSortMode == mode {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label(selectedAppSortMode.localizedTitle, systemImage: "arrow.up.arrow.down")
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundColor(.secondary)
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("排序方式".localized)
+    }
 
     private var externalDriveWarning: some View {
         HStack(spacing: 10) {
@@ -534,9 +568,14 @@ struct DataDirsView: View {
     private var directorySearchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-            TextField("搜索目录或路径…".localized, text: $directorySearchText)
+                .foregroundColor(.primary.opacity(0.6))
+            TextField(
+                "搜索目录或路径…".localized,
+                text: $directorySearchText,
+                prompt: Text("搜索目录或路径…".localized).foregroundColor(.primary.opacity(0.6))
+            )
                 .textFieldStyle(.plain)
+                .foregroundColor(.primary)
                 .onExitCommand { directorySearchText = "" }
             if !directorySearchText.isEmpty {
                 Button { directorySearchText = "" } label: {
@@ -551,12 +590,11 @@ struct DataDirsView: View {
                 .foregroundColor(.secondary)
                 .fixedSize()
         }
-        .font(.system(size: 12))
+        .font(.system(size: 13))
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.primary.opacity(0.08)))
+        .background(Color.primary.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var appDataFilterButton: some View {
@@ -694,24 +732,63 @@ struct DataDirsView: View {
     }
 
     private func statsBar(items: [DataDirItem]) -> some View {
-        // 只统计根级项大小，避免父目录大小与子目录大小重复计入
-        let standardizedPaths = items.map { $0.path.standardizedFileURL.path }
-        let rootItems = items.filter { item in
-            let path = item.path.standardizedFileURL.path
-            return !standardizedPaths.contains { $0 != path && path.hasPrefix($0 + "/") }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                statsSummary(items: items, allItems: dotFolderItems, readIssues: dotFolderReadIssues)
+                zeroByteDirectoriesToggle
+            }
+            if !dotFolderReadIssues.isEmpty {
+                directoryReadWarning(issues: dotFolderReadIssues)
+            }
         }
-        let total = rootItems.filter { $0.status == "本地" }.reduce(0) { $0 + $1.sizeBytes }
+        .settingsCardBackground(opacity: 0.05)
+        .padding(12)
+    }
+
+    private var zeroByteDirectoriesToggle: some View {
+        Toggle("显示零字节目录".localized, isOn: $showZeroByteDirectories)
+            .toggleStyle(.checkbox)
+            .font(.system(size: 12))
+            .fixedSize()
+    }
+
+    private func directoryReadWarning(issues: [DataDirReadIssue]) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("部分目录无法读取，请检查后刷新。".localized)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(issues.map { $0.url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~") }.joined(separator: "\n"))
+            Spacer(minLength: 0)
+            if issues.contains(where: \.isPermissionDenied) {
+                Button("检查访问权限".localized) {
+                    showReadinessCheck = true
+                }
+                .buttonStyle(.link)
+                .help("AppPorts 读取邮件、信息等受保护的应用数据目录需要它。请在「系统设置 › 隐私与安全性 › 完全磁盘访问权限」里勾选 AppPorts。".localized)
+            }
+        }
+        .font(.system(size: 12))
+    }
+
+    private func statsSummary(items: [DataDirItem], allItems: [DataDirItem], readIssues: [DataDirReadIssue]) -> some View {
+        let summary = DataDirSpaceSummary(items: items, allItems: allItems, hasReadIssues: !readIssues.isEmpty)
         let linked = items.filter { $0.status == "已链接" }.count
         let mounted = items.filter { DataDirStatus.mountStatuses.contains($0.status) }.count
         let needsNormalization = items.filter { $0.status == "待规范" }.count
         let existingSymlinks = items.filter { $0.status == "现有软链" }.count
         let relinkable = items.filter { $0.status == "待接回" }.count
-        return HStack(spacing: 20) {
+        return HStack(spacing: 14) {
             Label(String(format: "%lld 个目录".localized, Int64(items.count)), systemImage: "folder.fill")
                 .foregroundColor(.secondary)
-            if total > 0 {
+            if summary.isIncomplete {
+                Label("空间统计不完整".localized, systemImage: "exclamationmark.circle")
+                    .foregroundColor(.orange)
+            } else if summary.isCalculating {
+                Label("计算中...".localized, systemImage: "hourglass")
+                    .foregroundColor(.secondary)
+            } else if summary.reclaimableBytes > 0 {
                 Label(
-                    LocalizedByteCountFormatter.string(fromByteCount: total, allowedUnits: [.mb, .gb]) + " 可释放".localized,
+                    LocalizedByteCountFormatter.string(fromByteCount: summary.reclaimableBytes, allowedUnits: [.mb, .gb]) + " 可释放".localized,
                     systemImage: "sparkles"
                 )
                     .foregroundColor(.accentColor)
@@ -739,10 +816,6 @@ struct DataDirsView: View {
             Spacer()
         }
         .font(.system(size: 12))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .overlay(Rectangle().frame(height: 1).foregroundColor(Color.primary.opacity(0.05)), alignment: .bottom)
     }
 
     private func directoryOperationButtons(for item: DataDirItem) -> DataDirOperationButtons {
@@ -764,6 +837,10 @@ struct DataDirsView: View {
 
     private var filteredLibraryItems: [DataDirItem] {
         libraryItems.filter(matchesAppDataFilters)
+    }
+
+    private var filteredDotFolderItems: [DataDirItem] {
+        dotFolderItems.filter { showZeroByteDirectories || !$0.isEmptyLocalDirectory }
     }
 
     /// 链接状态优先级：已链接、挂载迁移、待规范、现有软链优先展示
@@ -839,6 +916,7 @@ struct DataDirsView: View {
         return matchesSearch && (selectedPriorityFilters.isEmpty || selectedPriorityFilters.contains(item.priority))
             && (selectedStatusFilters.isEmpty || selectedStatusFilters.contains(item.status))
             && (selectedTypeFilters.isEmpty || selectedTypeFilters.contains(item.type))
+            && (showZeroByteDirectories || !item.isEmptyLocalDirectory)
     }
 
     private func clearAppDataFilters() {
@@ -911,11 +989,14 @@ struct DataDirsView: View {
             level: "TRACE"
         )
         if selectedTab == .toolDirs {
+            libraryScanToken = UUID()
             scanDotFolders()
         } else {
             dotFolderScanToken = UUID()
             if let app = selectedApp {
                 scanLibraryDirs(for: app)
+            } else {
+                isScanning = false
             }
         }
     }
@@ -924,6 +1005,7 @@ struct DataDirsView: View {
         let scanToken = UUID()
         dotFolderScanToken = scanToken
         isScanning = true
+        dotFolderReadIssues = []
         let selectedExternalRoot = externalDriveURL
         let scanID = AppLogger.shared.makeOperationID(prefix: "scan-dot-folders")
         AppLogger.shared.logContext(
@@ -941,7 +1023,6 @@ struct DataDirsView: View {
             await MainActor.run {
                 guard self.dotFolderScanToken == scanToken else { return }
                 self.dotFolderItems = initialItems
-                self.isScanning = false
             }
             AppLogger.shared.logContext(
                 "工具目录扫描完成",
@@ -952,9 +1033,9 @@ struct DataDirsView: View {
                 ]
             )
 
-            // 并行计算所有目录大小（TaskGroup，非 actor 隔离的 fastDirectorySize）
-            let sizedItems = await withTaskGroup(of: (Int, Int64).self) { group in
-                var results: [(Int, Int64)] = []
+            // 每次扫描重新测量，应用运行期间的写入不能沿用上次大小。
+            let sizedItems = await withTaskGroup(of: (Int, DirectorySizeResult).self) { group in
+                var results: [(Int, DirectorySizeResult)] = []
                 var iterator = items.indices.makeIterator()
                 var active = 0
                 let maxConcurrency = 4
@@ -963,7 +1044,7 @@ struct DataDirsView: View {
                 for _ in 0..<min(maxConcurrency, items.count) {
                     guard let i = iterator.next() else { break }
                     let scanURL = items[i].linkedDestination ?? items[i].path
-                    group.addTask { (i, fastDirectorySize(at: scanURL)) }
+                    group.addTask { (i, measureDirectorySize(at: scanURL, useCache: false)) }
                     active += 1
                 }
 
@@ -973,7 +1054,7 @@ struct DataDirsView: View {
                     active -= 1
                     if let i = iterator.next() {
                         let scanURL = items[i].linkedDestination ?? items[i].path
-                        group.addTask { (i, fastDirectorySize(at: scanURL)) }
+                        group.addTask { (i, measureDirectorySize(at: scanURL, useCache: false)) }
                         active += 1
                     }
                 }
@@ -982,13 +1063,13 @@ struct DataDirsView: View {
 
             await MainActor.run {
                 guard self.dotFolderScanToken == scanToken else { return }
-                for (i, sizeBytes) in sizedItems {
-                    guard i < self.dotFolderItems.count else { continue }
-                    let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
-                    withAnimation {
-                        self.dotFolderItems[i].size = sizeStr
-                        self.dotFolderItems[i].sizeBytes = sizeBytes
+                withAnimation {
+                    for (i, result) in sizedItems {
+                        guard i < self.dotFolderItems.count else { continue }
+                        self.dotFolderItems[i].applySize(result)
+                        self.dotFolderReadIssues.append(contentsOf: result.readIssues)
                     }
+                    self.isScanning = false
                 }
             }
         }
@@ -999,6 +1080,7 @@ struct DataDirsView: View {
         libraryScanToken = scanToken
         isScanning = true
         libraryItems = []
+        libraryReadIssues = []
         let appDisplayName = app.displayName
         let appID = app.id
         let selectedExternalRoot = externalDriveURL
@@ -1016,14 +1098,15 @@ struct DataDirsView: View {
             let scanner = DataDirScanner()
             // 沙盒应用迁移数据后不能重签名；先算一次供整页使用。
             let isSandboxed = await scanner.isSandboxed(app)
-            let items = await scanner.scanLibraryDirs(for: app, externalRootURL: selectedExternalRoot)
+            let scanResult = await scanner.scanLibraryDirsWithDiagnostics(for: app, externalRootURL: selectedExternalRoot)
+            let items = scanResult.items
 
             await MainActor.run {
                 guard self.libraryScanToken == scanToken,
                       self.selectedApp?.id == appID else { return }
                 self.libraryItems = items
+                self.libraryReadIssues = scanResult.readIssues
                 self.selectedAppIsSandboxed = isSandboxed
-                self.isScanning = false
             }
             AppLogger.shared.logContext(
                 "应用数据目录扫描完成",
@@ -1037,8 +1120,8 @@ struct DataDirsView: View {
             )
 
             // 并行计算所有目录大小
-            let sizedItems = await withTaskGroup(of: (Int, Int64).self) { group in
-                var results: [(Int, Int64)] = []
+            let sizedItems = await withTaskGroup(of: (Int, DirectorySizeResult).self) { group in
+                var results: [(Int, DirectorySizeResult)] = []
                 var iterator = items.indices.makeIterator()
                 var active = 0
                 let maxConcurrency = 4
@@ -1047,7 +1130,7 @@ struct DataDirsView: View {
                 for _ in 0..<min(maxConcurrency, items.count) {
                     guard let i = iterator.next() else { break }
                     let scanURL = items[i].linkedDestination ?? items[i].path
-                    group.addTask { (i, fastDirectorySize(at: scanURL)) }
+                    group.addTask { (i, measureDirectorySize(at: scanURL, useCache: false)) }
                     active += 1
                 }
 
@@ -1057,7 +1140,7 @@ struct DataDirsView: View {
                     active -= 1
                     if let i = iterator.next() {
                         let scanURL = items[i].linkedDestination ?? items[i].path
-                        group.addTask { (i, fastDirectorySize(at: scanURL)) }
+                        group.addTask { (i, measureDirectorySize(at: scanURL, useCache: false)) }
                         active += 1
                     }
                 }
@@ -1067,13 +1150,13 @@ struct DataDirsView: View {
             await MainActor.run {
                 guard self.libraryScanToken == scanToken,
                       self.selectedApp?.id == appID else { return }
-                for (i, sizeBytes) in sizedItems {
-                    guard i < self.libraryItems.count else { continue }
-                    let sizeStr = LocalizedByteCountFormatter.string(fromByteCount: sizeBytes)
-                    withAnimation {
-                        self.libraryItems[i].size = sizeStr
-                        self.libraryItems[i].sizeBytes = sizeBytes
+                withAnimation {
+                    for (i, result) in sizedItems {
+                        guard i < self.libraryItems.count else { continue }
+                        self.libraryItems[i].applySize(result)
+                        self.libraryReadIssues.append(contentsOf: result.readIssues)
                     }
+                    self.isScanning = false
                 }
             }
         }
@@ -2341,19 +2424,15 @@ private struct AppListRow: View {
     let isSelected: Bool
 
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 10) {
-            // 选中指示条
-            RoundedRectangle(cornerRadius: 2)
-                .fill(isSelected ? Color.accentColor : .clear)
-                .frame(width: 3, height: 24)
-
             AppIconView(url: app.displayURL, size: 32)
 
             Text(app.displayName)
                 .font(.system(size: 13, weight: isSelected ? .medium : .regular))
-                .foregroundColor(isSelected ? .primary : .primary.opacity(0.85))
+                .foregroundColor(.primary)
                 .lineLimit(1)
 
             // 已重签名标记
@@ -2378,25 +2457,18 @@ private struct AppListRow: View {
             }
 
             Spacer()
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.accentColor)
-            }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 6)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(isSelected
                       ? Color.accentColor.opacity(0.12)
                       : (isHovered ? Color.primary.opacity(0.04) : .clear))
         )
         .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering }
-        }
+        .onHover { isHovered = $0 }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isHovered)
     }
 }
 

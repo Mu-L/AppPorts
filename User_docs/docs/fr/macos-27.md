@@ -94,7 +94,7 @@ log show --last 1m --style compact 2>/dev/null | grep -i "rejected approval requ
 ```
 :::
 
-## Ce qu’AppPorts 1.8.2 a changé
+## Ce qu’AppPorts 1.9.0 a changé
 
 Ces comportements correspondent à la version en développement :
 

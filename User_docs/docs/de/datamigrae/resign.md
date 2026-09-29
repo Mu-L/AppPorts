@@ -9,7 +9,7 @@ outline: deep
 ::: warning Neusignierung ist keine allgemeine Reparatur
 Ad-hoc-Neusignierung ersetzt die Entwicklersignatur und entfernt Rechte für Sandbox, App-Gruppen und Schlüsselbund. Sandbox-Apps wie WeChat oder App Store-Apps können dadurch unter macOS 27 nicht mehr öffnen oder ihre Anmeldesitzung verlieren. Die neue Version speichert zuerst die vollständige Original-App, damit Signatur und ursprüngliche Rechte später wiederhergestellt werden können. Bereits verlorene Anmeldesitzungen kehren mit der Signatur nicht garantiert zurück.
 
-Seit 1.8.2 lehnt AppPorts die Neusignierung von Sandbox-Apps standardmäßig ab. Sie ist nur im klassischen Modus nach Risikobestätigung erlaubt. Containerdaten verwenden [Mount-Migration](/de/datamigrae/mount-migration) ohne Signaturänderung. Hintergründe: [Containerdaten, Sandbox und Signaturidentität](/de/datamigrae/container-identity).
+Seit 1.9.0 lehnt AppPorts die Neusignierung von Sandbox-Apps standardmäßig ab. Sie ist nur im klassischen Modus nach Risikobestätigung erlaubt. Containerdaten verwenden [Mount-Migration](/de/datamigrae/mount-migration) ohne Signaturänderung. Hintergründe: [Containerdaten, Sandbox und Signaturidentität](/de/datamigrae/container-identity).
 :::
 
 ## Welches Problem löst Neusignierung?

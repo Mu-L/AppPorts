@@ -9,7 +9,7 @@ outline: deep
 ::: warning 重签名不是通用修复手段
 Ad-hoc 重签名会替换应用的开发者签名，并移除沙盒、应用组和钥匙串授权。对沙盒应用（微信、App Store 应用等）来说，这可能让它在 macOS 27 上无法打开，登录态也可能丢失。新版会先保存完整原始应用，之后可以恢复签名和原有授权；已经丢失的登录态不保证随签名恢复。
 
-从 1.8.2 起，AppPorts 默认拒绝重签名沙盒应用；开启经典模式并确认风险后才允许。容器数据的迁移改用[挂载迁移](/datamigrae/mount-migration)，不需要动签名。来龙去脉见[容器数据、沙盒与签名身份](/datamigrae/container-identity)。
+从 1.9.0 起，AppPorts 默认拒绝重签名沙盒应用；开启经典模式并确认风险后才允许。容器数据的迁移改用[挂载迁移](/datamigrae/mount-migration)，不需要动签名。来龙去脉见[容器数据、沙盒与签名身份](/datamigrae/container-identity)。
 :::
 
 ## 重签名解决什么问题

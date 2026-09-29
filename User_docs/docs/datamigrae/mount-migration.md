@@ -5,7 +5,7 @@ outline: deep
 # 挂载迁移：容器数据怎么放到外置盘
 
 ::: tip 一句话结论
-`~/Library/Containers/` 和 `~/Library/Group Containers/` 里的数据（微信聊天记录、QQ 音乐缓存、App Store 应用的数据）不能用符号链接搬走。AppPorts 1.8.2 起改为：在外置盘上新建一个专用的 APFS 数据卷，把数据复制进去，再把这个卷**挂载到原来的目录上**。应用看到的路径没变，签名没动。
+`~/Library/Containers/` 和 `~/Library/Group Containers/` 里的数据（微信聊天记录、QQ 音乐缓存、App Store 应用的数据）不能用符号链接搬走。AppPorts 1.9.0 起改为：在外置盘上新建一个专用的 APFS 数据卷，把数据复制进去，再把这个卷**挂载到原来的目录上**。应用看到的路径没变，签名没动。
 
 前提三条：外置盘是未加密的 APFS；第一次打开应用时点允许授权框；打开应用前先连接外置盘。
 :::

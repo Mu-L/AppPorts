@@ -28,12 +28,12 @@ Escanea el código con WeChat para apoyar el proyecto. **No hay importe mínimo*
 
 ## Apodo y enlace en el mensaje
 
-Al apoyar, escribe en el mensaje (o en la nota) tu **apodo** y un **enlace**: perfil de GitHub, blog, red social, lo que prefieras.
+Al apoyar, escribe tu **apodo** en el mensaje. El **enlace es opcional**: un perfil de GitHub, blog o red social, lo que prefieras.
 
 El apodo y el enlace aparecerán en la lista de arriba y también en la página «Acerca de AppPorts».
 
 ::: tip ¿Prefieres el anonimato?
-Si no indicas apodo ni enlace, no mostraremos ninguna información.
+Sin apodo, no mostramos información sobre el apoyo. Si proporcionas un apodo sin enlace, lo mostramos como texto sin enlace.
 :::
 
 ## Orden de aparición

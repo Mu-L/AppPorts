@@ -79,7 +79,7 @@ WeChat-Chatverläufe, VM-Abbilder, Spielebibliotheken, Datenbanken und Modell-Ca
 :::
 
 ::: warning Containerdaten nur per Mount-Migration verschieben
-Werden Daten aus `~/Library/Containers/` oder `~/Library/Group Containers/` per symbolischem Link verschoben, können Sandbox-Apps sie nicht lesen. Ältere Versionen umgingen dies durch erneutes Signieren; dadurch lassen sich die Apps unter macOS 27 möglicherweise nicht mehr öffnen. Seit 1.8.2 wird für diese beiden Verzeichnistypen nur die [Mount-Migration](/de/datamigrae/mount-migration) angeboten, und das erneute Signieren von Sandbox-Apps wird grundsätzlich verweigert. Hintergründe: [Containerdaten, Sandbox und Signaturidentität](/de/datamigrae/container-identity).
+Werden Daten aus `~/Library/Containers/` oder `~/Library/Group Containers/` per symbolischem Link verschoben, können Sandbox-Apps sie nicht lesen. Ältere Versionen umgingen dies durch erneutes Signieren; dadurch lassen sich die Apps unter macOS 27 möglicherweise nicht mehr öffnen. Seit 1.9.0 wird für diese beiden Verzeichnistypen nur die [Mount-Migration](/de/datamigrae/mount-migration) angeboten, und das erneute Signieren von Sandbox-Apps wird grundsätzlich verweigert. Hintergründe: [Containerdaten, Sandbox und Signaturidentität](/de/datamigrae/container-identity).
 :::
 
 ::: warning Zulässige eigene Verzeichnisse

@@ -502,62 +502,91 @@ struct ContentView: View {
     // MARK: - 辅助组件
     
     struct HeaderView: View {
+        @Environment(\.colorScheme) private var colorScheme
+
         let title: String
         let subtitle: String // subtitle 可能是路径，也可能是 "未选择"
         let icon: String
+        var iconColumnWidth: CGFloat = 32
+        var tint: Color = .accentColor
         var actionButtonText: String? = nil
         var onAction: (() -> Void)? = nil
         var onRefresh: (() -> Void)? = nil
         var accessory: AnyView? = nil
         
         var body: some View {
-            VStack(spacing: 0) {
-                HStack(alignment: .center, spacing: 16) {
-                    Image(systemName: icon)
-                        .font(.system(size: 24))
-                        .foregroundColor(.accentColor)
-                        .frame(width: 32)
-                        
-                    VStack(alignment: .leading, spacing: 4) {
-                        // 将传入的 title 字符串转换为 Key，触发翻译
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(tint)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(tint.opacity(colorScheme == .dark ? 0.18 : 0.10))
+                    )
+                    .frame(width: iconColumnWidth, height: 40)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
                         Text(title)
-                            .font(.headline)
-                        
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 15, weight: .semibold))
                             .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(subtitle)
-                    }
-                    Spacer()
-                    
-                    if let btnText = actionButtonText, let action = onAction {
+                            .layoutPriority(1)
+                        Spacer(minLength: 8)
 
-                        Button(btnText, action: action)
-                            .controlSize(.small)
-                            .buttonStyle(.bordered)
-                    }
+                        HStack(spacing: 8) {
+                            if let btnText = actionButtonText, let action = onAction {
+                                Button(action: action) {
+                                    Text(btnText)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.accentColor)
+                                        .padding(.horizontal, 10)
+                                        .frame(minWidth: 28, minHeight: 26)
+                                        .background(Color.accentColor.opacity(0.10))
+                                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
 
-                    if let accessory {
-                        accessory
-                    }
+                            if let accessory {
+                                accessory
+                            }
 
-                    if let onRefresh {
-                        Button(action: onRefresh) {
-                            Image(systemName: "arrow.clockwise")
+                            if let onRefresh {
+                                Button(action: onRefresh) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 26, height: 26)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("刷新列表".localized)
+                            }
                         }
-                        .buttonStyle(.borderless)
-                        .padding(.leading, 8)
-                        .help("刷新列表".localized)
+                        .fixedSize()
                     }
+                    .frame(minHeight: 24)
+
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundColor(.primary.opacity(0.65))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(subtitle)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                
-                Divider()
             }
-            .background(.ultraThinMaterial) // Glassmorphism
+            // 列表内容起点：系统外边距 8 + 行 inset 10 + 行内边距 12。
+            .padding(.leading, 18)
+            .padding(.trailing, 10)
+            .padding(.vertical, 10)
+            .frame(minHeight: 64)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(colorScheme == .dark ? 0.09 : 0.045))
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
         }
@@ -571,9 +600,6 @@ struct ContentView: View {
 
         var body: some View {
             VStack(spacing: 0) {
-                Divider()
-                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-
                 Button(action: action) {
                     HStack(spacing: 6) {
                         Text(title)
@@ -590,10 +616,32 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
-            .background(.bar)
+            .background(Color(nsColor: .controlBackgroundColor))
         }
     }
     
+    struct RowSeparatorVisibility: ViewModifier {
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if #available(macOS 13.0, *) {
+                content.listRowSeparator(.hidden)
+            } else {
+                content
+            }
+        }
+    }
+
+    struct TransparentListBackground: ViewModifier {
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if #available(macOS 13.0, *) {
+                content.scrollContentBackground(.hidden)
+            } else {
+                content
+            }
+        }
+    }
+
     struct EmptyStateView: View {
         let icon: String
         let text: String
@@ -618,8 +666,6 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // MARK: - Top Toolbar
             topToolbar
-
-            Divider()
 
             // MARK: - 主内容区（Tab 切换）
             if mainTab == .dataDirs {
@@ -655,6 +701,7 @@ struct ContentView: View {
             } // end HSplitView for mainTab == .apps
             } // end else for mainTab == .apps
         }
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var updateSheetContent: some View {
@@ -691,7 +738,7 @@ struct ContentView: View {
     private var topToolbar: some View {
     HStack(spacing: 14) {
         // Tab 切换器
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             TabButton(title: "应用".localized, systemImage: "cube", isSelected: mainTab == .apps) {
                 withAnimation { mainTab = .apps }
             }
@@ -702,18 +749,14 @@ struct ContentView: View {
                 withAnimation { mainTab = .customDirs }
             }
         }
-        .padding(3)
+        .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                )
+                .fill(Color.primary.opacity(0.03))
         )
 
         if mainTab == .dataDirs {
-            HStack(spacing: 4) {
+            HStack(spacing: 2) {
                 TabButton(title: "工具目录".localized, isSelected: selectedDataDirsTab == .toolDirs) {
                     withAnimation { selectedDataDirsTab = .toolDirs }
                 }
@@ -721,14 +764,10 @@ struct ContentView: View {
                     withAnimation { selectedDataDirsTab = .appDirs }
                 }
             }
-            .padding(3)
+            .padding(4)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                    )
+                    .fill(Color.primary.opacity(0.03))
             )
             .transition(.opacity.combined(with: .move(edge: .leading)))
         }
@@ -743,12 +782,8 @@ struct ContentView: View {
                     .font(.system(size: 13))
             }
             .padding(8)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(6)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-            )
+            .background(Color.primary.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             // Sort Button
             Menu {
@@ -783,24 +818,30 @@ struct ContentView: View {
         // App Store Settings Button（始终显示）
         Button(action: { showAppStoreSettings = true }) {
             Label("设置".localized, systemImage: "gearshape")
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(Color.primary.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
+        .foregroundColor(.secondary)
         .help("App Store 应用迁移设置".localized)
     }
-    .padding(.horizontal, 20)
-    .padding(.vertical, 8)
-    .background(.ultraThinMaterial)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(Color(nsColor: .controlBackgroundColor))
     }
 
     // MARK: - 应用页两个面板（拆出以减轻 body 的类型推断负担）
 
     private var localAppsPane: some View {
         VStack(spacing: 0) {
-            // Header Area (Restored to original simple style)
             HeaderView(
                 title: "Mac 本地应用".localized,
                 subtitle: localAppsSubtitle,
-                icon: "macmini",
+                icon: "desktopcomputer",
+                iconColumnWidth: 40,
                 actionButtonText: "＋",
                 onAction: addCustomLocalScanPath,
                 onRefresh: { scanLocalApps() },
@@ -837,8 +878,10 @@ struct ContentView: View {
                         )
                         .tag(app.id)
                         .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)) // Add spacing around rows
+                        .modifier(RowSeparatorVisibility())
                     }
                     .listStyle(.plain)
+                    .modifier(TransparentListBackground())
                 }
             }
 
@@ -861,13 +904,15 @@ struct ContentView: View {
                 title: "外部应用库".localized,
                 subtitle: externalDriveURL?.path ?? "未选择".localized,
                 icon: "externaldrive.fill",
+                iconColumnWidth: 40,
+                tint: .teal,
                 actionButtonText: "选择文件夹".localized,
                 onAction: { _ = openPanelForExternalDrive() },
                 onRefresh: { scanExternalApps() }
             )
 
         ZStack {
-            Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
+            Color(nsColor: .controlBackgroundColor).ignoresSafeArea()
 
             if externalDriveURL == nil {
                 VStack(spacing: 12) {
@@ -903,16 +948,15 @@ struct ContentView: View {
                     )
                     .tag(app.id)
                     .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+                    .modifier(RowSeparatorVisibility())
                 }
                 .listStyle(.plain)
+                .modifier(TransparentListBackground())
             }
         }
 
         // 双按钮底部栏
         VStack(spacing: 0) {
-            Divider()
-                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: -1)
-
             HStack(spacing: 8) {
                 Button(action: performLinkIn) {
                     HStack(spacing: 6) {
@@ -947,7 +991,7 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .background(.bar)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
     .frame(minWidth: 320, maxWidth: .infinity)
     }
@@ -1010,15 +1054,26 @@ struct ContentView: View {
             }
 
             Button(action: { dataDirsRefreshTrigger += 1 }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 14, weight: .medium))
-                    .rotationEffect(.degrees(isDataDirsScanning ? 360 : 0))
-                    .animation(isDataDirsScanning ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isDataDirsScanning)
+                Group {
+                    if isDataDirsScanning {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                }
+                .frame(width: 16, height: 16)
+                .frame(width: 30, height: 30)
+                .background(Color.primary.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
             .disabled(isDataDirsScanning)
             .help("刷新列表".localized)
+            .accessibilityLabel(isDataDirsScanning ? "正在扫描...".localized : "刷新列表".localized)
         }
     }
 
@@ -1029,27 +1084,34 @@ struct ContentView: View {
         let isSelected: Bool
         let action: () -> Void
 
+        @State private var isHovered = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
         var body: some View {
             Button(action: action) {
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
                     if let systemImage {
                         Image(systemName: systemImage)
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                     }
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
                 }
                 .foregroundColor(isSelected ? .accentColor : .secondary)
-                .padding(.horizontal, systemImage == nil ? 14 : 12)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 12)
+                .frame(height: 30)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(isSelected ? Color(nsColor: .windowBackgroundColor) : Color.clear)
-                        .shadow(color: isSelected ? Color.black.opacity(0.12) : Color.clear, radius: 2, x: 0, y: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected
+                              ? Color.accentColor.opacity(0.12)
+                              : (isHovered ? Color.primary.opacity(0.04) : .clear))
                 )
-                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .onHover { isHovered = $0 }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isHovered)
         }
     }
 

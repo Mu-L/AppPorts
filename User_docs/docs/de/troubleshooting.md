@@ -24,7 +24,7 @@ Reparatur: Containerdaten wiederherstellen → aus offizieller Quelle neu instal
 | Externer Speicher verwendet kein APFS | exFAT / NTFS / HFS+ | Du kannst alles so belassen: Containerdaten bleiben lokal, anderes lässt sich weiter migrieren. Verwende später ein anderes APFS-Laufwerk oder [bereite APFS vor](/de/why-apfs#prepare-apfs). Systemwerkzeuge können exFAT nicht direkt verkleinern |
 | Externer Speicher ist verschlüsselt | Verschlüsseltes APFS; das neue Volume übernimmt das Passwort nicht | So belassen oder unverschlüsseltes APFS wählen. Siehe [Verschlüsselte externe Laufwerke](/de/why-apfs#encrypted-drives) |
 | Zu wenig Platz | Extern bei Migration oder lokal bei Wiederherstellung | Platz schaffen und erneut versuchen. Die Prüfung erfolgt vor Volumeerstellung oder Kopieren; keine Daten wurden verändert |
-| Festplattenbefehl fehlgeschlagen … `kDAReturnNotPrivileged` | Ältere Systeme wie macOS 12 erlauben normalen Nutzern keine eigenen Mountpfade | AppPorts versucht es mit dem Administratorpasswortdialog erneut. Vor 1.8.2 gab es diesen Schritt nicht |
+| Festplattenbefehl fehlgeschlagen … `kDAReturnNotPrivileged` | Ältere Systeme wie macOS 12 erlauben normalen Nutzern keine eigenen Mountpfade | AppPorts versucht es mit dem Administratorpasswortdialog erneut. Vor 1.9.0 gab es diesen Schritt nicht |
 | Administratorautorisierung abgebrochen | Passwortdialog abgebrochen | Vorgang erneut ausführen |
 | Mountpunkt ist nicht leer | Die App hat ohne eingebundenes Volume lokal Dateien geschrieben | Dateien verschieben, dann „Einbinden“ wählen |
 | Prüfung nach dem Einbinden fehlgeschlagen | Volume liegt nicht am erwarteten Pfad | Diagnosepaket exportieren und ein Issue melden |

@@ -28,12 +28,12 @@ Scan the code with WeChat to sponsor. **There is no minimum amount** — give wh
 
 ## Leave your nickname and link
 
-When sponsoring, please leave your **nickname** and a **link** in the message — a GitHub profile, a personal blog, a social account, anything works.
+When sponsoring, please leave your **nickname** in the message. A **link is optional** — a GitHub profile, personal blog, or social account all work.
 
 We will then list the nickname and link both above and on the **About AppPorts** page. Thank you for every bit of support.
 
 ::: tip Prefer to stay anonymous?
-If no nickname or link is provided, we will not display any information.
+Without a nickname, we do not display sponsorship information. If you provide a nickname without a link, we show the nickname as plain text.
 :::
 
 ## Display order

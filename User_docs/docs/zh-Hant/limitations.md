@@ -79,7 +79,7 @@ App Store 應用程式或 root 所有的應用程式可能因 macOS 權限無法
 :::
 
 ::: warning 容器資料只能掛載遷移
-`~/Library/Containers/` 與 `~/Library/Group Containers/` 裡的資料用符號連結搬走後沙盒應用程式讀不到；舊版本靠重簽名繞過，代價是應用程式在 macOS 27 上可能無法開啟。1.8.2 起這兩類目錄只提供[掛載遷移](/zh-Hant/datamigrae/mount-migration)，並對沙盒應用程式一律拒絕重簽名。來龍去脈見[容器資料、沙盒與簽名身分](/zh-Hant/datamigrae/container-identity)。
+`~/Library/Containers/` 與 `~/Library/Group Containers/` 裡的資料用符號連結搬走後沙盒應用程式讀不到；舊版本靠重簽名繞過，代價是應用程式在 macOS 27 上可能無法開啟。1.9.0 起這兩類目錄只提供[掛載遷移](/zh-Hant/datamigrae/mount-migration)，並對沙盒應用程式一律拒絕重簽名。來龍去脈見[容器資料、沙盒與簽名身分](/zh-Hant/datamigrae/container-identity)。
 :::
 
 ::: warning 自訂目錄範圍

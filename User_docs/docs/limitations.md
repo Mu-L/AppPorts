@@ -79,7 +79,7 @@ App Store 应用或 root 所有的应用可能因 macOS 权限无法由 AppPorts
 :::
 
 ::: warning 容器数据只能挂载迁移
-`~/Library/Containers/` 与 `~/Library/Group Containers/` 里的数据用符号链接搬走后沙盒应用读不到；旧版本靠重签名绕过，代价是应用在 macOS 27 上可能无法打开。1.8.2 起这两类目录只提供[挂载迁移](/datamigrae/mount-migration)，并对沙盒应用一律拒绝重签名。来龙去脉见[容器数据、沙盒与签名身份](/datamigrae/container-identity)。
+`~/Library/Containers/` 与 `~/Library/Group Containers/` 里的数据用符号链接搬走后沙盒应用读不到；旧版本靠重签名绕过，代价是应用在 macOS 27 上可能无法打开。1.9.0 起这两类目录只提供[挂载迁移](/datamigrae/mount-migration)，并对沙盒应用一律拒绝重签名。来龙去脉见[容器数据、沙盒与签名身份](/datamigrae/container-identity)。
 :::
 
 ::: warning 自定义目录范围

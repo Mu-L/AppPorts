@@ -5,7 +5,7 @@ outline: deep
 # Why External Drives Must Use APFS
 
 ::: tip The key point
-Starting with 1.8.2, AppPorts migrates `~/Library/Containers/` data, such as WeChat chat history, by creating a volume in the external drive's APFS container and attaching it directly to the original directory. Only an APFS external drive supports this approach. We also tested disk images as a workaround for exFAT / NTFS drives, but **unplugging the drive made the entire image unusable**, so that option is not offered.
+Starting with 1.9.0, AppPorts migrates `~/Library/Containers/` data, such as WeChat chat history, by creating a volume in the external drive's APFS container and attaching it directly to the original directory. Only an APFS external drive supports this approach. We also tested disk images as a workaround for exFAT / NTFS drives, but **unplugging the drive made the entire image unusable**, so that option is not offered.
 
 **If your external drive is not APFS, you do not have to change it now.** Apps and ordinary data directories can still be migrated; leave container data on this Mac and use the apps normally. When you want to migrate container data later, follow [Prepare an APFS External Drive](#prepare-apfs). Free space inside an exFAT partition does not mean you can split off a new partition directly.
 :::

@@ -79,7 +79,7 @@ WeChat のチャット履歴、仮想マシンイメージ、ゲームライブ�
 :::
 
 ::: warning コンテナデータにはマウント移行を使用します
-`~/Library/Containers/` と `~/Library/Group Containers/` のデータをシンボリックリンクで移すと、サンドボックスアプリから読めなくなります。旧版は再署名で回避していましたが、macOS 27 でアプリが開けなくなる可能性があります。1.8.2 以降はこの 2 種類のディレクトリに[マウント移行](/ja/datamigrae/mount-migration)のみを提供し、サンドボックスアプリの再署名を一律で拒否します。[コンテナデータ、サンドボックスと署名 ID](/ja/datamigrae/container-identity)を参照してください。
+`~/Library/Containers/` と `~/Library/Group Containers/` のデータをシンボリックリンクで移すと、サンドボックスアプリから読めなくなります。旧版は再署名で回避していましたが、macOS 27 でアプリが開けなくなる可能性があります。1.9.0 以降はこの 2 種類のディレクトリに[マウント移行](/ja/datamigrae/mount-migration)のみを提供し、サンドボックスアプリの再署名を一律で拒否します。[コンテナデータ、サンドボックスと署名 ID](/ja/datamigrae/container-identity)を参照してください。
 :::
 
 ::: warning カスタムディレクトリの対象範囲

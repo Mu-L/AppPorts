@@ -1,0 +1,120 @@
+import XCTest
+@testable import AppPorts
+
+final class DataDirSpaceSummaryTests: XCTestCase {
+    func testProtectedWeChatParentsDoNotHideOrInflateMigratableChildren() {
+        let items = [
+            item("/Data/Documents", bytes: 9000, migratable: false),
+            item("/Data/Documents/xwechat_files", bytes: 6000, migratable: false),
+            item("/Data/Documents/xwechat_files/account", bytes: 5000),
+            item("/Data/Documents/xwechat_files/Backup", bytes: 1000),
+            item("/Data/Library", bytes: 4000, migratable: false),
+            item("/Data/Library/Application Support", bytes: 3500, migratable: false),
+            item("/Data/Library/Application Support/com.tencent.xinWeChat", bytes: 3000)
+        ]
+
+        let summary = DataDirSpaceSummary(items: items, allItems: items)
+
+        XCTAssertEqual(summary.reclaimableBytes, 9000)
+        XCTAssertFalse(summary.isCalculating)
+        XCTAssertFalse(summary.isIncomplete)
+    }
+
+    func testParentsChildrenAndDuplicatePathsAreCountedOnce() {
+        let parent = item("/Data/Cache", bytes: 1000)
+        let child = item("/Data/Cache/Images", bytes: 800)
+        let other = item("/Data/CacheBackup", bytes: 500)
+        let items = [child, parent, other, parent]
+
+        XCTAssertEqual(DataDirSpaceSummary(items: items, allItems: items).reclaimableBytes, 1500)
+    }
+
+    func testMountedDescendantsDoNotReduceAlreadyLocalParentMeasurement() {
+        let items = [
+            item("/Data", bytes: 1000),
+            item("/Data/External", bytes: 800, status: DataDirStatus.mounted),
+            item("/Data/External/Nested", bytes: 100, status: DataDirStatus.mounted),
+            item("/Data/External/AppData", bytes: 200)
+        ]
+
+        XCTAssertEqual(DataDirSpaceSummary(items: items, allItems: items).reclaimableBytes, 1000)
+    }
+
+    func testFilteringToAChildOfAnExternalDirectoryDoesNotMakeItReclaimable() {
+        let child = item("/Data/Linked/account", bytes: 1000)
+        for status in [DataDirStatus.linked, DataDirStatus.existingSymlink, DataDirStatus.mounted] {
+            let parent = item("/Data/Linked", bytes: 2000, status: status)
+            let summary = DataDirSpaceSummary(items: [child], allItems: [parent, child])
+            XCTAssertEqual(summary.reclaimableBytes, 0, status)
+        }
+    }
+
+    func testFilteringToAMigratableChildOnlyCountsTheMatchingData() {
+        let parent = item("/Data", bytes: 2000)
+        let child = item("/Data/Images", bytes: 1000)
+
+        XCTAssertEqual(DataDirSpaceSummary(items: [child], allItems: [parent, child]).reclaimableBytes, 1000)
+    }
+
+    func testUnavailableLocalSizeMakesSummaryIncomplete() {
+        var parent = item("/Data", bytes: 1000)
+        parent.sizeIsIncomplete = true
+        XCTAssertTrue(DataDirSpaceSummary(items: [parent], allItems: [parent]).isIncomplete)
+    }
+
+    func testUnreadableDiscoveryPreventsSmallVisibleDirectoriesFromLookingComplete() {
+        let cache = item("/Library/Caches/com.tencent.xinWeChat", bytes: 353_000)
+        let summary = DataDirSpaceSummary(items: [cache], allItems: [cache], hasReadIssues: true)
+        XCTAssertTrue(summary.isIncomplete)
+    }
+
+    func testPendingMeasurementIsCalculatingAndRemainsVisible() {
+        var pending = item("/Data", bytes: 0)
+        pending.size = nil
+
+        XCTAssertTrue(DataDirSpaceSummary(items: [pending], allItems: [pending]).isCalculating)
+        XCTAssertFalse(pending.isEmptyLocalDirectory)
+    }
+
+    func testZeroByteFilterOnlyHidesConfirmedEmptyLocalDirectories() {
+        XCTAssertTrue(item("/Data/Empty", bytes: 0).isEmptyLocalDirectory)
+        XCTAssertFalse(item("/Data/Small", bytes: 1).isEmptyLocalDirectory)
+
+        var unreadable = item("/Data/Restricted", bytes: 0)
+        unreadable.applySize(DirectorySizeResult(readIssues: [
+            DataDirReadIssue(url: unreadable.path, error: CocoaError(.fileReadNoPermission))
+        ]))
+        XCTAssertFalse(unreadable.isEmptyLocalDirectory)
+
+        for status in [DataDirStatus.linked, DataDirStatus.existingSymlink, DataDirStatus.pendingRelink,
+                       DataDirStatus.mounted, DataDirStatus.pendingMount, DataDirStatus.volumeMissing] {
+            XCTAssertFalse(item("/Data/Managed", bytes: 0, status: status).isEmptyLocalDirectory, status)
+        }
+    }
+
+    func testZeroByteFilteringKeepsTheAncestorsOfNonemptyChildren() {
+        let parent = item("/Data", bytes: 0)
+        let child = item("/Data/Files", bytes: 512)
+        let empty = item("/Data/Empty", bytes: 0)
+        let items = [parent, child, empty]
+        let matches = Set(items.filter { !$0.isEmptyLocalDirectory }.map(\.id))
+
+        let tree = DataDirTree.retainingMatches(in: DataDirTree.build(from: items), matchingIDs: matches)
+
+        XCTAssertEqual(DataDirTree.rows(in: tree).map(\.id), [parent.id, child.id])
+    }
+
+    private func item(_ path: String, bytes: Int64, status: String = DataDirStatus.local, migratable: Bool = true) -> DataDirItem {
+        var item = DataDirItem(
+            name: URL(fileURLWithPath: path).lastPathComponent,
+            path: URL(fileURLWithPath: path),
+            type: .containers,
+            priority: .critical,
+            description: "",
+            status: status,
+            isMigratable: migratable
+        )
+        item.applySize(DirectorySizeResult(bytes: bytes))
+        return item
+    }
+}

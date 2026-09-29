@@ -9,7 +9,7 @@ outline: deep
 ::: warning Re-signing is not a general repair tool
 Ad-hoc re-signing replaces the developer signature and removes sandbox, app group, and Keychain entitlements. For sandboxed apps such as WeChat and App Store apps, this can prevent opening on macOS 27 and may lose login sessions. The new version first saves a complete original app, allowing the signature and entitlements to be restored later. Restoring a signature does not guarantee recovery of login sessions already lost.
 
-Starting with 1.8.2, AppPorts refuses to re-sign sandboxed apps by default. It is allowed only after enabling classic mode and confirming the risks. Container data now uses [mount migration](/en/datamigrae/mount-migration), without signature changes. See [Container Data, Sandboxing, and Signing Identity](/en/datamigrae/container-identity) for the background.
+Starting with 1.9.0, AppPorts refuses to re-sign sandboxed apps by default. It is allowed only after enabling classic mode and confirming the risks. Container data now uses [mount migration](/en/datamigrae/mount-migration), without signature changes. See [Container Data, Sandboxing, and Signing Identity](/en/datamigrae/container-identity) for the background.
 :::
 
 ## What Re-signing Solves

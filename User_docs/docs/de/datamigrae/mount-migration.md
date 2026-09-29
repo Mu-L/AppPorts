@@ -5,7 +5,7 @@ outline: deep
 # Mount-Migration: Containerdaten auf ein externes Laufwerk verschieben
 
 ::: tip Kurz erklärt
-Daten in `~/Library/Containers/` und `~/Library/Group Containers/`, etwa WeChat-Chats, QQ Music-Caches und Daten von App Store-Apps, lassen sich nicht über symbolische Links auslagern. Seit AppPorts 1.8.2 wird dafür ein eigenes APFS-Datenvolume auf dem externen Laufwerk erstellt. AppPorts kopiert die Daten hinein und **bindet das Volume im ursprünglichen Ordner ein**. Der sichtbare Pfad und die App-Signatur bleiben unverändert.
+Daten in `~/Library/Containers/` und `~/Library/Group Containers/`, etwa WeChat-Chats, QQ Music-Caches und Daten von App Store-Apps, lassen sich nicht über symbolische Links auslagern. Seit AppPorts 1.9.0 wird dafür ein eigenes APFS-Datenvolume auf dem externen Laufwerk erstellt. AppPorts kopiert die Daten hinein und **bindet das Volume im ursprünglichen Ordner ein**. Der sichtbare Pfad und die App-Signatur bleiben unverändert.
 
 Drei Voraussetzungen: Das externe Laufwerk verwendet unverschlüsseltes APFS; beim ersten Öffnen der App erlaubst du den Zugriff; vor dem Öffnen schließt du das Laufwerk an.
 :::

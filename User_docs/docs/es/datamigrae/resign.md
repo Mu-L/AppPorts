@@ -9,7 +9,7 @@ outline: deep
 ::: warning Volver a firmar no es una solución universal
 Volver a firmar con Ad-hoc sustituye la firma del desarrollador y elimina los derechos de aislamiento, grupos de apps y llavero. Una app aislada, como WeChat o una app de App Store, podría no abrirse en macOS 27 y perder su sesión. La nueva versión guarda primero la app original completa para restaurar su firma y derechos; restaurar la firma no garantiza recuperar una sesión que ya se haya perdido.
 
-Desde la versión 1.8.2, AppPorts rechaza por defecto volver a firmar apps aisladas. Solo se permite al activar el modo clásico y confirmar los riesgos. Los datos de contenedores usan [migración por montaje](/es/datamigrae/mount-migration), sin modificar la firma. Consulte [Datos de contenedores, aislamiento e identidad de firma](/es/datamigrae/container-identity).
+Desde la versión 1.9.0, AppPorts rechaza por defecto volver a firmar apps aisladas. Solo se permite al activar el modo clásico y confirmar los riesgos. Los datos de contenedores usan [migración por montaje](/es/datamigrae/mount-migration), sin modificar la firma. Consulte [Datos de contenedores, aislamiento e identidad de firma](/es/datamigrae/container-identity).
 :::
 
 ## Qué problema resuelve volver a firmar

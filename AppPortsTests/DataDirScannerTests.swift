@@ -587,6 +587,97 @@ final class DataDirScannerTests: XCTestCase {
 
     // MARK: - 目录大小缓存
 
+    func testFreshMeasurementIncludesWritesWhileFileRemainsOpen() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let directory = workspace.homeURL.appendingPathComponent("ActiveData")
+        try createDirectoryWithPayload(at: directory)
+        XCTAssertEqual(fastDirectorySize(at: directory), 7)
+
+        let handle = try FileHandle(forWritingTo: directory.appendingPathComponent("payload.txt"))
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(repeating: 1, count: 4096))
+
+        let result = measureDirectorySize(at: directory, useCache: false)
+        XCTAssertTrue(result.isComplete)
+        XCTAssertEqual(result.bytes, 4103)
+        XCTAssertEqual(fastDirectorySize(at: directory), 4103)
+    }
+
+    func testUnreadableDirectoryIsNotReportedOrCachedAsEmpty() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let directory = workspace.homeURL.appendingPathComponent("ProtectedData")
+        try createDirectoryWithPayload(at: directory)
+        try fileManager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: directory.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path) }
+        guard !fileManager.isReadableFile(atPath: directory.path) else {
+            throw XCTSkip("当前进程可绕过测试目录的文件权限")
+        }
+
+        let result = measureDirectorySize(at: directory)
+        XCTAssertFalse(result.isComplete)
+        XCTAssertEqual(result.bytes, 0)
+        XCTAssertTrue(result.readIssues.contains(where: \.isPermissionDenied))
+
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        let retried = measureDirectorySize(at: directory)
+        XCTAssertTrue(retried.isComplete)
+        XCTAssertEqual(retried.bytes, 7)
+    }
+
+    func testPartialDirectorySizeIsNotCachedAsACompleteResult() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let directory = workspace.homeURL.appendingPathComponent("MixedData")
+        let protected = directory.appendingPathComponent("Protected")
+        try createDirectoryWithPayload(at: directory)
+        try createDirectoryWithPayload(at: protected)
+        try fileManager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: protected.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: protected.path) }
+        guard !fileManager.isReadableFile(atPath: protected.path) else {
+            throw XCTSkip("当前进程可绕过测试目录的文件权限")
+        }
+
+        let partial = measureDirectorySize(at: directory)
+        XCTAssertFalse(partial.isComplete)
+        XCTAssertEqual(partial.bytes, 7)
+
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: protected.path)
+        let retried = measureDirectorySize(at: directory)
+        XCTAssertTrue(retried.isComplete)
+        XCTAssertEqual(retried.bytes, 14)
+    }
+
+    func testSizeMeasurementDistinguishesMissingAndEmptyDirectories() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let empty = workspace.homeURL.appendingPathComponent("Empty")
+        try fileManager.createDirectory(at: empty, withIntermediateDirectories: true)
+
+        let emptyResult = measureDirectorySize(at: empty)
+        let missingResult = measureDirectorySize(at: workspace.homeURL.appendingPathComponent("Missing"))
+        XCTAssertEqual(emptyResult.bytes, 0)
+        XCTAssertTrue(emptyResult.isComplete)
+        XCTAssertEqual(missingResult.bytes, 0)
+        XCTAssertFalse(missingResult.isComplete)
+    }
+
+    func testSizeMeasurementDoesNotFollowNestedSymlinks() throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let local = workspace.homeURL.appendingPathComponent("Local")
+        let external = workspace.externalRootURL.appendingPathComponent("ExternalData")
+        try createDirectoryWithPayload(at: local)
+        try createDirectoryWithPayload(at: external)
+        try fileManager.createSymbolicLink(at: local.appendingPathComponent("Linked"), withDestinationURL: external)
+
+        let result = measureDirectorySize(at: local)
+        XCTAssertTrue(result.isComplete)
+        XCTAssertEqual(result.bytes, 7)
+    }
+
     func testNestedDirectoryChangesInvalidateEveryAncestorInBothMountStates() throws {
         let workspace = try makeWorkspace()
         defer { cleanupWorkspace(workspace.rootURL) }
@@ -866,6 +957,35 @@ final class DataDirScannerTests: XCTestCase {
     }
 
     // MARK: - 微信容器扫描策略测试
+
+    func testUnreadableWeChatContainerReportsIncompleteScanAndCanBeRetried() async throws {
+        let workspace = try makeWorkspace()
+        defer { cleanupWorkspace(workspace.rootURL) }
+        let appURL = try createAppBundle(named: "WeChat.app", bundleID: "com.tencent.xinWeChat", in: workspace.appsURL)
+        let dataURL = workspace.homeURL.appendingPathComponent("Library/Containers/com.tencent.xinWeChat/Data")
+        let accountURL = dataURL.appendingPathComponent("Documents/xwechat_files/account")
+        let cacheURL = workspace.homeURL.appendingPathComponent("Library/Caches/com.tencent.xinWeChat")
+        try createDirectoryWithPayload(at: accountURL)
+        try createDirectoryWithPayload(at: cacheURL)
+        try fileManager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: dataURL.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dataURL.path) }
+        guard !fileManager.isReadableFile(atPath: dataURL.path) else {
+            throw XCTSkip("当前进程可绕过测试目录的文件权限")
+        }
+
+        let scanner = DataDirScanner(homeDir: workspace.homeURL)
+        let app = AppItem(name: "WeChat.app", path: appURL, status: "本地")
+        let partial = await scanner.scanLibraryDirsWithDiagnostics(for: app)
+        XCTAssertTrue(partial.items.contains { $0.path.resolvingSymlinksInPath() == cacheURL.resolvingSymlinksInPath() })
+        XCTAssertTrue(partial.readIssues.contains {
+            $0.url.resolvingSymlinksInPath() == dataURL.resolvingSymlinksInPath() && $0.isPermissionDenied
+        })
+
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dataURL.path)
+        let retried = await scanner.scanLibraryDirsWithDiagnostics(for: app)
+        XCTAssertTrue(retried.readIssues.isEmpty)
+        XCTAssertTrue(retried.items.contains { $0.path.resolvingSymlinksInPath() == accountURL.resolvingSymlinksInPath() })
+    }
 
     func testWeChatContainerOnlySurfacesDocumentsAndLibraryAtDataLevel() async throws {
         let workspace = try makeWorkspace()

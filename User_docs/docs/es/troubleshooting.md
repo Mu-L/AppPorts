@@ -24,7 +24,7 @@ Reparación: restaurar datos de contenedores → reinstalar desde una fuente ofi
 | El almacenamiento externo no es APFS | Disco exFAT / NTFS / HFS+ | Deje los contenedores en el Mac y migre el resto normalmente. Para migrarlos, use otro disco APFS o siga la [preparación](/es/why-apfs#prepare-apfs). Las herramientas integradas no reducen exFAT directamente |
 | Almacenamiento externo encriptado | APFS encriptado; el nuevo volumen no heredaría la contraseña | Dejar como está o elegir APFS sin encriptar; consulte [Discos encriptados](/es/why-apfs#encrypted-drives) |
 | Espacio insuficiente | Falta espacio externo para migrar o local para restaurar | Libere espacio y reintente. Se comprueba antes de crear el volumen o copiar; ningún dato ha cambiado |
-| Fallo de comando de disco … `kDAReturnNotPrivileged` | Sistemas antiguos como macOS 12 no permiten al usuario montar en rutas personalizadas | AppPorts reintenta con un diálogo de administrador. Introduzca la contraseña; este paso no existía antes de 1.8.2 |
+| Fallo de comando de disco … `kDAReturnNotPrivileged` | Sistemas antiguos como macOS 12 no permiten al usuario montar en rutas personalizadas | AppPorts reintenta con un diálogo de administrador. Introduzca la contraseña; este paso no existía antes de 1.9.0 |
 | Autorización de administrador cancelada | Se canceló el diálogo de contraseña | Repita la operación |
 | Punto de montaje no vacío | La app escribió archivos locales sin el volumen | Muévalos y pulse «Montar» |
 | Verificación posterior al montaje fallida | El volumen está montado en otra ruta | Exporte un diagnóstico y abra una Issue |

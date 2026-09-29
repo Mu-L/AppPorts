@@ -151,7 +151,7 @@ AppPorts/
 | Setting | Value |
 |---------|-------|
 | Bundle ID | `com.shimoko.AppPorts` |
-| Marketing Version | `1.8.2` (`MARKETING_VERSION` in `project.pbxproj`) |
+| Marketing Version | `1.9.0` (`MARKETING_VERSION` in `project.pbxproj`) |
 | Deployment Target | macOS 12.0 (Monterey) |
 | Swift Version | 5.0 |
 | App Sandbox | **Disabled** (required for /Applications access) |
@@ -161,7 +161,7 @@ AppPorts/
 | Entitlements | None (no sandbox) |
 | UI Framework | SwiftUI views with AppKit window management (no storyboards/xibs) |
 
-Release notes for the `1.8.1` update live in `RELEASE_NOTES_1.8.1.md`. The project now declares version `1.8.2`, build `2`; the `1.8.1` notes describe the prior release and do not create a release tag. Keep the Chinese and English notes aligned and begin each with a short user-facing summary. Icon explorations under `design/icon-exploration/` are drafts, not a shipped app-icon replacement.
+Release notes for the previous `1.8.1` update live in `RELEASE_NOTES_1.8.1.md`; the upcoming `1.9.0` notes live in `RELEASE_NOTES_1.9.0.md`. The project now declares version `1.9.0`, build `21`. The upcoming notes are a draft and do not create a release tag. Keep the Chinese and English notes aligned and begin each with a short user-facing summary. Icon explorations under `design/icon-exploration/` are drafts, not a shipped app-icon replacement.
 
 ### Core Pattern: Actor-based Concurrency
 
@@ -334,6 +334,9 @@ Missing targets, malformed portals, and cycles fail before signing or backing up
 - Launching a migrated app from its repaired Dock pin requires the external drive. Changing the independent local stub does not modify the external app bundle.
 
 ### About Window and Updates
+
+- The published `https://docs-appports.shimoko.com/sponsors.json` is authoritative: every successful response replaces the sponsor list and disk cache, including an empty list, regardless of `updatedAt`. Only request or decoding failures fall back to the last successful cache, then the bundled JSON. `updatedAt` is informational, not a source-priority rule. The repository-root `sponsors.json` supplies both the Xcode bundle resource and the documentation site's root JSON; local edits reach online users after deploying the documentation site. Rebuilding AppPorts only updates its bundled fallback.
+- A sponsor's `link` is optional (empty or omitted). Display an unlinked name as plain text. Amounts remain website-only, with up to two decimal places. Keep the sponsor acknowledgments in both READMEs in sync, and run `SponsorsTests` after changes to sponsor loading.
 
 - `AboutWindowController` hosts SwiftUI in a reusable, resizable AppKit window on macOS 12+. Closing About does not release it; opening it again restores the same window, including from a minimized state.
 - Show the app icon, name, description, version/build, project links, text-only contributor links, update section, copyright, and Apache License 2.0 link. Contributors must not have avatars or decorative icons.

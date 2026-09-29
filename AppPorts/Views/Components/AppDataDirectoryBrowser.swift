@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 目录行直接提供操作，选中详情用于查看完整路径。
 struct AppDataDirectoryBrowser<Actions: View>: View {
@@ -10,7 +11,11 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
     @State private var selectedItemID: String?
     @State private var collapsedDirectoryIDs: Set<String> = []
     @State private var collapsedGroups: Set<DataDirType> = []
+    @State private var informationPanelHeight: CGFloat = 160
+    @State private var informationResizeStartHeight: CGFloat?
+    @State private var isInformationHandleHovered = false
     @FocusState private var isOutlineFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var allRows: [DataDirTree.Row] {
         groups.flatMap { DataDirTree.rows(in: $0.items) }
@@ -25,10 +30,96 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
         allRows.first { $0.id == selectedItemID }?.item
     }
 
+    private var isFullyExpanded: Bool {
+        groups.allSatisfy { !collapsedGroups.contains($0.type) }
+            && allRows.allSatisfy { $0.item.children.isEmpty || !collapsedDirectoryIDs.contains($0.id) }
+    }
+
+    private var outlineAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.22)
+    }
+
     var body: some View {
+        GeometryReader { geometry in
+            let panelHeight = clampedInformationHeight(informationPanelHeight, availableHeight: geometry.size.height)
+
+            VStack(spacing: 0) {
+                directoryOutline
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                informationResizeHandle(panelHeight: panelHeight, availableHeight: geometry.size.height)
+
+                informationPanel(height: panelHeight)
+                    .frame(height: panelHeight)
+            }
+            .coordinateSpace(name: "directoryInformationResize")
+        }
+        .frame(minHeight: DirectoryPanelLayout.minimumOutlineHeight + DirectoryPanelLayout.minimumInformationHeight + DirectoryPanelLayout.handleHeight)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .onChange(of: isFiltering) { isFiltering in
+            if isFiltering { expandAll() }
+        }
+        .onChange(of: matchingItemIDs) { _ in
+            if isFiltering { expandAll() }
+            if selectedItem == nil { selectedItemID = nil }
+        }
+    }
+
+    private func clampedInformationHeight(_ height: CGFloat, availableHeight: CGFloat) -> CGFloat {
+        let maximum = max(
+            DirectoryPanelLayout.minimumInformationHeight,
+            min(DirectoryPanelLayout.maximumInformationHeight,
+                availableHeight - DirectoryPanelLayout.minimumOutlineHeight - DirectoryPanelLayout.handleHeight)
+        )
+        return min(max(height, DirectoryPanelLayout.minimumInformationHeight), maximum)
+    }
+
+    private func informationResizeHandle(panelHeight: CGFloat, availableHeight: CGFloat) -> some View {
+        Capsule()
+            .fill(Color.primary.opacity(isInformationHandleHovered || informationResizeStartHeight != nil ? 0.45 : 0.25))
+            .frame(width: 32, height: 3)
+            .frame(maxWidth: .infinity)
+            .frame(height: DirectoryPanelLayout.handleHeight)
+            .background(Color.primary.opacity(0.03))
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                isInformationHandleHovered = hovering
+                if hovering { NSCursor.resizeUpDown.set() }
+                else { NSCursor.arrow.set() }
+            }
+            .onDisappear {
+                if isInformationHandleHovered { NSCursor.arrow.set() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("directoryInformationResize"))
+                    .onChanged { value in
+                        let startHeight = informationResizeStartHeight ?? panelHeight
+                        informationResizeStartHeight = startHeight
+                        informationPanelHeight = clampedInformationHeight(
+                            startHeight - value.translation.height,
+                            availableHeight: availableHeight
+                        )
+                    }
+                    .onEnded { _ in informationResizeStartHeight = nil }
+            )
+            .help("调整信息栏高度".localized)
+            .accessibilityElement()
+            .accessibilityLabel("调整信息栏高度".localized)
+            .accessibilityValue(Text(verbatim: String(Int(panelHeight))))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    informationPanelHeight = clampedInformationHeight(panelHeight + 20, availableHeight: availableHeight)
+                case .decrement:
+                    informationPanelHeight = clampedInformationHeight(panelHeight - 20, availableHeight: availableHeight)
+                @unknown default: break
+                }
+            }
+    }
+
+    private var directoryOutline: some View {
         VStack(spacing: 0) {
             columnHeader
-            Divider()
 
             ScrollViewReader { proxy in
                 List(selection: $selectedItemID) {
@@ -51,12 +142,14 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
                                         Button("在 Finder 中显示".localized) { reveal(row.item) }
                                         Button("复制路径".localized) { copyPath(row.item) }
                                     }
-                                    .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
+                                    .listRowInsets(EdgeInsets(top: 3, leading: 4, bottom: 3, trailing: 4))
+                                    .modifier(DirectorySeparatorVisibility())
                                 }
                             }
                         } header: {
                             groupHeader(group)
                         }
+                        .modifier(DirectorySeparatorVisibility())
                     }
                 }
                 .listStyle(.inset)
@@ -75,52 +168,46 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
                     if id != nil { isOutlineFocused = true }
                 }
             }
+        }
+    }
 
-            Divider()
-            Group {
-                if let selectedItem {
-                    details(for: selectedItem)
-                } else {
-                    Label("选择目录以查看完整路径".localized, systemImage: "info.circle")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                }
+    private func informationPanel(height: CGFloat) -> some View {
+        Group {
+            if let selectedItem {
+                details(for: selectedItem, isCompact: height < 88)
+            } else {
+                Label("选择目录以查看完整路径".localized, systemImage: "info.circle")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(16)
             }
-            // Selection and differing path lengths must not resize the list above.
-            .frame(height: 104)
-            .background(.regularMaterial)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
-        .onChange(of: matchingItemIDs) { _ in
-            if isFiltering { expandAll() }
-            if selectedItem == nil { selectedItemID = nil }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.primary.opacity(0.03))
     }
 
     private var columnHeader: some View {
         HStack(spacing: 12) {
-            Text("名称".localized)
-            Spacer(minLength: 4)
-            HStack(spacing: 8) {
-                Button(action: expandAll) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+            HStack(spacing: 6) {
+                Button {
+                    if isFullyExpanded { collapseAll() }
+                    else { expandAll() }
+                } label: {
+                    Label(
+                        isFullyExpanded ? "折叠全部".localized : "展开全部".localized,
+                        systemImage: isFullyExpanded ? "rectangle.compress.vertical" : "rectangle.expand.vertical"
+                    )
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 11, weight: .medium))
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
-                .help("展开全部".localized)
-                .accessibilityLabel("展开全部".localized)
-                Button(action: collapseAll) {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .help("折叠全部".localized)
-                .accessibilityLabel("折叠全部".localized)
+                .buttonStyle(.plain)
+                .help(isFullyExpanded ? "折叠全部".localized : "展开全部".localized)
+                Text("名称".localized)
             }
-            .font(.system(size: 13, weight: .medium))
-            .buttonStyle(.plain)
+            Spacer(minLength: 4)
             Text("大小".localized + " · " + "状态".localized)
                 .frame(width: DirectoryRowColumns.metadataWidth, alignment: .trailing)
             Text("操作".localized)
@@ -130,54 +217,61 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
         .foregroundColor(.secondary)
         .padding(.leading, 20)
         .padding(.trailing, 36)
-        .padding(.vertical, 6)
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
+        .padding(.vertical, 4)
     }
 
     private func groupHeader(_ group: DataDirGroup) -> some View {
         Button {
-            if collapsedGroups.contains(group.type) {
-                collapsedGroups.remove(group.type)
-            } else {
-                collapsedGroups.insert(group.type)
-                if DataDirTree.rows(in: group.items).contains(where: { $0.id == selectedItemID }) {
-                    selectedItemID = nil
+            withAnimation(outlineAnimation) {
+                if collapsedGroups.contains(group.type) {
+                    collapsedGroups.remove(group.type)
+                } else {
+                    collapsedGroups.insert(group.type)
+                    if DataDirTree.rows(in: group.items).contains(where: { $0.id == selectedItemID }) {
+                        selectedItemID = nil
+                    }
                 }
             }
         } label: {
-            HStack(spacing: 7) {
-                Image(systemName: collapsedGroups.contains(group.type) ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 18)
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .rotationEffect(.degrees(collapsedGroups.contains(group.type) ? 0 : 90))
+                    .frame(width: 16)
                 Image(systemName: group.type.icon)
-                    .font(.system(size: 17))
-                    .foregroundColor(.accentColor)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                    .frame(width: 16)
                 Text(group.type.localizedTitle)
                     .fontWeight(.semibold)
-                Text("\(DataDirTree.rows(in: group.items).filter { matchingItemIDs.contains($0.id) }.count)")
+                    .foregroundColor(.primary)
+                Text(verbatim: "(\(DataDirTree.rows(in: group.items).filter { matchingItemIDs.contains($0.id) }.count))")
                     .foregroundColor(.secondary)
                     .monospacedDigit()
                 Spacer()
             }
             .font(.system(size: 13))
-            .padding(.vertical, 7)
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(collapsedGroups.contains(group.type) ? "展开目录".localized : "折叠目录".localized)
     }
 
-    private func details(for item: DataDirItem) -> some View {
+    private func details(for item: DataDirItem, isCompact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                DataDirFolderIcon(type: item.type, pointSize: 20)
-                    .foregroundColor(.accentColor)
-                Text(verbatim: item.path.lastPathComponent)
-                    .font(.system(size: 14, weight: .semibold))
+                DataDirFolderIcon(pointSize: 22)
+                Text(verbatim: isCompact ? item.path.path : item.path.lastPathComponent)
+                    .font(.system(size: isCompact ? 11 : 14, weight: isCompact ? .regular : .semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
-                PriorityBadge(priority: item.priority)
+                    .help(item.path.path)
+                if !isCompact {
+                    PriorityBadge(priority: item.priority)
+                }
                 Spacer(minLength: 4)
                 Button { reveal(item) } label: {
                     Label("在 Finder 中显示".localized, systemImage: "folder")
@@ -203,28 +297,35 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
                 .accessibilityLabel("关闭".localized)
             }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    pathLine(item.path, label: "本地路径".localized)
-                    if let destination = item.linkedDestination, destination != item.path {
-                        pathLine(destination, label: "外部路径".localized)
-                    }
-                    Text(item.description)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                    if !item.isMigratable, !DataDirStatus.mountStatuses.contains(item.status) {
-                        Label((item.nonMigratableReason ?? "此目录不支持迁移").localized, systemImage: "lock")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if !isCompact {
+                detailContent(for: item)
             }
-            .frame(maxHeight: .infinity)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, isCompact ? 8 : 12)
+    }
+
+    private func detailContent(for item: DataDirItem) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                pathLine(item.path, label: "本地路径".localized)
+                if let destination = item.linkedDestination, destination != item.path {
+                    pathLine(destination, label: "外部路径".localized)
+                }
+                Text(item.description)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                if !item.isMigratable, !DataDirStatus.mountStatuses.contains(item.status) {
+                    Label((item.nonMigratableReason ?? "此目录不支持迁移").localized, systemImage: "lock")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: .infinity)
+        .id(item.id)
     }
 
     private func pathLine(_ url: URL, label: String) -> some View {
@@ -241,25 +342,31 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
     }
 
     private func toggleDirectory(_ item: DataDirItem) {
-        if collapsedDirectoryIDs.contains(item.id) {
-            collapsedDirectoryIDs.remove(item.id)
-        } else {
-            collapsedDirectoryIDs.insert(item.id)
-            if let selectedItemID, selectedItemID.hasPrefix(item.id + "/") {
-                self.selectedItemID = item.id
+        withAnimation(outlineAnimation) {
+            if collapsedDirectoryIDs.contains(item.id) {
+                collapsedDirectoryIDs.remove(item.id)
+            } else {
+                collapsedDirectoryIDs.insert(item.id)
+                if let selectedItemID, selectedItemID.hasPrefix(item.id + "/") {
+                    self.selectedItemID = item.id
+                }
             }
         }
     }
 
     private func expandAll() {
-        collapsedGroups.removeAll()
-        collapsedDirectoryIDs.removeAll()
+        withAnimation(outlineAnimation) {
+            collapsedGroups.removeAll()
+            collapsedDirectoryIDs.removeAll()
+        }
     }
 
     private func collapseAll() {
-        collapsedGroups = Set(groups.map(\.type))
-        collapsedDirectoryIDs = Set(allRows.filter { !$0.item.children.isEmpty }.map(\.id))
-        selectedItemID = nil
+        withAnimation(outlineAnimation) {
+            collapsedGroups = Set(groups.map(\.type))
+            collapsedDirectoryIDs = Set(allRows.filter { !$0.item.children.isEmpty }.map(\.id))
+            selectedItemID = nil
+        }
     }
 
     private func moveSelection(_ direction: MoveCommandDirection) {
@@ -281,7 +388,7 @@ struct AppDataDirectoryBrowser<Actions: View>: View {
             }
         case .right:
             if collapsedDirectoryIDs.contains(row.id) {
-                collapsedDirectoryIDs.remove(row.id)
+                toggleDirectory(row.item)
             } else if let child = row.item.children.first {
                 selectedItemID = child.id
             }
@@ -304,53 +411,24 @@ private enum DirectoryRowColumns {
     static let actionsWidth: CGFloat = 128
 }
 
-private struct DataDirFolderIcon: View {
-    let type: DataDirType
-    let pointSize: CGFloat
-
-    var body: some View {
-        DataDirFolderSilhouette()
-            .frame(width: pointSize * 1.2, height: pointSize)
-            .overlay {
-                Image(systemName: type.icon)
-                    .resizable()
-                    .scaledToFit()
-                    .font(.system(size: pointSize * 0.5, weight: .semibold))
-                    .frame(width: pointSize * 0.5, height: pointSize * 0.5)
-                    .foregroundColor(.black)
-                    // Keep the entire emblem inside the face, clear of the tab.
-                    .offset(y: pointSize * 0.12)
-                    .blendMode(.destinationOut)
-            }
-            .symbolRenderingMode(.monochrome)
-            // The cutout stays legible on both blue and selected white folders.
-            .compositingGroup()
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(type.localizedTitle)
-    }
+private enum DirectoryPanelLayout {
+    static let minimumOutlineHeight: CGFloat = 160
+    static let minimumInformationHeight: CGFloat = 48
+    static let maximumInformationHeight: CGFloat = 480
+    static let handleHeight: CGFloat = 12
 }
 
-/// A solid folder face gives each type emblem room without the system symbol's horizontal cutout.
-private struct DataDirFolderSilhouette: Shape {
-    func path(in rect: CGRect) -> Path {
-        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
-        }
+private struct DataDirFolderIcon: View {
+    let pointSize: CGFloat
+    private static let folderIcon = NSWorkspace.shared.icon(for: UTType.folder)
 
-        var path = Path()
-        path.move(to: point(0, 0.15))
-        path.addQuadCurve(to: point(0.13, 0), control: point(0, 0))
-        path.addLine(to: point(0.35, 0))
-        path.addQuadCurve(to: point(0.42, 0.04), control: point(0.39, 0))
-        path.addLine(to: point(0.50, 0.16))
-        path.addLine(to: point(0.87, 0.16))
-        path.addQuadCurve(to: point(1, 0.31), control: point(1, 0.16))
-        path.addLine(to: point(1, 0.85))
-        path.addQuadCurve(to: point(0.87, 1), control: point(1, 1))
-        path.addLine(to: point(0.13, 1))
-        path.addQuadCurve(to: point(0, 0.85), control: point(0, 1))
-        path.closeSubpath()
-        return path
+    var body: some View {
+        Image(nsImage: Self.folderIcon)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: pointSize, height: pointSize)
+            .accessibilityHidden(true)
     }
 }
 
@@ -368,15 +446,16 @@ private struct AppDataDirectoryRow<Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 if row.item.children.isEmpty {
-                    Color.clear.frame(width: 20, height: 32)
+                    Color.clear.frame(width: 16, height: 28)
                 } else {
                     Button(action: onToggle) {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(isEmphasized ? .white.opacity(0.85) : .secondary)
-                            .frame(width: 20, height: 32)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            .frame(width: 16, height: 28)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -384,16 +463,13 @@ private struct AppDataDirectoryRow<Actions: View>: View {
                     .accessibilityLabel(isExpanded ? "折叠目录".localized : "展开目录".localized)
                 }
 
-                DataDirFolderIcon(type: row.item.type, pointSize: 23)
-                    .frame(width: 36, height: 36)
-                    .foregroundColor(isEmphasized ? .white : .accentColor.opacity(isContext ? 0.5 : 0.85))
-                    .background(isEmphasized ? Color.white.opacity(0.16) : Color.accentColor.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                DataDirFolderIcon(pointSize: 26)
+                    .opacity(isContext ? 0.55 : 1)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
                         Text(verbatim: row.item.path.lastPathComponent)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 14))
                             .foregroundColor(isEmphasized ? .white : (isContext ? .secondary : .primary))
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -414,25 +490,38 @@ private struct AppDataDirectoryRow<Actions: View>: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.leading, CGFloat(row.level) * 20)
+            .padding(.leading, CGFloat(row.level) * 18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(row.item.path.path)
 
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 3) {
                 Text(row.item.size ?? "计算中...".localized)
                     .font(.system(size: 13, weight: .medium))
                     .monospacedDigit()
                     .foregroundColor(isEmphasized ? .white : (row.item.size == nil ? .secondary : .primary))
-                DataDirStatusBadge(status: row.item.status, compact: false, isEmphasized: isEmphasized)
+                DataDirStatusBadge(status: row.item.status, isEmphasized: isEmphasized)
             }
             .frame(width: DirectoryRowColumns.metadataWidth, alignment: .trailing)
 
             HStack(spacing: 6) { actions }
                 .frame(width: DirectoryRowColumns.actionsWidth, alignment: .trailing)
         }
-        .frame(minHeight: 52)
+        .frame(minHeight: 46)
         .contentShape(Rectangle())
         .accessibilityElement(children: .contain)
+    }
+}
+
+private struct DirectorySeparatorVisibility: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 13.0, *) {
+            content
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
+        } else {
+            content
+        }
     }
 }
 

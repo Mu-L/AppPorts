@@ -79,7 +79,7 @@ Historiales de WeChat, imágenes de máquinas virtuales, bibliotecas de juegos, 
 :::
 
 ::: warning Los contenedores solo pueden migrarse por montaje
-Las apps aisladas no pueden leer los datos de `~/Library/Containers/` y `~/Library/Group Containers/` trasladados mediante enlaces simbólicos. El método antiguo lo evitaba volviendo a firmar, pero la app podía dejar de abrirse en macOS 27. Desde 1.8.2 estos directorios solo ofrecen [migración por montaje](/es/datamigrae/mount-migration) y se rechaza volver a firmar apps aisladas. Consulte [Datos de contenedores, aislamiento e identidad de firma](/es/datamigrae/container-identity).
+Las apps aisladas no pueden leer los datos de `~/Library/Containers/` y `~/Library/Group Containers/` trasladados mediante enlaces simbólicos. El método antiguo lo evitaba volviendo a firmar, pero la app podía dejar de abrirse en macOS 27. Desde 1.9.0 estos directorios solo ofrecen [migración por montaje](/es/datamigrae/mount-migration) y se rechaza volver a firmar apps aisladas. Consulte [Datos de contenedores, aislamiento e identidad de firma](/es/datamigrae/container-identity).
 :::
 
 ::: warning Alcance de las carpetas personalizadas

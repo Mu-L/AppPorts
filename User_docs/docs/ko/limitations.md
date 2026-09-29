@@ -79,7 +79,7 @@ WeChat 채팅 기록, 가상 머신 이미지, 게임 라이브러리, 데이터
 :::
 
 ::: warning 컨테이너 데이터는 마운트 마이그레이션만 지원
-`~/Library/Containers/`와 `~/Library/Group Containers/` 데이터를 심볼릭 링크로 옮기면 샌드박스 앱이 읽을 수 없습니다. 이전 버전은 재서명으로 이를 우회했지만, 그 결과 앱이 macOS 27에서 열리지 않을 수 있습니다. 1.8.2부터 이 두 디렉토리 유형에는 [마운트 마이그레이션](/ko/datamigrae/mount-migration)만 제공하며 샌드박스 앱의 재서명을 모두 거부합니다. 배경은 [컨테이너 데이터, 샌드박스 및 서명 신원](/ko/datamigrae/container-identity)을 참조하세요.
+`~/Library/Containers/`와 `~/Library/Group Containers/` 데이터를 심볼릭 링크로 옮기면 샌드박스 앱이 읽을 수 없습니다. 이전 버전은 재서명으로 이를 우회했지만, 그 결과 앱이 macOS 27에서 열리지 않을 수 있습니다. 1.9.0부터 이 두 디렉토리 유형에는 [마운트 마이그레이션](/ko/datamigrae/mount-migration)만 제공하며 샌드박스 앱의 재서명을 모두 거부합니다. 배경은 [컨테이너 데이터, 샌드박스 및 서명 신원](/ko/datamigrae/container-identity)을 참조하세요.
 :::
 
 ::: warning 사용자 지정 디렉토리 범위

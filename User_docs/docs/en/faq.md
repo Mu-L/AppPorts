@@ -154,7 +154,7 @@ Yes, with "Mount migration". Select WeChat in "App Data". The per-account `xwech
 
 There are two cases:
 
-- **Mount migration with 1.8.2**: check that the drive is connected, the directory is "Mounted", and you did not deny the permission prompt. See [Troubleshooting](/en/troubleshooting#app-cannot-see-data-after-mount-migration).
+- **Mount migration with 1.9.0**: check that the drive is connected, the directory is "Mounted", and you did not deny the permission prompt. See [Troubleshooting](/en/troubleshooting#app-cannot-see-data-after-mount-migration).
 - **Symbolic-link migration with an older version**: sandboxed WeChat cannot read outside its container through a link. This is a platform restriction. Restore the directory locally in AppPorts; if you agreed to re-sign, also reinstall WeChat from its website. See [Upgrading to macOS 27](/en/macos-27#repair).
 
 **Do not** try to repair this by re-signing; that makes it worse.

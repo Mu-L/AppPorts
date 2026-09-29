@@ -79,7 +79,7 @@ WeChat chat history, virtual machine images, game libraries, databases, and mode
 :::
 
 ::: warning Container data requires mount migration
-Sandboxed apps cannot read data moved out of `~/Library/Containers/` or `~/Library/Group Containers/` through symbolic links. Older versions bypassed this by re-signing, which may prevent the apps from opening on macOS 27. Starting with 1.8.2, these directories use [mount migration](/en/datamigrae/mount-migration), and sandboxed apps are refused re-signing. See [Container Data, Sandboxing, and Signing Identity](/en/datamigrae/container-identity).
+Sandboxed apps cannot read data moved out of `~/Library/Containers/` or `~/Library/Group Containers/` through symbolic links. Older versions bypassed this by re-signing, which may prevent the apps from opening on macOS 27. Starting with 1.9.0, these directories use [mount migration](/en/datamigrae/mount-migration), and sandboxed apps are refused re-signing. See [Container Data, Sandboxing, and Signing Identity](/en/datamigrae/container-identity).
 :::
 
 ::: warning Scope of custom directories

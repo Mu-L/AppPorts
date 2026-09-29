@@ -94,7 +94,7 @@ log show --last 1m --style compact 2>/dev/null | grep -i "rejected approval requ
 ```
 :::
 
-## AppPorts 1.8.2 做了什麼
+## AppPorts 1.9.0 做了什麼
 
 以下對應目前開發版本：
 

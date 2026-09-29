@@ -225,6 +225,20 @@ struct DataDirItem: Identifiable, Equatable, Sendable {
     /// 目录大小原始字节数
     var sizeBytes: Int64 = 0
 
+    /// 读取失败时保留已测得的大小，但不能把它当成完整统计或空目录。
+    var sizeIsIncomplete: Bool = false
+
+    /// 待计算、读取失败和需要管理的外置目录始终保留在列表中。
+    var isEmptyLocalDirectory: Bool {
+        status == DataDirStatus.local && size != nil && !sizeIsIncomplete && sizeBytes == 0
+    }
+
+    mutating func applySize(_ result: DirectorySizeResult) {
+        sizeBytes = result.bytes
+        sizeIsIncomplete = !result.isComplete
+        size = result.formattedSize
+    }
+
     // MARK: - 权限控制
 
     /// 是否允许迁移
@@ -261,6 +275,7 @@ struct DataDirItem: Identifiable, Equatable, Sendable {
         lhs.status == rhs.status &&
         lhs.size == rhs.size &&
         lhs.sizeBytes == rhs.sizeBytes &&
+        lhs.sizeIsIncomplete == rhs.sizeIsIncomplete &&
         lhs.linkedDestination == rhs.linkedDestination &&
         lhs.isMigratable == rhs.isMigratable &&
         lhs.migrationWarning == rhs.migrationWarning &&
