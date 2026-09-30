@@ -6,7 +6,6 @@
 
 Move apps and data to an external drive. Open them as usual.
 
-Free & open source · Native SwiftUI · macOS 12.0+
 
 [English](README.md)｜[简体中文](README_CN.md)｜[Official Website](https://appports.shimoko.com/)｜[Documentation](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
@@ -175,6 +174,7 @@ Thanks to the following sponsors (this list is kept in sync with `sponsors.json`
 
 - **师杀** · [space.bilibili.com/396481888](https://space.bilibili.com/396481888)
 - **符华**
+- **VC**
 
 ## Advanced Storage Management
 

@@ -6,7 +6,6 @@
 
 应用和数据迁往外置硬盘，熟悉的打开方式依然在。
 
-免费开源 · 原生 SwiftUI · macOS 12.0+
 
 [English](README.md)｜[简体中文](README_CN.md)｜[官方网站](https://appports.shimoko.com/)｜[使用文档](https://docs-appports.shimoko.com/)｜[DeepWiki](https://deepwiki.com/wzh4869/AppPorts)
 
@@ -175,7 +174,8 @@ AppPorts 完全免费、开源、无广告，项目由个人在业余时间维�
 
 - **师杀** · [space.bilibili.com/396481888](https://space.bilibili.com/396481888)
 - **符华**
-
+- **VC**
+ 
 ## 🔗 进阶存储管理
 
 * [LazyMount-Mac](https://github.com/yuanweize/LazyMount-Mac)：轻松扩展 Mac 存储空间 —— 开机自动挂载 SMB 共享与云存储，无需任何手动操作。
